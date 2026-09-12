@@ -27,30 +27,34 @@ describe('API client', () => {
     )
   })
 
-  it('exposes stable error code and requestId from an error envelope', async () => {
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          ok: false,
-          error: {
-            code: 'AUTH_REQUIRED',
-            message: 'Authentication required',
-            requestId: 'req-error',
-          },
-        }),
-        { status: 401 },
-      ),
-    )
-    const client = createApiClient({ baseUrl, fetchImpl })
+  it.each([
+    [401, 'AUTH_REQUIRED', 'Authentication required', 'req-auth'],
+    [422, 'VALIDATION_ERROR', 'Invalid request', 'req-validation'],
+    [500, 'UPSTREAM_ERROR', 'Upstream service failed', 'req-upstream'],
+  ])(
+    'exposes stable boundary fields for a %i solution error',
+    async (status, code, message, requestId) => {
+      const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            ok: false,
+            error: { code, message, requestId },
+          }),
+          { status },
+        ),
+      )
+      const client = createApiClient({ baseUrl, fetchImpl })
 
-    await expect(client.request('/api/v1/me')).rejects.toMatchObject({
-      status: 401,
-      code: 'AUTH_REQUIRED',
-      requestId: 'req-error',
-    } satisfies Partial<ApiError>)
-  })
+      await expect(client.request('/api/v1/me')).rejects.toMatchObject({
+        status,
+        code,
+        message,
+        requestId,
+      } satisfies Partial<ApiError>)
+    },
+  )
 
-  it('rejects malformed responses without leaking their body', async () => {
+  it('rejects malformed JSON through the API boundary', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
       new Response('<html>upstream error</html>', {
         status: 502,
@@ -59,10 +63,41 @@ describe('API client', () => {
     )
     const client = createApiClient({ baseUrl, fetchImpl })
 
+    await expect(client.request('/api/v1/products')).rejects.toSatisfy(
+      (error: unknown) =>
+        error instanceof ApiError &&
+        error.status === 502 &&
+        error.code === 'MALFORMED_RESPONSE' &&
+        error.requestId === 'req-malformed' &&
+        error.message !== 'Unexpected token < in JSON at position 0',
+    )
+  })
+
+  it('rejects valid JSON that is not a solution envelope', async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ foo: 'bar' }), { status: 200 }),
+      )
+    const client = createApiClient({ baseUrl, fetchImpl })
+
     await expect(client.request('/api/v1/products')).rejects.toMatchObject({
-      status: 502,
+      status: 200,
       code: 'MALFORMED_RESPONSE',
-      requestId: 'req-malformed',
+      message: 'The public API returned an invalid response',
+    } satisfies Partial<ApiError>)
+  })
+
+  it('converts a network rejection into a distinguishable ApiError', async () => {
+    const networkFailure = new TypeError('Failed to fetch')
+    const fetchImpl = vi.fn<typeof fetch>().mockRejectedValue(networkFailure)
+    const client = createApiClient({ baseUrl, fetchImpl })
+
+    await expect(client.request('/api/v1/products')).rejects.toMatchObject({
+      status: 0,
+      code: 'NETWORK_ERROR',
+      message: 'Unable to reach the public API',
+      cause: networkFailure,
     } satisfies Partial<ApiError>)
   })
 })
