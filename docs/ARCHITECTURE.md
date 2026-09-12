@@ -79,6 +79,18 @@ Challenge token 是单次、短期、敏感的局部 form-flow state。它不得
 metadata、storage、URL、日志或 analytics；任何实际发送了 challengeToken 的 mutation
 attempt 都视为已消费，settle 后必须清除 token 并 reset widget。
 
+`features/auth` 以一个 Public Account API boundary 实现 Onboarding、Email Code、Register
+与 Password Reset。Response parser 强校验已知字段并 strip additive unknown fields；
+request builder 使用 strict schema，只发送当前 Contract 字段。Email Code purpose 由各页面
+固定，Register 成功后复用 AuthProvider 的唯一 `establishSession` 路径；Password Reset
+成功只返回 Login，不自动建立 Session。
+
+Google client script 只在 supported AntiBot 启用时由 Aureole-owned challenge wrapper 通过
+HTTPS lazy-load，单例去重并 explicit render visible checkbox。Wrapper 处理 light/dark、
+success、expired、error、reset 和 load retry；Google-specific browser API 不散落到表单。
+Email Verification 与 AntiBot 同时启用时，发码 challenge 与最终 Register challenge 是两个
+独立生命周期，前一个 mutation settle 后不可复用。
+
 ## Theme and presentation
 
 Light、Dark、System 由 Theme Provider 管理；显式选择可保存为非敏感 local UI preference。CSS tokens 是颜色和 radius 的 SSOT，传统 `tailwind.config.js` 不是 token 核心。使用 system font 与 system monospace。

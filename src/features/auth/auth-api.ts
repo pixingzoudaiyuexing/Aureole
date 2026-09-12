@@ -15,7 +15,7 @@ export const loginSchema = z.object({
     .max(1024, '密码不能超过 1024 个字符'),
 })
 
-const loginResponseSchema = z
+export const loginResponseSchema = z
   .object({
     accessToken: z.string().min(1),
     tokenType: z.literal('Bearer'),
@@ -39,7 +39,7 @@ export interface AuthApi {
   getCurrentUser: (accessToken: string) => Promise<CurrentUser>
 }
 
-function parsePublicData<T>(schema: z.ZodType<T>, data: unknown) {
+export function parsePublicData<T>(schema: z.ZodType<T>, data: unknown) {
   const parsed = schema.safeParse(data)
   if (!parsed.success) {
     throw new ApiError({

@@ -31,6 +31,10 @@
 - challenge 获取与验证分别由 Google client和 V2Board 持有；solution Contract 是字段和错误
   SSOT，Aureole 不发送 `recaptchaData`、`recaptchaToken` 或
   `gRecaptchaResponse`。
+- Register 成功复用既有 Token -> `/me` -> authenticated Session Core；Password Reset
+  payload 只有 email、emailCode、newPassword，成功后不自动登录。
+- Email Code、Register、Password Reset mutation 均不自动 retry。含 challengeToken 的请求
+  一旦实际发出，无论结果如何都消费并 reset 本地 challenge。
 
 ## Error and request rules
 

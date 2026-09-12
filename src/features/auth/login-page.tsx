@@ -9,7 +9,11 @@ import { loginSchema, type LoginInput } from './auth-api'
 import { useAuth } from './auth-context'
 import { getLoginErrorMessage } from './auth-errors'
 
-export function LoginPage() {
+export function LoginPage({
+  passwordResetSucceeded = false,
+}: {
+  passwordResetSucceeded?: boolean
+}) {
   const navigate = useNavigate()
   const { signIn } = useAuth()
   const {
@@ -69,6 +73,17 @@ export function LoginPage() {
       <p className="mt-3 text-sm leading-6 text-muted-foreground">
         登录后管理你的订阅、订单和支持请求。
       </p>
+
+      {passwordResetSucceeded ? (
+        <div
+          className="mt-6 border-l-2 border-primary bg-primary/5 px-4 py-3"
+          role="status"
+        >
+          <p className="text-sm text-foreground">
+            密码已重置，请使用新密码登录。
+          </p>
+        </div>
+      ) : null}
 
       <form
         className="mt-8 space-y-5"

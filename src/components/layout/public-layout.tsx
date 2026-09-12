@@ -30,7 +30,7 @@ export function PublicLayout() {
           </Link>
           <ThemeToggle />
         </header>
-        <div className="flex flex-1 items-center justify-center px-5 py-12 sm:px-8">
+        <div className="flex flex-1 items-center-safe justify-center px-5 py-12 sm:px-8">
           <Outlet />
         </div>
         <footer className="px-6 py-5 text-center text-xs text-muted-foreground">

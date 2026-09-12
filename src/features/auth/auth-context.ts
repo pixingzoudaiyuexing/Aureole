@@ -8,6 +8,7 @@ export interface AuthContextValue {
   status: AuthStatus
   currentUser: CurrentUser | null
   bootstrapError: unknown
+  establishSession: (accessToken: string) => Promise<CurrentUser>
   signIn: (input: LoginInput) => Promise<CurrentUser>
   retryBootstrap: () => void
   logout: () => void

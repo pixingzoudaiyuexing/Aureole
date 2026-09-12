@@ -56,17 +56,15 @@ export function AuthProvider({
     currentUserQuery.isError,
   ])
 
-  const signIn = useCallback(
-    async (input: Parameters<AuthContextValue['signIn']>[0]) => {
-      const loginResult = await api.login(input)
-
+  const establishSession = useCallback(
+    async (accessToken: string) => {
       queryClient.clear()
-      setAccessToken(loginResult.accessToken)
+      setAccessToken(accessToken)
 
       try {
         return await queryClient.fetchQuery({
           queryKey: authQueryKeys.me,
-          queryFn: () => api.getCurrentUser(loginResult.accessToken),
+          queryFn: () => api.getCurrentUser(accessToken),
         })
       } catch (error) {
         if (isInvalidSessionError(error)) {
@@ -76,6 +74,14 @@ export function AuthProvider({
       }
     },
     [api, clearSession, queryClient, setAccessToken],
+  )
+
+  const signIn = useCallback(
+    async (input: Parameters<AuthContextValue['signIn']>[0]) => {
+      const loginResult = await api.login(input)
+      return establishSession(loginResult.accessToken)
+    },
+    [api, establishSession],
   )
 
   let status: AuthStatus
@@ -98,6 +104,7 @@ export function AuthProvider({
     status,
     currentUser: currentUserQuery.data ?? null,
     bootstrapError: currentUserQuery.error,
+    establishSession,
     signIn,
     retryBootstrap: () => {
       void currentUserQuery.refetch()
