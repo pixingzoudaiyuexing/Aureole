@@ -5,8 +5,8 @@
 | 0         | COMPLETE | Product framing and workflow baseline                                    |
 | 1         | COMPLETE | solution Public Contract and upstream architecture baseline              |
 | 2         | COMPLETE | Aureole repository, frontend foundation, app shell, quality and Git SSOT |
-| 3         | CURRENT  | Auth / Account                                                           |
-| 4         | PLANNED  | Read-only Core                                                           |
+| 3         | COMPLETE | Auth / Account                                                           |
+| 4         | CURRENT  | Read-only Core                                                           |
 | 5         | PLANNED  | Commerce / Payment                                                       |
 | 6         | PLANNED  | Subscription Mutations                                                   |
 | 7         | PLANNED  | Wallet / Gift Card                                                       |
@@ -18,4 +18,10 @@
 
 - Public Resource Status
 
-Milestone 3 的 Auth Session Core、Registration / Password Recovery 与 Account Self-Service 已完成实现；Account 独立审查通过前 Milestone 3 保持 CURRENT，不进入 Milestone 4。每个后续子阶段必须以当前 solution Public Contract、风险边界和验收要求为输入。
+Milestone 3 的 Auth Session Core、Registration / Password Recovery 与 Account Self-Service 已完成实现及独立审查。Milestone 4 按以下边界推进：
+
+- M4-001 Subscription Read Model + Dashboard Core
+- M4-002 Plans + Resources + Traffic
+- M4-003 Notices + Dashboard Completion
+
+M4-001 独立审查通过前不得自动开始 M4-002。每个后续子阶段必须以当前 solution Public Contract、风险边界和验收要求为输入。

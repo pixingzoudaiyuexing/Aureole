@@ -51,6 +51,22 @@
 - Account Config 只显示 upstream currency 与 currencySymbol，不推断币种枚举、金额精度或
   minor-unit 换算。Stats 直接显示 Public DTO count，不从其他业务 endpoint 重算。
 
+## Subscription read mapping
+
+- `GET /api/v1/subscription` 只读取 previous-purchaser access eligibility 和 solution-owned
+  `accessUrl`。Aureole 不调用、prefetch 或 probe `/api/v1/access/subscription`，不把 credential
+  作为链接，也不下载或解析 subscription content。
+- `GET /api/v1/subscription/overview` 是 current product、expiry、traffic、device 和 cycle
+  config 的权威 read。Dashboard 与 Subscription Page 复用 canonical Overview query；Dashboard
+  不创建独立 fetcher。
+- Access eligibility 与 Overview current product 是独立语义。`product=null` 不改变
+  `eligible/accessUrl`，previous purchaser eligibility 也不证明当前 product 存在。
+- Traffic 只做 human-readable byte formatting，不计算 remaining/percentage/over-quota；expiry
+  只显示 absolute timestamp 或 neutral null state；device/reset nullable value 不转换为 0 或
+  unlimited。
+- `renewalAllowed` 只翻译为“新周期功能已启用/未启用”。Rotate Access 与 Advance Period 均不在
+  M4-001 实现范围。
+
 ## Error and request rules
 
 - 业务分支依据稳定 `error.code`，禁止依据 message 文本包含关系。

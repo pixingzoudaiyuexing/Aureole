@@ -1,11 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { FeaturePlaceholder } from '@/components/shared/feature-placeholder'
+import { DashboardPage } from '@/features/subscription/dashboard-page'
 
 export const Route = createFileRoute('/_app/dashboard')({
-  component: () => (
-    <FeaturePlaceholder
-      title="Overview"
-      description="Your account and subscription summary will appear here after secure sign-in is connected."
-    />
-  ),
+  component: DashboardPage,
 })

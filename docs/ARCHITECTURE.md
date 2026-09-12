@@ -112,6 +112,25 @@ form-local synchronous lock 防止 same-tick 重复提交。成功意味着上�
 失效；Aureole 复用 Auth `logout()` 清除 local credential 与完整 Query cache，再返回 Login。
 密码 mutation 结果不确定时采用同样的保守退出策略，不重提 POST，也不声称修改成功或失败。
 
+## Subscription read model
+
+`features/subscription` 持有 Subscription Access 与 Overview 的 Public API parser、canonical
+query keys 和 read-only presentation。Dashboard 与 Subscription Page 复用同一个 Overview
+query；Access eligibility 与当前 product 相互独立，前端不得从任一 read 推断另一个 read 的
+业务状态。普通 read failure 只影响对应 section，AUTH_REQUIRED/AUTH_FAILED 则复用 Auth
+logout 清除 credential 与完整 Query cache。
+
+Subscription `accessUrl` 是 solution-owned sensitive credential，只允许存在于 TanStack Query
+memory state 和 API request result。它不进入 Zustand、storage、URL state、analytics、日志或
+query key，也不成为 `href` 或 prefetch target。页面默认掩码，只有明确 Reveal 才显示完整值；
+Copy 直接写入 clipboard，反馈不得包含 credential。Aureole 不请求
+`/api/v1/access/subscription`，不下载或解析 subscription content。
+
+Overview 只展示 Public Contract 原始字段。Byte formatting 与 absolute date formatting 仅是
+presentation；不得生成 remaining traffic、usage percentage、remaining days、expiry flag 或
+next reset date。`renewalAllowed` 只显示为“新周期功能已启用/未启用”，不表示当前用户可以执行
+Advance Period。
+
 ## Theme and presentation
 
 Light、Dark、System 由 Theme Provider 管理；显式选择可保存为非敏感 local UI preference。CSS tokens 是颜色和 radius 的 SSOT，传统 `tailwind.config.js` 不是 token 核心。使用 system font 与 system monospace。

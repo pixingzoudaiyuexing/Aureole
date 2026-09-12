@@ -1,11 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { FeaturePlaceholder } from '@/components/shared/feature-placeholder'
+import { SubscriptionPage } from '@/features/subscription/subscription-page'
 
 export const Route = createFileRoute('/_app/subscription')({
-  component: () => (
-    <FeaturePlaceholder
-      title="Subscription"
-      description="Subscription status, usage, and access controls will be connected in a later milestone."
-    />
-  ),
+  component: SubscriptionPage,
 })

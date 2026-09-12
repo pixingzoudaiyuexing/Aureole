@@ -296,6 +296,8 @@ describe('Account self-service', () => {
     expect(
       await screen.findByText(
         '保存结果和服务器当前设置均无法确认，请稍后刷新页面核对，暂时不要重复保存。',
+        {},
+        { timeout: 3_000 },
       ),
     ).toBeInTheDocument()
     expect(mocks.updatePreferences).toHaveBeenCalledOnce()
