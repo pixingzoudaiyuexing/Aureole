@@ -39,7 +39,8 @@ report are the operational source of truth.
   keyboard validation, visible error, loading, controlled login, refresh
   bootstrap, authenticated App Shell, mobile Drawer and local logout. No
   horizontal overflow or browser console error was observed.
-- M3-001 remote GitHub Actions: pending final commit and push.
+- M3-001 implementation CI: PASS for
+  `d3b2896d97681b9a816fafa0254122e97a82f2cc` in workflow run `34702858678`.
 
 ## Known gaps
 
