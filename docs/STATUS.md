@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 3 - Auth / Account (`AUR-M3-002` Registration / Recovery)
+Milestone 3 - Auth / Account (`AUR-M3-002R1` Race Hardening)
 
 ## Contract baseline
 
@@ -22,10 +22,10 @@ baseline are present. Remote Foundation CI completed successfully for
 ## Milestone 3 status
 
 M3-001 Auth Session Core and its R1 review fixes are COMPLETE. M3-002 Registration
-/ Recovery is COMPLETE locally: onboarding-driven Registration, Email Code purpose
-separation, invite/terms/suffix requirements, supported/unsupported AntiBot,
-single-use challenge lifecycle, shared Session establishment and Password Recovery
-are implemented. Account management remains outside this checkpoint.
+/ Recovery is COMPLETE. M3-002R1 mutation race hardening is COMPLETE locally:
+Registration and Recovery each serialize their form-level public-account mutations
+with a shared synchronous lock, including same-tick duplicate and cross-action
+attempts. Account management remains outside this checkpoint.
 
 ## Current commit
 
@@ -39,10 +39,10 @@ report are the operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (11 files, 90 tests)
+- `npm test`: PASS (11 files, 95 tests)
 - `npm run build`: PASS
-- Build evidence: main JS 463.30 kB raw / 146.00 kB gzip; CSS 26.00 kB raw /
-  5.74 kB gzip; Register route 3.09 kB gzip; Forgot Password route 2.48 kB gzip.
+- Build evidence: main JS 463.31 kB raw / 146.01 kB gzip; CSS 26.00 kB raw /
+  5.74 kB gzip; Register route 3.12 kB gzip; Forgot Password route 2.52 kB gzip.
   Assets remain within budget; initial-route composition has not been measured
   by a dedicated analyzer.
 - Browser verification: PASS at 1280 x 720 and 390 x 844 for Login Light/Dark,
@@ -62,9 +62,14 @@ report are the operational source of truth.
   Registration, suffix guidance, Email Code, invite, terms, unsupported
   challenge fail-closed, Session establishment, Recovery success/error and
   horizontal overflow.
-- Google reCAPTCHA wrapper lifecycle is tested against a controlled mocked
-  `grecaptcha` browser boundary. A real Google widget is NOT TESTED because no
-  public site key authorized for the local domain was available.
+- Google reCAPTCHA wrapper lifecycle remains tested against a controlled mocked
+  `grecaptcha` browser boundary.
+- Real Google reCAPTCHA runtime: NOT TESTED. Status: DEFERRED - provider not used
+  in current production. Blocking: NO. The existing `recaptcha` + `v2-checkbox`
+  implementation remains intact.
+- Special real-Google 320 px verification: NOT REQUIRED for M3-002R1. Existing
+  responsive browser evidence remains the applicable mobile baseline because the
+  race patch does not change layout.
 
 ## Known gaps
 
@@ -74,5 +79,6 @@ report are the operational source of truth.
 
 ## Next milestone
 
-Continue Milestone 3 only after independent Auth review. The next implementation
-task is not authorized by this checkpoint.
+M3-002R1 requires focused re-review of the synchronous mutation lock, same-tick
+and cross-action protection, challenge lifecycle and Session Core regression.
+`AUR-M3-003` is NOT STARTED and is not authorized by this checkpoint.

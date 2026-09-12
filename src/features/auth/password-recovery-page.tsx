@@ -21,6 +21,7 @@ import {
   publicAccountApi,
   type OnboardingConfig,
 } from './public-account-api'
+import { useSynchronousActionLock } from './use-synchronous-action-lock'
 
 interface RecoveryFormValues {
   email: string
@@ -60,6 +61,7 @@ export function PasswordRecoveryPage() {
 function RecoveryForm({ config }: { config: OnboardingConfig }) {
   const navigate = useNavigate()
   const challengeRef = useRef<ChallengeFieldHandle>(null)
+  const actionLock = useSynchronousActionLock()
   const [challengeToken, setChallengeToken] = useState<string | null>(null)
   const [challengeError, setChallengeError] = useState<string | null>(null)
   const [codeSent, setCodeSent] = useState(false)
@@ -114,6 +116,7 @@ function RecoveryForm({ config }: { config: OnboardingConfig }) {
       setChallengeError('请先完成人机验证')
       return
     }
+    if (!actionLock.tryAcquire()) return
 
     const tokenToConsume = challengeToken
     try {
@@ -127,6 +130,7 @@ function RecoveryForm({ config }: { config: OnboardingConfig }) {
       setCodeSent(false)
       setEmailCodeError(error)
     } finally {
+      actionLock.release()
       if (tokenToConsume) resetConsumedChallenge()
       emailCodeMutation.reset()
     }
@@ -148,6 +152,7 @@ function RecoveryForm({ config }: { config: OnboardingConfig }) {
       }
       return
     }
+    if (!actionLock.tryAcquire()) return
 
     try {
       await resetMutation.mutateAsync({
@@ -163,6 +168,7 @@ function RecoveryForm({ config }: { config: OnboardingConfig }) {
     } catch (error) {
       setPasswordResetError(error)
     } finally {
+      actionLock.release()
       resetMutation.reset()
     }
   })

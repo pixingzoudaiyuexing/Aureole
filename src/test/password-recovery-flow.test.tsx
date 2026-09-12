@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AppProviders } from '@/app/providers/app-providers'
@@ -71,6 +71,14 @@ function installRecaptchaMock() {
       return options
     },
   }
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
 }
 
 describe('Password Recovery flow', () => {
@@ -270,5 +278,45 @@ describe('Password Recovery flow', () => {
 
     resolveSend({ sent: true })
     expect(await screen.findByText('验证码已发送')).toBeInTheDocument()
+  })
+
+  it('starts only one email-code request for same-tick actions', async () => {
+    const deferred = createDeferred<{ sent: true }>()
+    const sendEmailCode = vi
+      .spyOn(publicAccountApi, 'sendEmailCode')
+      .mockImplementation(() => deferred.promise)
+    renderRecovery(disabledConfig)
+    const user = userEvent.setup()
+
+    await user.type(await screen.findByLabelText('邮箱'), 'member@example.com')
+    const sendButton = screen.getByRole('button', { name: '发送验证码' })
+    act(() => {
+      fireEvent.click(sendButton)
+      fireEvent.click(sendButton)
+    })
+
+    await waitFor(() => expect(sendEmailCode).toHaveBeenCalledTimes(1))
+    deferred.resolve({ sent: true })
+  })
+
+  it('starts only one Password Reset request for same-tick submissions', async () => {
+    const deferred = createDeferred<{ reset: true }>()
+    const resetPassword = vi
+      .spyOn(publicAccountApi, 'resetPassword')
+      .mockImplementation(() => deferred.promise)
+    renderRecovery(disabledConfig)
+    const user = userEvent.setup()
+
+    await fillRecoveryForm(user)
+    const form = screen
+      .getByRole('button', { name: '重置密码' })
+      .closest('form')!
+    act(() => {
+      fireEvent.submit(form)
+      fireEvent.submit(form)
+    })
+
+    await waitFor(() => expect(resetPassword).toHaveBeenCalledTimes(1))
+    deferred.resolve({ reset: true })
   })
 })

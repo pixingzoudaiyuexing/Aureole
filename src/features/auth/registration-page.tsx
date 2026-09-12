@@ -23,6 +23,7 @@ import {
   publicAccountApi,
   type OnboardingConfig,
 } from './public-account-api'
+import { useSynchronousActionLock } from './use-synchronous-action-lock'
 
 interface RegistrationFormValues {
   email: string
@@ -96,6 +97,7 @@ function RegistrationForm({ config }: { config: OnboardingConfig }) {
   const navigate = useNavigate()
   const { establishSession } = useAuth()
   const challengeRef = useRef<ChallengeFieldHandle>(null)
+  const actionLock = useSynchronousActionLock()
   const [challengeToken, setChallengeToken] = useState<string | null>(null)
   const [challengeError, setChallengeError] = useState<string | null>(null)
   const [codeSent, setCodeSent] = useState(false)
@@ -156,6 +158,7 @@ function RegistrationForm({ config }: { config: OnboardingConfig }) {
       setChallengeError('请先完成人机验证')
       return
     }
+    if (!actionLock.tryAcquire()) return
 
     const tokenToConsume = challengeToken
     try {
@@ -169,6 +172,7 @@ function RegistrationForm({ config }: { config: OnboardingConfig }) {
       setCodeSent(false)
       setEmailCodeError(error)
     } finally {
+      actionLock.release()
       if (tokenToConsume) resetConsumedChallenge()
       emailCodeMutation.reset()
     }
@@ -195,6 +199,7 @@ function RegistrationForm({ config }: { config: OnboardingConfig }) {
       setChallengeError('请先完成人机验证')
       return
     }
+    if (!actionLock.tryAcquire()) return
 
     const tokenToConsume = challengeToken
     const inviteCode = parsed.data.inviteCode.trim()
@@ -212,6 +217,7 @@ function RegistrationForm({ config }: { config: OnboardingConfig }) {
     } catch (error) {
       setRegistrationError(error)
     } finally {
+      actionLock.release()
       if (tokenToConsume) resetConsumedChallenge()
       registerMutation.reset()
     }

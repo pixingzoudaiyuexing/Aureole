@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AppProviders } from '@/app/providers/app-providers'
@@ -78,6 +78,14 @@ function installRecaptchaMock() {
       return options
     },
   }
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
 }
 
 describe('Registration flow', () => {
@@ -420,5 +428,108 @@ describe('Registration flow', () => {
 
     resolveRegister({ accessToken: 'registered-token', tokenType: 'Bearer' })
     await screen.findAllByRole('heading', { name: 'Overview' })
+  })
+
+  it('starts only one Register request for same-tick submissions', async () => {
+    const deferred = createDeferred<{
+      accessToken: string
+      tokenType: 'Bearer'
+    }>()
+    const registerUser = vi
+      .spyOn(publicAccountApi, 'register')
+      .mockImplementation(() => deferred.promise)
+    renderRegistration(disabledConfig)
+    const user = userEvent.setup()
+
+    await fillBaseRegistration(user)
+    const form = screen
+      .getByRole('button', { name: '注册账号' })
+      .closest('form')!
+    act(() => {
+      fireEvent.submit(form)
+      fireEvent.submit(form)
+    })
+
+    await waitFor(() => expect(registerUser).toHaveBeenCalledTimes(1))
+    deferred.resolve({ accessToken: 'registered-token', tokenType: 'Bearer' })
+  })
+
+  it('starts only one email-code request for same-tick actions', async () => {
+    const deferred = createDeferred<{ sent: true }>()
+    const sendEmailCode = vi
+      .spyOn(publicAccountApi, 'sendEmailCode')
+      .mockImplementation(() => deferred.promise)
+    renderRegistration({
+      ...disabledConfig,
+      emailVerificationRequired: true,
+    })
+    const user = userEvent.setup()
+
+    await user.type(await screen.findByLabelText('邮箱'), 'member@example.com')
+    const sendButton = screen.getByRole('button', { name: '发送验证码' })
+    act(() => {
+      fireEvent.click(sendButton)
+      fireEvent.click(sendButton)
+    })
+
+    await waitFor(() => expect(sendEmailCode).toHaveBeenCalledTimes(1))
+    deferred.resolve({ sent: true })
+  })
+
+  it('allows only one same-tick cross-action to consume a challenge', async () => {
+    const { api, getOptions } = installRecaptchaMock()
+    const emailDeferred = createDeferred<{ sent: true }>()
+    const registerDeferred = createDeferred<{
+      accessToken: string
+      tokenType: 'Bearer'
+    }>()
+    const sendEmailCode = vi
+      .spyOn(publicAccountApi, 'sendEmailCode')
+      .mockImplementation(() => emailDeferred.promise)
+    const registerUser = vi
+      .spyOn(publicAccountApi, 'register')
+      .mockImplementation(() => registerDeferred.promise)
+    renderRegistration({
+      ...disabledConfig,
+      emailVerificationRequired: true,
+      antiBot: {
+        state: 'supported',
+        provider: 'recaptcha',
+        mode: 'v2-checkbox',
+        siteKey: 'public-site-key',
+      },
+    })
+    const user = userEvent.setup()
+
+    await fillBaseRegistration(user)
+    await user.type(screen.getByLabelText('邮箱验证码'), '123456')
+    await waitFor(() => expect(api.render).toHaveBeenCalledOnce())
+    act(() => getOptions().callback('same-tick-challenge'))
+
+    const sendButton = screen.getByRole('button', { name: '发送验证码' })
+    const form = screen
+      .getByRole('button', { name: '注册账号' })
+      .closest('form')!
+    act(() => {
+      fireEvent.click(sendButton)
+      fireEvent.submit(form)
+    })
+
+    await waitFor(() =>
+      expect(
+        sendEmailCode.mock.calls.length + registerUser.mock.calls.length,
+      ).toBe(1),
+    )
+    const tokens = [
+      sendEmailCode.mock.calls[0]?.[0].challengeToken,
+      registerUser.mock.calls[0]?.[0].challengeToken,
+    ].filter(Boolean)
+    expect(tokens).toEqual(['same-tick-challenge'])
+
+    emailDeferred.resolve({ sent: true })
+    registerDeferred.resolve({
+      accessToken: 'registered-token',
+      tokenType: 'Bearer',
+    })
   })
 })

@@ -85,6 +85,10 @@ request builder 使用 strict schema，只发送当前 Contract 字段。Email C
 固定，Register 成功后复用 AuthProvider 的唯一 `establishSession` 路径；Password Reset
 成功只返回 Login，不自动建立 Session。
 
+Registration 与 Recovery 各自使用一个 form-local synchronous action lock，串行化同一表单
+内的 Public Account mutation。该锁只在本地校验与 challenge requirement 检查通过后获取，
+并在 mutation settle 后释放；`isPending` 仍单独负责渲染层 busy/disabled feedback。
+
 Google client script 只在 supported AntiBot 启用时由 Aureole-owned challenge wrapper 通过
 HTTPS lazy-load，单例去重并 explicit render visible checkbox。Wrapper 处理 light/dark、
 success、expired、error、reset 和 load retry；Google-specific browser API 不散落到表单。
