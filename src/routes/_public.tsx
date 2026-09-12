@@ -4,7 +4,7 @@ import {
   AuthBootstrapScreen,
   AuthRecoveryScreen,
 } from '@/features/auth/auth-status-screen'
-import { useAuth } from '@/features/auth/auth-provider'
+import { useAuth } from '@/features/auth/auth-context'
 
 export const Route = createFileRoute('/_public')({
   component: PublicAuthRoute,

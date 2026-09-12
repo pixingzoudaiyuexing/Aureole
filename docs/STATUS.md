@@ -32,7 +32,7 @@ report are the operational source of truth.
 - `npm run lint`: PASS
 - `npm test`: PASS (5 files, 30 tests)
 - `npm run build`: PASS
-- Build evidence: primary entry JS 462.96 kB raw / 145.98 kB gzip; CSS 25.05 kB
+- Build evidence: primary entry JS 462.96 kB raw / 145.99 kB gzip; CSS 25.05 kB
   raw / 5.58 kB gzip. Login route chunk is 13.18 kB gzip. Assets remain within
   budget; initial-route composition has not been measured by a dedicated analyzer.
 - Browser verification: PASS at 1280 x 720 and 390 x 844 for Login Light/Dark,

@@ -24,13 +24,7 @@ export default defineConfig([
       'react-refresh/only-export-components': [
         'error',
         {
-          allowExportNames: [
-            'Route',
-            'authQueryKeys',
-            'buttonVariants',
-            'useAuth',
-            'useTheme',
-          ],
+          allowExportNames: ['Route', 'buttonVariants', 'useTheme'],
         },
       ],
     },

@@ -1,37 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  type ReactNode,
-} from 'react'
+import { useCallback, useEffect, type ReactNode } from 'react'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
+import { authApi as defaultAuthApi, type AuthApi } from './auth-api'
 import {
-  authApi as defaultAuthApi,
-  type AuthApi,
-  type CurrentUser,
-  type LoginInput,
-} from './auth-api'
+  AuthContext,
+  type AuthContextValue,
+  type AuthStatus,
+} from './auth-context'
 import { isInvalidSessionError } from './auth-errors'
-
-export const authQueryKeys = {
-  me: ['auth', 'me'] as const,
-}
-
-export type AuthStatus =
-  'unknown' | 'unauthenticated' | 'bootstrapping' | 'authenticated' | 'error'
-
-interface AuthContextValue {
-  status: AuthStatus
-  currentUser: CurrentUser | null
-  bootstrapError: unknown
-  signIn: (input: LoginInput) => Promise<CurrentUser>
-  retryBootstrap: () => void
-  logout: () => void
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null)
+import { authQueryKeys } from './auth-query-keys'
 
 export function AuthProvider({
   children,
@@ -80,7 +57,7 @@ export function AuthProvider({
   ])
 
   const signIn = useCallback(
-    async (input: LoginInput) => {
+    async (input: Parameters<AuthContextValue['signIn']>[0]) => {
       const loginResult = await api.login(input)
 
       queryClient.clear()
@@ -129,12 +106,4 @@ export function AuthProvider({
   }
 
   return <AuthContext value={value}>{children}</AuthContext>
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider')
-  }
-  return context
 }

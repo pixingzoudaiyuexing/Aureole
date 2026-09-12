@@ -2,8 +2,8 @@ import { useNavigate } from '@tanstack/react-router'
 import { LoaderCircle, RefreshCw } from 'lucide-react'
 import { Brand } from '@/components/layout/brand'
 import { Button } from '@/components/ui/button'
+import { useAuth } from './auth-context'
 import { getBootstrapErrorMessage } from './auth-errors'
-import { useAuth } from './auth-provider'
 
 export function AuthBootstrapScreen() {
   return (

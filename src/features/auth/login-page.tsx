@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ApiError } from '@/lib/api/errors'
 import { loginSchema, type LoginInput } from './auth-api'
+import { useAuth } from './auth-context'
 import { getLoginErrorMessage } from './auth-errors'
-import { useAuth } from './auth-provider'
 
 export function LoginPage() {
   const navigate = useNavigate()
