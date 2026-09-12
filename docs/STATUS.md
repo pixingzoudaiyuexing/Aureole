@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 3 - Auth / Account (`AUR-M3-002R1` Race Hardening)
+Milestone 3 - Auth / Account (`AUR-M3-003` Account Self-Service)
 
 ## Contract baseline
 
@@ -22,16 +22,17 @@ baseline are present. Remote Foundation CI completed successfully for
 ## Milestone 3 status
 
 M3-001 Auth Session Core and its R1 review fixes are COMPLETE. M3-002 Registration
-/ Recovery is COMPLETE. M3-002R1 mutation race hardening is COMPLETE locally:
-Registration and Recovery each serialize their form-level public-account mutations
-with a shared synchronous lock, including same-tick duplicate and cross-action
-attempts. Account management remains outside this checkpoint.
+/ Recovery is COMPLETE. M3-002R1 mutation race hardening is COMPLETE and its
+focused independent review passed with no required fixes. M3-003 Account
+Self-Service implementation is COMPLETE locally: Account identity/status, Stats,
+Preferences, Account Config and Password Change are implemented. Independent
+M3-003 review remains pending, so Milestone 3 remains CURRENT.
 
 ## Current commit
 
-This checkpoint is part of the M3-001 implementation commit. A commit cannot
-embed its own SHA without changing that SHA; Git HEAD and the implementation
-report are the operational source of truth.
+This file records the latest checkpoint state. A commit cannot embed its own SHA
+without changing that SHA; Git HEAD and the implementation report are the
+operational source of truth.
 
 ## Validation summary
 
@@ -39,10 +40,10 @@ report are the operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (11 files, 95 tests)
+- `npm test`: PASS (13 files, 146 tests)
 - `npm run build`: PASS
-- Build evidence: main JS 463.31 kB raw / 146.01 kB gzip; CSS 26.00 kB raw /
-  5.74 kB gzip; Register route 3.12 kB gzip; Forgot Password route 2.52 kB gzip.
+- Build evidence: main JS 468.44 kB raw / 147.30 kB gzip; CSS 28.54 kB raw /
+  6.10 kB gzip; Account route 5.06 kB gzip.
   Assets remain within budget; initial-route composition has not been measured
   by a dedicated analyzer.
 - Browser verification: PASS at 1280 x 720 and 390 x 844 for Login Light/Dark,
@@ -54,6 +55,10 @@ report are the operational source of truth.
 - M3-001R1 remote GitHub Actions is tracked by exact final SHA in the
   implementation report.
 - M3-002 remote GitHub Actions is tracked by exact final SHA in the
+  implementation report.
+- M3-002R1 CI: PASS for `5e66f12d20790c1c7e96cea4257bd1fe8f244a44`
+  in workflow run `34712395937`.
+- M3-003 remote GitHub Actions is tracked by exact final SHA in the
   implementation report.
 
 ## Runtime verification
@@ -70,15 +75,17 @@ report are the operational source of truth.
 - Special real-Google 320 px verification: NOT REQUIRED for M3-002R1. Existing
   responsive browser evidence remains the applicable mobile baseline because the
   race patch does not change layout.
+- Account controlled-browser verification: PASS at desktop and 390 x 844 in
+  Light/Dark for identity, status, expiry, stats, preferences save/error,
+  Password Change validation/business error/successful session exit, section
+  retry, keyboard focus and horizontal overflow. Production API is NOT TESTED.
 
 ## Known gaps
 
-- Account preferences, password change, account config and stats are not implemented.
 - Non-Auth feature routes remain placeholders without mock business data.
 - Hosting provider is undecided; production requires SPA fallback.
 
 ## Next milestone
 
-M3-002R1 requires focused re-review of the synchronous mutation lock, same-tick
-and cross-action protection, challenge lifecycle and Session Core regression.
-`AUR-M3-003` is NOT STARTED and is not authorized by this checkpoint.
+M3-003 requires independent Account/Auth review before Milestone 3 can close.
+Milestone 4 is NOT STARTED and is not authorized by this checkpoint.

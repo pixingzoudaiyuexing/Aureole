@@ -18,4 +18,4 @@
 
 - Public Resource Status
 
-Milestone 3 从 Auth Session Core 开始；Registration、Password Recovery 与 Account 设置仍需独立任务。每个子阶段必须以当前 solution Public Contract、风险边界和验收要求为输入。
+Milestone 3 的 Auth Session Core、Registration / Password Recovery 与 Account Self-Service 已完成实现；Account 独立审查通过前 Milestone 3 保持 CURRENT，不进入 Milestone 4。每个后续子阶段必须以当前 solution Public Contract、风险边界和验收要求为输入。

@@ -36,6 +36,21 @@
 - Email Code、Register、Password Reset mutation 均不自动 retry。含 challengeToken 的请求
   一旦实际发出，无论结果如何都消费并 reset 本地 challenge。
 
+## Account self-service mapping
+
+- `GET /api/v1/me` 继续由 Auth Session Core 持有，Account 页面直接复用其 email、expiresAt
+  和 status，不创建第二套 `/me` client 或 query。
+- `GET /api/v1/me/preferences`、`GET /api/v1/me/stats` 与
+  `GET /api/v1/config/account` 是独立 TanStack Query server state；section failure 不阻塞其他
+  Account 功能，但 AUTH_REQUIRED/AUTH_FAILED 会退出完整 authenticated UI。
+- `PATCH /api/v1/me/preferences` 只发送实际变化的 boolean 字段，空差异不发请求。mutation
+  不 retry，并在成功或结果不确定时重新读取权威 Preferences。
+- `POST /api/v1/me/password` 只发送 currentPassword 与 newPassword，其中新密码边界是
+  8..1024，不复用 Registration/Reset 的 8..64 schema。成功或结果不确定都会清理本地 session
+  并要求重新登录；PASSWORD_CHANGE_FAILED 保留当前 session。
+- Account Config 只显示 upstream currency 与 currencySymbol，不推断币种枚举、金额精度或
+  minor-unit 换算。Stats 直接显示 Public DTO count，不从其他业务 endpoint 重算。
+
 ## Error and request rules
 
 - 业务分支依据稳定 `error.code`，禁止依据 message 文本包含关系。

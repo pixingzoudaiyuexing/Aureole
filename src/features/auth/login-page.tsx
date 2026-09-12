@@ -11,8 +11,10 @@ import { getLoginErrorMessage } from './auth-errors'
 
 export function LoginPage({
   passwordResetSucceeded = false,
+  accountNotice,
 }: {
   passwordResetSucceeded?: boolean
+  accountNotice?: 'password-changed' | 'password-change-uncertain'
 }) {
   const navigate = useNavigate()
   const { signIn } = useAuth()
@@ -81,6 +83,23 @@ export function LoginPage({
         >
           <p className="text-sm text-foreground">
             密码已重置，请使用新密码登录。
+          </p>
+        </div>
+      ) : null}
+
+      {accountNotice ? (
+        <div
+          className={
+            accountNotice === 'password-changed'
+              ? 'mt-6 border-l-2 border-primary bg-primary/5 px-4 py-3'
+              : 'mt-6 border-l-2 border-foreground/40 bg-muted px-4 py-3'
+          }
+          role={accountNotice === 'password-changed' ? 'status' : 'alert'}
+        >
+          <p className="text-sm text-foreground">
+            {accountNotice === 'password-changed'
+              ? '密码已修改，请使用新密码重新登录。'
+              : '密码修改结果无法确认。请尝试使用新密码登录；如果失败，再使用原密码。'}
           </p>
         </div>
       ) : null}

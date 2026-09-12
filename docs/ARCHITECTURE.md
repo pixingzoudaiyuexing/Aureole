@@ -95,6 +95,23 @@ success、expired、error、reset 和 load retry；Google-specific browser API �
 Email Verification 与 AntiBot 同时启用时，发码 challenge 与最终 Register challenge 是两个
 独立生命周期，前一个 mutation settle 后不可复用。
 
+## Account self-service
+
+`features/account` 持有 Preferences、Stats、Account Config 与 Password Change 的 API、query
+和页面边界；现有 `/me` 仍由 Auth Session Core 独占并通过 `useAuth().currentUser` 复用。
+Preferences、Stats 与 Account Config 均为 TanStack Query server state，query key 不包含
+credential，且不进入 Zustand 或 browser storage。
+
+Preferences 使用显式 Save 与 partial PATCH，只发送相对权威 GET 的实际差异。PATCH 不自动
+retry；成功后重新读取权威 Preferences。NETWORK_ERROR、MALFORMED_RESPONSE、
+UPSTREAM_ERROR 或 UPSTREAM_TIMEOUT 造成结果不确定时同样通过 GET 对账，无法完成对账时
+不声明已保存或未保存。
+
+Password Change 只发送 `currentPassword` 与 `newPassword`，mutation 不自动 retry，并使用
+form-local synchronous lock 防止 same-tick 重复提交。成功意味着上游已使全部旧 session
+失效；Aureole 复用 Auth `logout()` 清除 local credential 与完整 Query cache，再返回 Login。
+密码 mutation 结果不确定时采用同样的保守退出策略，不重提 POST，也不声称修改成功或失败。
+
 ## Theme and presentation
 
 Light、Dark、System 由 Theme Provider 管理；显式选择可保存为非敏感 local UI preference。CSS tokens 是颜色和 radius 的 SSOT，传统 `tailwind.config.js` 不是 token 核心。使用 system font 与 system monospace。
