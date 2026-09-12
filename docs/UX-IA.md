@@ -13,7 +13,7 @@ Desktop 使用 persistent sidebar、header 和 main content。Mobile 使用 hamb
 | Public | `/login`, `/register`, `/forgot-password`                                                                                      |
 | App    | `/dashboard`, `/subscription`, `/plans`, `/resources`, `/orders`, `/wallet`, `/notices`, `/support`, `/referrals`, `/settings` |
 
-当前 `/` 固定跳转 `/login`。Milestone 3 完成真实 Auth Lifecycle 后，再由 Auth State 决定登录或 dashboard。
+`/` 根据真实 Auth State 跳转 `/login` 或 `/dashboard`。Auth bootstrap 未完成时不渲染 App Shell；临时服务错误显示可恢复状态，允许重试或 local logout。
 
 ## Responsive behavior
 

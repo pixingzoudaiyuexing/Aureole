@@ -1,7 +1,27 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { Navigate, createFileRoute } from '@tanstack/react-router'
+import {
+  AuthBootstrapScreen,
+  AuthRecoveryScreen,
+} from '@/features/auth/auth-status-screen'
+import { useAuth } from '@/features/auth/auth-provider'
 
 export const Route = createFileRoute('/')({
-  beforeLoad: () => {
-    throw redirect({ to: '/login' })
-  },
+  component: RootRoute,
 })
+
+function RootRoute() {
+  const { status } = useAuth()
+
+  if (status === 'unknown' || status === 'bootstrapping') {
+    return <AuthBootstrapScreen />
+  }
+  if (status === 'error') {
+    return <AuthRecoveryScreen />
+  }
+  return (
+    <Navigate
+      to={status === 'authenticated' ? '/dashboard' : '/login'}
+      replace
+    />
+  )
+}

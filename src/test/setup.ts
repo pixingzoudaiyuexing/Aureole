@@ -1,10 +1,13 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterEach } from 'vitest'
+import { useAuthSessionStore } from '@/lib/auth/session-store'
 
 afterEach(() => {
   cleanup()
   window.localStorage.clear()
+  window.sessionStorage.clear()
+  useAuthSessionStore.setState({ accessToken: null, hydrated: false })
   document.documentElement.classList.remove('dark')
   document.documentElement.style.colorScheme = ''
 })

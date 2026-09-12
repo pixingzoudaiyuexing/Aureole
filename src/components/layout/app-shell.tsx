@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { navigationItems } from '@/config/navigation'
+import { AccountSummary } from '@/features/auth/account-summary'
 
 export function AppShell() {
   const pathname = useRouterState({
@@ -23,9 +24,7 @@ export function AppShell() {
         </div>
         <Separator />
         <SidebarNavigation />
-        <div className="border-t border-border px-5 py-4 text-xs leading-5 text-muted-foreground">
-          Secure account portal
-        </div>
+        <AccountSummary />
       </aside>
 
       <div className="min-w-0">
@@ -47,6 +46,7 @@ export function AppShell() {
                 </div>
                 <Separator />
                 <SidebarNavigation closeOnNavigate />
+                <AccountSummary />
               </SheetContent>
             </Sheet>
           </div>

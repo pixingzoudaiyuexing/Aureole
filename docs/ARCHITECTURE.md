@@ -42,7 +42,7 @@ src/
 
 ## Routing and code splitting
 
-`_public` 提供 `/login`、`/register`、`/forgot-password`。`_app` 提供 authenticated app 的长期路由骨架，但 Milestone 2 不做假 Auth 判断或 Route Guard。`/` 临时 redirect `/login`；Milestone 3 将根据真实 Auth State 决定 `/login` 或 `/dashboard`。
+`_public` 提供 `/login`、`/register`、`/forgot-password`。`_app` 在统一 route group boundary 执行真实 Auth Guard：bootstrap 未完成时只显示安全 loading，未认证时 redirect `/login`，认证成功后才渲染 App Shell。`/` 根据同一 Auth State 决定 `/login` 或 `/dashboard`；已认证用户访问 public Auth route 会返回 `/dashboard`。
 
 TanStack Router 插件启用 route-level auto code splitting；生成的 `src/routeTree.gen.ts` 提交到 Git，业务 route 产出独立 lazy chunk。
 
@@ -50,7 +50,11 @@ TanStack Router 插件启用 route-level auto code splitting；生成的 `src/ro
 
 `src/lib/api` 使用 native `fetch` typed wrapper，集中处理 base URL、JSON、public envelope、HTTP status、requestId、network error 与 malformed response。路径必须以 `/api/v1/` 开头。业务分类只能依据 `ApiError.code`，禁止 `message.includes(...)`。
 
-`VITE_API_BASE_URL` 是公开 solution Origin，不是 Secret。当前 Auth future boundary 不包含登录请求、Bearer persistence、`/me` bootstrap、logout 或 guard。Milestone 3 计划仅在 `sessionStorage` 持久化 opaque bearer；不得使用 `localStorage`。
+`VITE_API_BASE_URL` 是公开 solution Origin，不是 Secret。Auth session 只在 memory + `sessionStorage` 保存 opaque bearer，不解析、不写入 `localStorage`，也不持久化 Query cache。API Client 只通过显式 authenticated request boundary 添加 `Authorization: Bearer <opaque-token>`，并拒绝调用方手工注入 Authorization header。
+
+`features/auth` 独占 Login、session bootstrap 和 `/me` query 的前端 ownership。Zustand 只保存 access token 与 hydration 状态；`/me` DTO 只存在于 TanStack Query server state，不复制进 Zustand。Login mutation 明确不 retry，收到 token 后必须完成 `/me` bootstrap 才建立 authenticated UI。
+
+`AUTH_REQUIRED` / `AUTH_FAILED` 证明 credential 无效时，前端清除 memory、sessionStorage 和完整 Query cache 并回到 Login。`NETWORK_ERROR`、`UPSTREAM_ERROR`、`UPSTREAM_TIMEOUT` 不证明 credential 无效：保留 token，隐藏受保护 UI，并提供重试或 local logout。由于 solution 没有 Public logout endpoint，当前 Logout 只清理本地 credential 与 Query cache，不声明服务器撤销。
 
 ## Theme and presentation
 

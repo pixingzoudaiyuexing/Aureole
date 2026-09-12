@@ -25,6 +25,43 @@ describe('API client', () => {
       new URL('https://gateway.example.com/api/v1/me'),
       expect.objectContaining({ headers: expect.any(Headers) }),
     )
+    const headers = new Headers(fetchImpl.mock.calls[0]?.[1]?.headers)
+    expect(headers.has('authorization')).toBe(false)
+    expect(fetchImpl.mock.calls[0]?.[1]?.redirect).toBe('error')
+  })
+
+  it('adds a bearer only through the authenticated request boundary', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true, data: { status: 'active' } }), {
+        status: 200,
+      }),
+    )
+    const client = createApiClient({ baseUrl, fetchImpl })
+
+    await client.authenticatedRequest('/api/v1/me', {
+      accessToken: 'opaque-session-token',
+    })
+
+    const [url, init] = fetchImpl.mock.calls[0] ?? []
+    const headers = new Headers(init?.headers)
+    expect(url).toEqual(new URL('https://gateway.example.com/api/v1/me'))
+    expect(headers.get('authorization')).toBe('Bearer opaque-session-token')
+    expect(init?.redirect).toBe('error')
+  })
+
+  it('rejects manually supplied authorization headers', async () => {
+    const fetchImpl = vi.fn<typeof fetch>()
+    const client = createApiClient({ baseUrl, fetchImpl })
+
+    await expect(
+      client.request('/api/v1/me', {
+        headers: { authorization: 'Bearer bypass' },
+      }),
+    ).rejects.toMatchObject({
+      code: 'INVALID_AUTH_HEADER',
+      status: 0,
+    } satisfies Partial<ApiError>)
+    expect(fetchImpl).not.toHaveBeenCalled()
   })
 
   it.each([

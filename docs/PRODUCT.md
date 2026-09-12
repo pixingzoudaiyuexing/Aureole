@@ -23,7 +23,7 @@ Gift Card、Withdrawal、Commission、Wallet 都属于 v1，不得在后续计�
 ## Current non-goals
 
 - Public Plans 不是 v1；产品信息仅面向已认证用户。
-- Marketing Homepage 不是 v1；`/` 在 Auth 完成前跳转 `/login`。
+- Marketing Homepage 不是 v1；`/` 根据当前 Auth State 进入 `/login` 或 `/dashboard`。
 - Public Resource Status 是 Post-v1 Enhancement；不要与 v1 的 authenticated Resources 混淆。
 - 不提供 Gift Card 管理、自动打款、Withdrawal admin、Fake Analytics 或任何 V2Board 管理能力。
 
