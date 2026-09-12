@@ -62,6 +62,23 @@ Auth response parser 对 solution 的 additive unknown fields 保持兼容，同
 
 `AUTH_REQUIRED` / `AUTH_FAILED` 证明 credential 无效时，前端清除 memory、sessionStorage 和完整 Query cache 并回到 Login。`NETWORK_ERROR`、`UPSTREAM_ERROR`、`UPSTREAM_TIMEOUT` 不证明 credential 无效：保留 token，隐藏受保护 UI，并提供重试或 local logout。由于 solution 没有 Public logout endpoint，当前 Logout 只清理本地 credential 与 Query cache，不声明服务器撤销。
 
+## Public onboarding and challenge
+
+Active onboarding Contract baseline 是 solution
+`0a37894173d1db0bbc57576c640652878f8f623d`。Onboarding config 属于 TanStack
+Query server state，不进入 Zustand 或持久化缓存；requirements 未知时 Registration
+与 Recovery fail closed，不猜测 registration availability。
+
+P-09 当前只支持 `antiBot.provider="recaptcha"` 与
+`antiBot.mode="v2-checkbox"`，对应 Google reCAPTCHA v2 visible checkbox / explicit
+render。Mutation 始终只向 solution 发送 provider-neutral `challengeToken`，由 V2Board
+权威验证；Aureole 不持有 secret、不验证 challenge、不发送 provider-specific 字段。
+未知 provider/mode 必须分类为 unsupported 并 fail closed，不能静默降级为未启用。
+
+Challenge token 是单次、短期、敏感的局部 form-flow state。它不得进入 Zustand、Query
+metadata、storage、URL、日志或 analytics；任何实际发送了 challengeToken 的 mutation
+attempt 都视为已消费，settle 后必须清除 token 并 reset widget。
+
 ## Theme and presentation
 
 Light、Dark、System 由 Theme Provider 管理；显式选择可保存为非敏感 local UI preference。CSS tokens 是颜色和 radius 的 SSOT，传统 `tailwind.config.js` 不是 token 核心。使用 system font 与 system monospace。

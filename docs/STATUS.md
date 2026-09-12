@@ -2,7 +2,15 @@
 
 ## Current milestone
 
-Milestone 3 - Auth / Account (`AUR-M3-001` Auth Session Core)
+Milestone 3 - Auth / Account (`AUR-M3-002` Registration / Recovery)
+
+## Contract baseline
+
+Active solution baseline:
+`0a37894173d1db0bbc57576c640652878f8f623d` (`feat: expose anti-bot challenge
+mode`). P-09 freezes `recaptcha` + `v2-checkbox`, provider-neutral
+`challengeToken`, V2Board authoritative verification and unsupported capability
+fail-closed behavior.
 
 ## Foundation status
 

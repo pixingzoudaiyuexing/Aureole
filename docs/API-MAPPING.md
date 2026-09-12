@@ -19,6 +19,19 @@
 | Support                             | Tickets                                 | message 视为敏感用户内容，不记录 raw payload                            |
 | Referrals / Commission / Withdrawal | Referrals and guarded financial actions | 佣金、资格、minimum 与工单状态以上游为权威                              |
 
+## Public onboarding and challenge mapping
+
+- Onboarding requirements 是 TanStack Query server state；Contract 未提供
+  `registrationOpen`，前端不得发明或推断。
+- 当前支持的 AntiBot capability 只有 `recaptcha` + `v2-checkbox`。未知
+  provider/mode 显示 unsupported 并阻止 challenge-required mutation。
+- Email code 的 `purpose` 由页面固定为 `register` 或 `password-reset`，不作为用户输入。
+- Auth mutation 只发送 provider-neutral `challengeToken`。Password Reset 本身不接受该字段；
+  challenge 只用于获取 password-reset email code。
+- challenge 获取与验证分别由 Google client和 V2Board 持有；solution Contract 是字段和错误
+  SSOT，Aureole 不发送 `recaptchaData`、`recaptchaToken` 或
+  `gRecaptchaResponse`。
+
 ## Error and request rules
 
 - 业务分支依据稳定 `error.code`，禁止依据 message 文本包含关系。
