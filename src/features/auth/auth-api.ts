@@ -20,7 +20,7 @@ const loginResponseSchema = z
     accessToken: z.string().min(1),
     tokenType: z.literal('Bearer'),
   })
-  .strict()
+  .strip()
 
 const currentUserSchema = z
   .object({
@@ -28,7 +28,7 @@ const currentUserSchema = z
     expiresAt: z.string().datetime({ offset: true }).nullable(),
     status: z.enum(['active', 'expired', 'disabled']),
   })
-  .strict()
+  .strip()
 
 export type LoginInput = z.infer<typeof loginSchema>
 export type LoginResponse = z.infer<typeof loginResponseSchema>

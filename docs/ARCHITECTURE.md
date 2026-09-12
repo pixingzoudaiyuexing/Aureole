@@ -44,6 +44,8 @@ src/
 
 `_public` 提供 `/login`、`/register`、`/forgot-password`。`_app` 在统一 route group boundary 执行真实 Auth Guard：bootstrap 未完成时只显示安全 loading，未认证时 redirect `/login`，认证成功后才渲染 App Shell。`/` 根据同一 Auth State 决定 `/login` 或 `/dashboard`；已认证用户访问 public Auth route 会返回 `/dashboard`。
 
+当前 guard 在 route component 边界阻止受保护 UI render。未来引入 protected TanStack Router loader 前必须重新评估 guard/loading 架构；Auth 未解析完成时，loader 不得提前发起 authenticated business fetch。
+
 TanStack Router 插件启用 route-level auto code splitting；生成的 `src/routeTree.gen.ts` 提交到 Git，业务 route 产出独立 lazy chunk。
 
 ## API client
@@ -52,7 +54,11 @@ TanStack Router 插件启用 route-level auto code splitting；生成的 `src/ro
 
 `VITE_API_BASE_URL` 是公开 solution Origin，不是 Secret。Auth session 只在 memory + `sessionStorage` 保存 opaque bearer，不解析、不写入 `localStorage`，也不持久化 Query cache。API Client 只通过显式 authenticated request boundary 添加 `Authorization: Bearer <opaque-token>`，并拒绝调用方手工注入 Authorization header。
 
+`sessionStorage` 是正常的 tab-session persistence。如果浏览器因 privacy/security/quota 限制拒绝写入，登录可降级为当前 document lifetime 内的 memory-only session；页面刷新后无法恢复时按 unauthenticated 处理，禁止降级到 `localStorage`、IndexedDB、cookie 或 URL。
+
 `features/auth` 独占 Login、session bootstrap 和 `/me` query 的前端 ownership。Zustand 只保存 access token 与 hydration 状态；`/me` DTO 只存在于 TanStack Query server state，不复制进 Zustand。Login mutation 明确不 retry，收到 token 后必须完成 `/me` bootstrap 才建立 authenticated UI。
+
+Auth response parser 对 solution 的 additive unknown fields 保持兼容，同时 strip 未知字段，只把 Aureole 当前认识且已强校验的白名单字段交给应用层。Login 等 request schema 不因此放宽。
 
 `AUTH_REQUIRED` / `AUTH_FAILED` 证明 credential 无效时，前端清除 memory、sessionStorage 和完整 Query cache 并回到 Login。`NETWORK_ERROR`、`UPSTREAM_ERROR`、`UPSTREAM_TIMEOUT` 不证明 credential 无效：保留 token，隐藏受保护 UI，并提供重试或 local logout。由于 solution 没有 Public logout endpoint，当前 Logout 只清理本地 credential 与 Query cache，不声明服务器撤销。
 

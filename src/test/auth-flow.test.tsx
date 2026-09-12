@@ -1,5 +1,5 @@
-import { QueryClient } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AppProviders } from '@/app/providers/app-providers'
@@ -10,8 +10,12 @@ import type {
   CurrentUser,
   LoginResponse,
 } from '@/features/auth/auth-api'
+import { useAuth } from '@/features/auth/auth-context'
+import { AuthProvider } from '@/features/auth/auth-provider'
+import { authQueryKeys } from '@/features/auth/auth-query-keys'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
+import { useAuthSessionStore } from '@/lib/auth/session-store'
 
 const currentUser: CurrentUser = {
   email: 'member@example.com',
@@ -42,6 +46,53 @@ function renderRoute(
     <AppProviders router={router} authApi={api} queryClient={queryClient} />,
   )
   return { queryClient, router }
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, reject, resolve }
+}
+
+function AuthTransitionHarness() {
+  const { currentUser: user, logout, signIn, status } = useAuth()
+
+  return (
+    <div>
+      <output data-testid="auth-status">{status}</output>
+      <output data-testid="current-user">{user?.email ?? 'none'}</output>
+      <button type="button" onClick={logout}>
+        logout
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          void signIn({
+            email: 'session-b@example.com',
+            password: 'password123',
+          })
+        }}
+      >
+        login session B
+      </button>
+    </div>
+  )
+}
+
+function renderAuthTransition(api: AuthApi) {
+  const queryClient = createQueryClient()
+  render(
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider api={api}>
+        <AuthTransitionHarness />
+      </AuthProvider>
+    </QueryClientProvider>,
+  )
+  return queryClient
 }
 
 describe('Auth session lifecycle', () => {
@@ -80,8 +131,42 @@ describe('Auth session lifecycle', () => {
     expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
       'opaque-session-token',
     )
+    expect(useAuthSessionStore.getState().accessToken).toBe(
+      'opaque-session-token',
+    )
     expect(window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
     expect(screen.getAllByText('member@example.com').length).toBeGreaterThan(0)
+  })
+
+  it('completes login and /me bootstrap with a memory-only credential', async () => {
+    const originalSetItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      key,
+      value,
+    ) {
+      if (this === window.sessionStorage && key === AUTH_SESSION_STORAGE_KEY) {
+        throw new DOMException('Storage disabled', 'SecurityError')
+      }
+      return originalSetItem.call(this, key, value)
+    })
+    const getCurrentUser = vi.fn().mockResolvedValue(currentUser)
+    const { router } = renderRoute('/login', createAuthApi({ getCurrentUser }))
+    const user = userEvent.setup()
+
+    await user.type(await screen.findByLabelText('邮箱'), 'member@example.com')
+    await user.type(screen.getByLabelText('密码'), 'password123')
+    await user.click(screen.getByRole('button', { name: '登录' }))
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe('/dashboard'),
+    )
+    expect(useAuthSessionStore.getState().accessToken).toBe(
+      'opaque-session-token',
+    )
+    expect(getCurrentUser).toHaveBeenCalledWith('opaque-session-token')
+    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
+    expect(window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
   })
 
   it('disables duplicate login submission while the request is pending', async () => {
@@ -320,4 +405,94 @@ describe('Auth session lifecycle', () => {
     expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
     expect(queryClient.getQueryData(['private-account-data'])).toBeUndefined()
   })
+
+  it('does not resurrect session A when its in-flight /me resolves after logout', async () => {
+    window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'session-a-token')
+    const sessionA = createDeferred<CurrentUser>()
+    const getCurrentUser = vi.fn(() => sessionA.promise)
+    const queryClient = renderAuthTransition(createAuthApi({ getCurrentUser }))
+    const user = userEvent.setup()
+
+    await waitFor(() =>
+      expect(getCurrentUser).toHaveBeenCalledWith('session-a-token'),
+    )
+    await user.click(screen.getByRole('button', { name: 'logout' }))
+    expect(screen.getByTestId('auth-status')).toHaveTextContent(
+      'unauthenticated',
+    )
+
+    await act(async () => {
+      sessionA.resolve({ ...currentUser, email: 'session-a@example.com' })
+      await sessionA.promise
+    })
+    expect(screen.getByTestId('current-user')).toHaveTextContent('none')
+    expect(queryClient.getQueryData(authQueryKeys.me)).toBeUndefined()
+    expect(useAuthSessionStore.getState().accessToken).toBeNull()
+    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
+  })
+
+  it.each(['resolve', 'reject'] as const)(
+    'keeps session B when stale session A later %ss',
+    async (settlement) => {
+      window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'session-a-token')
+      const sessionA = createDeferred<CurrentUser>()
+      const sessionBUser: CurrentUser = {
+        ...currentUser,
+        email: 'session-b@example.com',
+      }
+      const login = vi.fn().mockResolvedValue({
+        accessToken: 'session-b-token',
+        tokenType: 'Bearer' as const,
+      })
+      const getCurrentUser = vi.fn((accessToken: string) =>
+        accessToken === 'session-a-token'
+          ? sessionA.promise
+          : Promise.resolve(sessionBUser),
+      )
+      const queryClient = renderAuthTransition(
+        createAuthApi({ getCurrentUser, login }),
+      )
+      const user = userEvent.setup()
+
+      await waitFor(() =>
+        expect(getCurrentUser).toHaveBeenCalledWith('session-a-token'),
+      )
+      await user.click(screen.getByRole('button', { name: 'login session B' }))
+      await waitFor(() => {
+        expect(screen.getByTestId('auth-status')).toHaveTextContent(
+          'authenticated',
+        )
+        expect(screen.getByTestId('current-user')).toHaveTextContent(
+          'session-b@example.com',
+        )
+      })
+
+      if (settlement === 'resolve') {
+        await act(async () => {
+          sessionA.resolve({ ...currentUser, email: 'session-a@example.com' })
+          await sessionA.promise
+        })
+      } else {
+        await act(async () => {
+          sessionA.reject(
+            new ApiError({
+              status: 401,
+              code: 'AUTH_FAILED',
+              message: 'Authentication failed',
+            }),
+          )
+          await sessionA.promise.catch(() => undefined)
+        })
+      }
+
+      expect(screen.getByTestId('current-user')).toHaveTextContent(
+        'session-b@example.com',
+      )
+      expect(queryClient.getQueryData(authQueryKeys.me)).toEqual(sessionBUser)
+      expect(useAuthSessionStore.getState().accessToken).toBe('session-b-token')
+      expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
+        'session-b-token',
+      )
+    },
+  )
 })

@@ -9,7 +9,12 @@ export function readSessionCredential() {
 }
 
 export function writeSessionCredential(accessToken: string) {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, accessToken)
+  try {
+    window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, accessToken)
+    return true
+  } catch {
+    return false
+  }
 }
 
 export function clearSessionCredential() {

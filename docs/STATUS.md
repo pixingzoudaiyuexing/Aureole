@@ -13,10 +13,12 @@ baseline are present. Remote Foundation CI completed successfully for
 
 ## Auth Session Core status
 
-COMPLETE locally. Login, memory + sessionStorage credential persistence, `/me`
-bootstrap, protected route guard, Auth-aware root redirect, local logout,
-authenticated Query cache clearing and recoverable service-error handling are
-implemented. Registration and account management remain outside this checkpoint.
+R1 REVIEW FIXES COMPLETE locally. Login and `/me` response parsing now accepts
+and strips additive unknown fields while validating known fields. sessionStorage
+write failures degrade to memory-only Auth. Real QueryClient concurrency tests
+confirm logout and A-to-B transitions reject stale Session A results without
+extra cancellation code. Registration and account management remain outside
+this checkpoint.
 
 ## Current commit
 
@@ -30,9 +32,9 @@ report are the operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (5 files, 30 tests)
+- `npm test`: PASS (6 files, 41 tests)
 - `npm run build`: PASS
-- Build evidence: primary entry JS 462.96 kB raw / 145.99 kB gzip; CSS 25.05 kB
+- Build evidence: primary entry JS 462.99 kB raw / 145.98 kB gzip; CSS 25.05 kB
   raw / 5.58 kB gzip. Login route chunk is 13.18 kB gzip. Assets remain within
   budget; initial-route composition has not been measured by a dedicated analyzer.
 - Browser verification: PASS at 1280 x 720 and 390 x 844 for Login Light/Dark,
@@ -41,6 +43,8 @@ report are the operational source of truth.
   horizontal overflow or browser console error was observed.
 - M3-001 implementation CI: PASS for
   `d3b2896d97681b9a816fafa0254122e97a82f2cc` in workflow run `34702858678`.
+- M3-001R1 remote GitHub Actions is tracked by exact final SHA in the
+  implementation report.
 
 ## Known gaps
 
