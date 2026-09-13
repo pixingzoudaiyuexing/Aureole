@@ -1,0 +1,2 @@
+export const PAYMENT_STATUS_POLL_INTERVAL_MS = 3_000
+export const PAYMENT_STATUS_POLL_CAP_MS = 5 * 60 * 1_000

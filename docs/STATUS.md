@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 5 - Commerce / Payment (`AUR-M5-002` Order Create + Promotion + Cancel)
+Milestone 5 - Commerce / Payment (`AUR-M5-003` Payment Methods + Checkout)
 
 ## Contract baseline
 
@@ -44,8 +44,9 @@ production runtime gap remains NOT TESTED and non-blocking. Milestone 4 is COMPL
 Milestone 5 is CURRENT. AUR-M5-001 Orders Read Model implementation and
 independent review are COMPLETE with no required fixes. Its production Orders
 runtime gap remains NOT TESTED and non-blocking. AUR-M5-002 Order Create +
-Promotion + Cancel implementation is COMPLETE and its independent Commerce
-Mutation review is PENDING. M5-003 Payment Methods + Checkout is NOT STARTED.
+Promotion + Cancel implementation and independent review are COMPLETE.
+AUR-M5-003 Payment Methods + Checkout implementation is COMPLETE and its
+independent Payment review is PENDING. Milestone 5 is not yet marked COMPLETE.
 
 ## Current commit
 
@@ -59,10 +60,14 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (24 files, 412 tests)
+- `npm test`: PASS (26 files, 468 tests)
 - `npm run build`: PASS
-- Build evidence: main JS 471.57 kB raw / 148.26 kB gzip; CSS 33.61 kB raw /
-  6.95 kB gzip; Plans route 5.16 kB gzip; Orders route 3.55 kB gzip.
+- `npm ls`: PASS
+- `git diff --check`: PASS
+- Build evidence: main JS 471.60 kB raw / 148.28 kB gzip; CSS 34.01 kB raw /
+  7.02 kB gzip; Plans route 5.16 kB gzip; Orders route 13.17 kB gzip.
+  Relative to the M5-002 baseline, main JS changed by about +0.02 kB gzip, CSS
+  by +0.07 kB gzip and the lazy Orders route by +9.62 kB gzip.
   Assets remain within budget; initial-route composition has not been measured
   by a dedicated analyzer.
 - Browser verification: PASS at 1280 x 720 and 390 x 844 for Login Light/Dark,
@@ -149,6 +154,18 @@ operational source of truth.
   unknown mutation recovery, guarded resubmit and Auth invalidation are covered
   by automated behavior tests. The global reduced-motion CSS baseline remains in
   effect. Production solution/V2Board is NOT TESTED.
+- M5-003 controlled-browser verification: PASS at exact 1280 x 720 and 390 x 844
+  in Light/Dark/System for lazy Payment Methods, empty/multiple methods, null icon
+  fallback, fixed + percent fee metadata, long method name, 36-character Order ID,
+  local QR, redirect-ready, finished-pending, definitive error, unknown-result
+  acknowledgement and pending -> processing recovery. Payment/Cancel mutual
+  exclusion and keyboard Escape/focus restoration were verified in the browser.
+  No horizontal overflow, iframe, raw redirect target, false payment
+  success claim or application console error was observed. Automated tests prove
+  QR content is not fetched or persisted, Checkout same-tick POST occurs once,
+  polling stops on close/non-pending/hard cap, manual status refresh works, and
+  all required recovery/Auth boundaries hold. Production solution/V2Board Payment
+  runtime is NOT TESTED.
 
 ## Known gaps
 
@@ -156,11 +173,15 @@ operational source of truth.
 - Production solution/V2Board Order Create, Promotion and Cancel behavior is NOT
   TESTED; controlled mock browser and automated contract/privacy tests are the
   current evidence.
+- Production solution/V2Board Payment Methods, Checkout, provider QR/redirect,
+  callback processing and final Order Status behavior are NOT TESTED; controlled
+  mock browser and automated Contract/privacy/recovery tests are the current
+  evidence.
 - Production solution/V2Board Notice behavior is NOT TESTED; controlled mock
   browser and automated contract/security tests are the current evidence.
 - Hosting provider is undecided; production requires SPA fallback.
 
 ## Next milestone
 
-AUR-M5-002 implementation is complete. Independent Commerce Mutation review is
-the next required gate; M5-003 remains NOT STARTED and was not entered.
+AUR-M5-003 implementation is complete. Independent Payment review is the next
+required gate. Milestone 6 and all later milestones remain NOT STARTED.

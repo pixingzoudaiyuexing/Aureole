@@ -127,7 +127,29 @@
   明确失败至少读取 Detail。恢复失败时不重新开放 Cancel。
 - 所有新增 API request/response 都经过 strict request schema 与 strip-additive response parser。
   AUTH_REQUIRED/AUTH_FAILED 在 Product、Promotion、Create、Cancel 或恢复读取任一边界都会退出完整
-  authenticated state。M5-002 不调用 Order Status、Payment Methods 或 Checkout endpoints。
+  authenticated state。
+
+## Payment mapping
+
+- `GET /api/v1/billing/methods` 只在用户从 pending Order Detail 点击“支付订单”后读取，使用
+  `['billing', 'methods']` query。UI 只显示 id 对应的 name、optional HTTPS icon 与 fee metadata；
+  icon 失败使用本地 fallback，不阻止选择支付方式。
+- fixedMinor 只通过 canonical Account Config 与 `formatMinorMoney` 展示，percent 只作为原始 metadata
+  展示。Aureole 不计算 percentage fee、order + fee、折扣 + fee 或任何最终应付金额。
+- `POST /api/v1/orders/{id}/checkout` 的 strict body 只有 paymentMethodId。Mutation 明确不 retry，并以
+  同步锁阻止 same-tick 双击；Checkout pending 时不能 Cancel，Cancel pending 时不能 Checkout。
+- `finished` 只触发权威状态读取。`qrcode.data` 作为 transient opaque content 在当前组件内本地生成
+  QR，不 fetch、解析、打开、上传或持久化。`redirect.target` 不显示、不修改、不 iframe，只在用户明确
+  点击“前往支付”后以当前 tab 导航。
+- `GET /api/v1/orders/{id}/status` 使用 `['orders', 'status', id]`，只在明确 Payment Flow 内轮询。
+  pending 约每 3 秒读取一次，非 pending、关闭 UI、route unmount、Auth failure 或约 5 分钟 hard cap
+  时停止；状态变化刷新 Detail/List，hard cap 后提供手动刷新。
+- Checkout 的 NETWORK_ERROR、UPSTREAM_TIMEOUT、UPSTREAM_ERROR 与 MALFORMED_RESPONSE 均视为
+  UNKNOWN：POST 不重试，立即读取 Status/Detail/List；状态仍 pending 时，用户必须确认已核对订单状态
+  才能再次提交。PAYMENT_METHOD_UNAVAILABLE、ORDER_EXPIRED、PAYMENT_CREATE_FAILED 与
+  VALIDATION_ERROR 按 Contract 分别恢复所需权威 read，不触发 logout 或自动 POST。
+- Payment Methods、Checkout、Status、Detail 或 List 任一边界返回 AUTH_REQUIRED/AUTH_FAILED 时，
+  继续复用 sealed Auth Session Core 清理 credential 与完整 Query cache。
 
 ## Error and request rules
 

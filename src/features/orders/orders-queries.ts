@@ -4,6 +4,14 @@ import { ordersApi } from './orders-api'
 export const ordersQueryKeys = {
   list: ['orders', 'list'] as const,
   detail: (id: string) => ['orders', 'detail', id] as const,
+  status: (id: string) => ['orders', 'status', id] as const,
+}
+
+export function orderStatusOptions(accessToken: string, id: string) {
+  return queryOptions({
+    queryKey: ordersQueryKeys.status(id),
+    queryFn: () => ordersApi.getStatus(accessToken, id),
+  })
 }
 
 export function ordersListOptions(accessToken: string) {

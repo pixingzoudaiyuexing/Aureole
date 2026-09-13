@@ -13,10 +13,11 @@ export const orderStatuses = [
 
 export const orderIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,36}$/)
 const timestampSchema = z.string().datetime({ offset: true })
+export const orderStatusSchema = z.enum(orderStatuses)
 const orderSchema = z
   .object({
     id: orderIdSchema,
-    status: z.enum(orderStatuses),
+    status: orderStatusSchema,
     amountMinor: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
     createdAt: timestampSchema,
     updatedAt: timestampSchema.nullable(),
@@ -34,6 +35,9 @@ const createOrderRequestSchema = z
   .strict()
 const createdOrderSchema = z.object({ id: orderIdSchema }).strip()
 const cancelledOrderSchema = z.object({ cancelled: z.literal(true) }).strip()
+const orderStatusResponseSchema = z
+  .object({ id: orderIdSchema, status: orderStatusSchema })
+  .strip()
 
 export type OrderStatus = (typeof orderStatuses)[number]
 export type Order = z.infer<typeof orderSchema>
@@ -67,6 +71,23 @@ export const ordersApi = {
       { method: 'GET', accessToken },
     )
     return parse(orderSchema, data)
+  },
+
+  async getStatus(accessToken: string, id: string) {
+    const validId = orderIdSchema.parse(id)
+    const data = await apiClient.authenticatedRequest<unknown>(
+      `/api/v1/orders/${encodeURIComponent(validId)}/status`,
+      { method: 'GET', accessToken },
+    )
+    const status = parse(orderStatusResponseSchema, data)
+    if (status.id !== validId) {
+      throw new ApiError({
+        status: 200,
+        code: 'MALFORMED_RESPONSE',
+        message: 'The public API returned an invalid response',
+      })
+    }
+    return status
   },
 
   async create(accessToken: string, input: CreateOrderInput) {

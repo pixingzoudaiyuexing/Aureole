@@ -40,10 +40,18 @@ type CancelFeedback =
 
 export function OrderCancelControl({
   accessToken,
+  disabled = false,
+  onConfirmingChange,
   order,
+  releaseSharedAction,
+  tryAcquireSharedAction,
 }: {
   accessToken: string
+  disabled?: boolean
+  onConfirmingChange: (confirming: boolean) => void
   order: Order
+  releaseSharedAction: () => void
+  tryAcquireSharedAction: () => boolean
 }) {
   const queryClient = useQueryClient()
   const actionLock = useSynchronousActionLock()
@@ -112,6 +120,10 @@ export function OrderCancelControl({
 
   const cancel = async () => {
     if (!actionLock.tryAcquire()) return
+    if (!tryAcquireSharedAction()) {
+      actionLock.release()
+      return
+    }
     mutation.reset()
     setFeedback(null)
     try {
@@ -154,6 +166,8 @@ export function OrderCancelControl({
       }
     } finally {
       setConfirming(false)
+      onConfirmingChange(false)
+      releaseSharedAction()
       actionLock.release()
     }
   }
@@ -174,8 +188,11 @@ export function OrderCancelControl({
         <Button
           type="button"
           variant="outline"
-          disabled={mutation.isPending}
-          onClick={() => setConfirming(true)}
+          disabled={disabled || mutation.isPending}
+          onClick={() => {
+            setConfirming(true)
+            onConfirmingChange(true)
+          }}
         >
           取消订单
         </Button>
@@ -192,7 +209,7 @@ export function OrderCancelControl({
           <div className="flex flex-wrap gap-3">
             <Button
               type="button"
-              disabled={mutation.isPending}
+              disabled={disabled || mutation.isPending}
               onClick={() => void cancel()}
             >
               {mutation.isPending ? (
@@ -206,8 +223,11 @@ export function OrderCancelControl({
             <Button
               type="button"
               variant="outline"
-              disabled={mutation.isPending}
-              onClick={() => setConfirming(false)}
+              disabled={disabled || mutation.isPending}
+              onClick={() => {
+                setConfirming(false)
+                onConfirmingChange(false)
+              }}
             >
               返回
             </Button>

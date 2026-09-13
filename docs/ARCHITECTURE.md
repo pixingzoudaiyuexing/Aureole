@@ -199,7 +199,25 @@ Cancel 入口只对当前 Detail DTO 的 pending 状态显示，但 V2Board 仍�
 二次确认；完成后按错误类别重新读取 Detail 和/或 List。结果未知时不再次开放 Cancel；明确失败也要
 先成功读取最新 Detail 才允许用户决定是否重试。恢复读取失败时保留最后已知 Detail 和安全提示，避免
 控件卸载后误导用户。任何 mutation 或恢复读取返回 AUTH_REQUIRED/AUTH_FAILED 都复用 Auth logout。
-M5-002 不调用 Order Status、Payment Methods 或 Checkout，也不持有 payment/callback state。
+M5-002 不持有 payment/callback state。
+
+M5-003 在独立 `features/payments` 边界实现 Payment Methods 与 Checkout，并在 `features/orders`
+复用 canonical Order Status。Payment Methods 使用无 credential 的 `['billing', 'methods']` query，
+只在用户从 pending Order Detail 明确打开支付流程后读取；Order Status 使用
+`['orders', 'status', id]`。两者都是 TanStack Query server state，不进入 Zustand 或 storage。
+
+Checkout request 只发送 strict `paymentMethodId`，mutation 显式 `retry: false`，并与 Cancel 共用
+当前 Order Detail 的同步 action lock。`finished`、QR 与任何不确定 POST 结果均不能直接声明付款完成；
+客户端只通过 `GET /api/v1/orders/{id}/status` 获取权威状态。QR opaque content 仅在本地通过
+`qrcode.react` 生成，不 fetch、不解析、不持久化；redirect target 只在用户点击“前往支付”后使用
+当前 tab 原样导航，也不持久化。
+
+QR 或 finished-pending 流程约每 3 秒轮询一次 Order Status，非 pending、Payment UI 关闭、route
+unmount、Auth failure 或约 5 分钟 hard cap 时停止。状态变化后刷新 Detail/List；hard cap 后只允许
+用户手动刷新状态，绝不自动重复 Checkout。NETWORK_ERROR、UPSTREAM_TIMEOUT、UPSTREAM_ERROR 与
+MALFORMED_RESPONSE 先读取 Status/Detail/List，并要求用户显式确认已核对状态后才能再次 POST。
+Payment Method fee 只显示 fixedMinor 和 percent metadata；fixedMinor 复用 Account Config 与
+`formatMinorMoney`，不得计算 percentage fee 或最终应付金额。
 
 ## Theme and presentation
 

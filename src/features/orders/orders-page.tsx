@@ -5,6 +5,8 @@ import { useAccountConfig } from '@/features/account/account-queries'
 import { formatMinorMoney } from '@/features/catalog/money-format'
 import { isInvalidSessionError } from '@/features/auth/auth-errors'
 import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invalid-session-error'
+import { useSynchronousActionLock } from '@/features/auth/use-synchronous-action-lock'
+import { OrderPaymentControl } from '@/features/payments/order-payment-control'
 import { formatAbsoluteDateTime } from '@/features/subscription/subscription-format'
 import { ReadError } from '@/components/shared/read-error'
 import {
@@ -243,9 +245,11 @@ function OrdersContent({ accessToken }: { accessToken: string }) {
                       : formatAbsoluteDateTime(detail.data.expiresAt)}
                   </DetailField>
                 </dl>
-                <OrderCancelControl
+                <OrderDetailActions
                   accessToken={accessToken}
                   order={detail.data}
+                  accountConfig={accountConfig}
+                  configPending={config.isPending}
                 />
               </>
             ) : detail.isError ? (
@@ -266,5 +270,59 @@ function OrdersContent({ accessToken }: { accessToken: string }) {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+function OrderDetailActions({
+  accessToken,
+  accountConfig,
+  configPending,
+  order,
+}: {
+  accessToken: string
+  accountConfig: AccountConfig | null
+  configPending: boolean
+  order: Order
+}) {
+  const sharedActionLock = useSynchronousActionLock()
+  const [activeMutation, setActiveMutation] = useState<
+    'cancel' | 'payment' | null
+  >(null)
+  const [cancelConfirming, setCancelConfirming] = useState(false)
+  const [paymentFlowOpen, setPaymentFlowOpen] = useState(false)
+
+  const tryAcquire = (kind: 'cancel' | 'payment') => {
+    if (!sharedActionLock.tryAcquire()) return false
+    setActiveMutation(kind)
+    return true
+  }
+  const release = () => {
+    setActiveMutation(null)
+    sharedActionLock.release()
+  }
+
+  return (
+    <>
+      {order.status === 'pending' ? (
+        <OrderPaymentControl
+          accessToken={accessToken}
+          accountConfig={accountConfig}
+          configPending={configPending}
+          disabled={activeMutation === 'cancel' || cancelConfirming}
+          order={order}
+          onFlowOpenChange={setPaymentFlowOpen}
+          tryAcquireSharedAction={() => tryAcquire('payment')}
+          releaseSharedAction={release}
+        />
+      ) : null}
+      <OrderCancelControl
+        accessToken={accessToken}
+        disabled={activeMutation === 'payment' || paymentFlowOpen}
+        order={order}
+        onConfirmingChange={setCancelConfirming}
+        tryAcquireSharedAction={() => tryAcquire('cancel')}
+        releaseSharedAction={release}
+      />
+    </>
   )
 }
