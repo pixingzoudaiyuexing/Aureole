@@ -1,11 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { FeaturePlaceholder } from '@/components/shared/feature-placeholder'
+import { TicketsPage } from '@/features/tickets/tickets-page'
 
 export const Route = createFileRoute('/_app/support')({
-  component: () => (
-    <FeaturePlaceholder
-      title="Support"
-      description="Support tickets and replies will be connected after the core account experience is ready."
-    />
-  ),
+  component: TicketsPage,
 })

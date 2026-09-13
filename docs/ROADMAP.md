@@ -9,8 +9,8 @@
 | 4         | COMPLETE | Read-only Core                                                           |
 | 5         | COMPLETE | Commerce / Payment                                                       |
 | 6         | COMPLETE | Subscription Mutations                                                   |
-| 7         | CURRENT  | Wallet / Gift Card                                                       |
-| 8         | PLANNED  | Support                                                                  |
+| 7         | COMPLETE | Wallet / Gift Card                                                       |
+| 8         | CURRENT  | Support                                                                  |
 | 9         | PLANNED  | Referral / Commission / Withdrawal                                       |
 | 10        | PLANNED  | Launch Readiness                                                         |
 
@@ -49,9 +49,17 @@ Milestone 7 按以下边界推进：
 
 - AUR-M7-001 Wallet Balance Read Model：COMPLETE，Independent Wallet/Auth Review PASS
 - AUR-M7-002 Wallet Deposit Create + Payment Handoff：COMPLETE，Independent Financial Mutation Review PASS
-- AUR-M7-003 Gift Card Redeem：IMPLEMENTATION COMPLETE，INDEPENDENT REVIEW PENDING
+- AUR-M7-003 Gift Card Redeem：COMPLETE，Independent Gift Card/Account Mutation Review PASS
 
-AUR-M7-003 只提交原样 credential-like code，并忠实展示 solution Public effect；成功与 UNKNOWN 均读取
-Wallet、Me 与 Subscription Overview，但不从账户变化推断 mutation outcome。Deposit 与 Gift Card
-金融 mutation 互斥。本任务不实现历史、preview、ledger 或后续 Milestone。Production Gift Card
-runtime 仍为 NOT TESTED；Milestone 7 暂不标记 COMPLETE。
+Milestone 7 已完成并冻结。Production solution/V2Board Wallet、Deposit、Payment 与 Gift Card runtime
+仍为 NOT TESTED，属于 Launch Readiness evidence gap。
+
+Milestone 8 按以下边界推进：
+
+- AUR-M8-001 Support Ticket Read Model：IMPLEMENTATION COMPLETE，INDEPENDENT REVIEW PENDING
+- AUR-M8-002 Create Ticket：NOT STARTED
+- AUR-M8-003 Reply + Close Ticket：NOT STARTED
+
+AUR-M8-001 只实现 `GET /api/v1/tickets` 与 `GET /api/v1/tickets/{id}`。List/Message 保持 server order，
+Detail lazy-load，Ticket text 只按不可信普通文本展示；不实现 create、reply、close、attachment、unread、
+search/filter 或任何 Referral / Commission / Withdrawal。Milestone 8 保持 CURRENT。

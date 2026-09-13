@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 7 - Wallet / Gift Card (`AUR-M7-003` Gift Card Redeem)
+Milestone 8 - Support (`AUR-M8-001` Support Ticket Read Model)
 
 ## Contract baseline
 
@@ -53,12 +53,19 @@ COMPLETE and its Independent Security Review passed. AUR-M6-002 Advance Period i
 COMPLETE and its Independent Subscription Mutation Review passed. Production
 Subscription Rotation and Advance Period runtime remain NOT TESTED.
 
-Milestone 7 is CURRENT. AUR-M7-001 Wallet Balance Read Model is COMPLETE and its
+Milestone 7 is COMPLETE and FROZEN. AUR-M7-001 Wallet Balance Read Model is COMPLETE and its
 Independent Wallet/Auth Review passed. AUR-M7-002 Wallet Deposit Create + Payment
-Handoff is COMPLETE and its Independent Financial Mutation Review passed.
-AUR-M7-003 Gift Card Redeem is IMPLEMENTATION COMPLETE with INDEPENDENT REVIEW
-PENDING. Production solution/V2Board Wallet, Deposit, Payment and Gift Card runtime
-is NOT TESTED. Milestone 7 remains CURRENT pending independent review.
+Handoff is COMPLETE and its Independent Financial Mutation Review passed. AUR-M7-003
+Gift Card Redeem is COMPLETE and its Independent Gift Card/Account Mutation Review
+passed. Production solution/V2Board Wallet, Deposit, Payment and Gift Card runtime is
+NOT TESTED and remains a Launch Readiness evidence gap.
+
+Milestone 8 is CURRENT. AUR-M8-001 Support Ticket Read Model is IMPLEMENTATION
+COMPLETE with INDEPENDENT REVIEW PENDING. It implements only Ticket List and lazy
+Ticket Detail reads with strict Public DTO parsing, server-order preservation,
+plain-text rendering and sealed Auth invalidation. AUR-M8-002 Create Ticket and
+AUR-M8-003 Reply + Close Ticket are NOT STARTED. Production solution/V2Board Ticket
+runtime is NOT TESTED.
 
 ## Current commit
 
@@ -72,15 +79,15 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (34 files, 711 tests)
+- `npm test`: PASS (36 files, 743 tests)
 - `npm run build`: PASS
 - `npm ls`: PASS
 - `git diff --check`: PASS
-- Build evidence: main JS 471.73 kB raw / 148.32 kB gzip; CSS 34.96 kB raw /
-  7.16 kB gzip; Wallet route 23.81 kB raw / 7.05 kB gzip; Subscription route
-  20.18 kB raw / 5.82 kB gzip; Plans route 5.16 kB gzip; Orders route 13.17 kB gzip.
-  Assets remain within budget; initial-route composition has not been measured
-  by a dedicated analyzer.
+- Build evidence: main JS 471.71 kB raw / 148.30 kB gzip; CSS 36.32 kB raw /
+  7.37 kB gzip; Support route 8.66 kB raw / 3.07 kB gzip; Wallet route 23.81 kB
+  raw / 7.06 kB gzip; Subscription route 20.18 kB raw / 5.83 kB gzip; Plans
+  route 5.16 kB gzip; Orders route 13.17 kB gzip. Assets remain within budget;
+  initial-route composition has not been measured by a dedicated analyzer.
 - Browser verification: PASS at 1280 x 720 and 390 x 844 for Login Light/Dark,
   keyboard validation, visible error, loading, controlled login, refresh
   bootstrap, authenticated App Shell, mobile Drawer and local logout. No
@@ -230,13 +237,28 @@ operational source of truth.
   signed INT boundaries, malformed effects, same-tick locks, ALREADY_REDEEMED
   after UNKNOWN and every recovery/Auth boundary. Production solution/V2Board
   Gift Card runtime is NOT TESTED.
+- AUR-M8-001 controlled-browser verification: PASS at exact 1280 x 720 and
+  390 x 844 in Light/Dark/System for empty and ordered multi-Ticket lists, all
+  priority/status labels, lazy Detail selection and switching, empty Messages,
+  long subject/message/URL/numeric ID, multiline content, `fromMe` true/false,
+  List/Detail ordinary errors and keyboard Retry, `TICKET_NOT_FOUND`, List/Detail
+  Auth invalidation, Escape/focus restoration and selected-item semantics. XSS-like
+  subject/message strings stayed visible as text; no `img`, `script`, unsafe anchor
+  or `window.hacked` execution was observed. Request evidence showed one initial
+  Ticket List GET, no eager Detail or Ticket POST, and one exact Detail GET per
+  selected Ticket. No horizontal overflow, Create/Reply/Close control, raw upstream
+  message, browser console warning/error or application page error was observed.
+  Production solution/V2Board Ticket runtime is NOT TESTED.
 
 ## Known gaps
 
-- Wallet Balance Read and Wallet Deposit Create are complete and independently
-  reviewed. Gift Card Redeem is implemented but still requires independent Gift
-  Card / Account Mutation Review. Support and Referrals remain placeholders without
-  mock business data.
+- Wallet Balance Read, Wallet Deposit Create and Gift Card Redeem are complete and
+  independently reviewed. Support Ticket List/Detail reads are implemented pending
+  independent review; Create/Reply/Close remain NOT STARTED. Referrals remains a
+  placeholder without mock business data.
+- Production solution/V2Board Ticket List and Detail behavior is NOT TESTED;
+  controlled mock browser and automated contract/privacy tests are the current
+  evidence.
 - Production solution/V2Board Order Create, Promotion and Cancel behavior is NOT
   TESTED; controlled mock browser and automated contract/privacy tests are the
   current evidence.
@@ -256,6 +278,5 @@ operational source of truth.
 
 ## Next milestone
 
-AUR-M7-003 implementation is complete. Exact-head CI verification and independent
-Gift Card / Account Mutation Review are the next required gates. The next milestone
-has not started.
+AUR-M8-001 implementation is complete. Exact-head CI verification and independent
+Support Read Review are the next required gates. AUR-M8-002 has not started.

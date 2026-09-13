@@ -294,6 +294,28 @@ acknowledgement 与新的标准确认才能再次 POST。Deposit 与 Gift Card �
 coordinator，最多一个金融 POST 处于活动状态。Gift Card history/preview、ledger、pending balance、
 bonus/fee、第二套 Payment flow 和其他后续里程碑能力均未实现。
 
+## Support Ticket read model
+
+`features/tickets` 持有 Support Ticket List 与 Detail 的 Public DTO parser、canonical Query 和
+只读页面边界。`GET /api/v1/tickets` 使用 credential-free `['tickets']` query；
+`GET /api/v1/tickets/{id}` 只在用户选择一条工单后使用 `['tickets', 'detail', id]` lazy query，
+不会进入页面时为每条工单预取 Detail。Ticket ID 复用 `1..2147483647` 的正整数 schema，非法本地
+ID 在 HTTP request 前被拒绝。
+
+List 与 Message 都保持 solution 返回顺序，不按时间、优先级、状态或 sender 重排。Parser 只保留
+Public `id`、`subject`、`priority`、`status`、timestamps、message `content` 与 `fromMe`，strip additive
+字段，并把已知字段、枚举、ID、timestamp 或 message 形状异常统一归类为 MALFORMED_RESPONSE。
+
+`subject` 与 message `content` 是不可信账户文本，只由 React text rendering 展示；不作为 HTML 或
+Markdown 解释，不使用 `dangerouslySetInnerHTML` 或 sanitizer。Message 使用 `white-space: pre-wrap`
+保留换行，并允许长单词和 URL 断行。Ticket data 只存在于 TanStack Query memory 和当前 React selection，
+不进入 Zustand、storage、URL、analytics 或 console。
+
+普通 List failure 保留 Support layout 并提供局部 Retry；Detail ordinary failure 与
+`TICKET_NOT_FOUND` 只影响 Detail，List 保持原样。List 或 Detail 的 AUTH_REQUIRED/AUTH_FAILED 继续复用
+sealed Auth Session Core 清理 credential 与完整 Query cache。本阶段不实现 Ticket create、reply、close、
+attachment、unread、search/filter、counter 或任何 Referral / Commission / Withdrawal 能力。
+
 ## Theme and presentation
 
 Light、Dark、System 由 Theme Provider 管理；显式选择可保存为非敏感 local UI preference。CSS tokens 是颜色和 radius 的 SSOT，传统 `tailwind.config.js` 不是 token 核心。使用 system font 与 system monospace。

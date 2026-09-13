@@ -221,6 +221,24 @@
 - AUR-M7-003 不实现 Gift Card list/history/preview、ledger、pending balance、bonus/fee、callback、第二套
   Payment flow、Support、Referral、Commission、Withdrawal 或 Launch Readiness。
 
+## Support Ticket read mapping
+
+- `GET /api/v1/tickets` 是 `/support` 的唯一 List 来源，使用 credential-free canonical
+  `['tickets']` query。Aureole 只接受 `{ tickets: TicketSummary[] }`，strip additive/V2Board 字段，
+  保持 server order，不推导 unread、waiting state、SLA、priority sort 或 open-first sort。
+- `GET /api/v1/tickets/{id}` 只在用户明确选择 Ticket 后读取，并使用
+  `['tickets', 'detail', id]` canonical cache。ID 必须是 `1..2147483647` 的十进制正整数字符串；非法
+  本地 ID 不发 HTTP request。Message 保持 server order，sender 只依据 Public `fromMe` 显示为“我”或
+  “客服”，不推断 staff/admin identity。
+- Ticket `subject` 与 Message `content` 只作为 React text node 展示，不解释 HTML/Markdown，不创建
+  unsafe link，不使用 `dangerouslySetInnerHTML` 或 sanitizer。换行使用 `white-space: pre-wrap` 保留，
+  长文本允许安全断行。
+- List ordinary error 提供局部 Retry；Detail ordinary error 与 `TICKET_NOT_FOUND` 不清除或修改 List。
+  两个 GET 的 AUTH_REQUIRED/AUTH_FAILED 均复用 sealed Session Core 清理 credential 与完整 Query cache。
+- Ticket 内容不进入 storage、URL、Zustand、analytics、console 或 Query key。本阶段不调用
+  `POST /api/v1/tickets`、reply/close route，也不实现 attachment、search/filter、unread/counter 或
+  Referral / Commission / Withdrawal。
+
 ## Error and request rules
 
 - 业务分支依据稳定 `error.code`，禁止依据 message 文本包含关系。

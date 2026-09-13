@@ -1,0 +1,150 @@
+import { describe, expect, it, vi } from 'vitest'
+import { ticketsApi } from '@/features/tickets/tickets-api'
+import { apiClient } from '@/lib/api/client'
+import { ApiError } from '@/lib/api/errors'
+
+const token = 'opaque-token'
+const summary = {
+  id: '7',
+  subject: 'Connection issue',
+  priority: 'normal' as const,
+  status: 'open' as const,
+  createdAt: '2026-09-13T00:00:00.000Z',
+  updatedAt: '2026-09-13T01:00:00.000Z',
+}
+
+const detail = {
+  ...summary,
+  messages: [
+    {
+      id: '11',
+      content: 'First message',
+      fromMe: true,
+      createdAt: '2026-09-13T00:10:00.000Z',
+    },
+    {
+      id: '12',
+      content: 'Second message',
+      fromMe: false,
+      createdAt: '2026-09-13T00:20:00.000Z',
+    },
+  ],
+}
+
+describe('Tickets API', () => {
+  it('requests the exact list path, preserves server order, and strips private fields', async () => {
+    const request = vi
+      .spyOn(apiClient, 'authenticatedRequest')
+      .mockResolvedValue({
+        tickets: [
+          {
+            ...summary,
+            level: 1,
+            user_id: 99,
+            rawStatus: 0,
+          },
+          {
+            ...summary,
+            id: '8',
+            subject: 'Second ticket',
+            priority: 'high',
+            status: 'closed',
+          },
+        ],
+        internal: true,
+      })
+
+    await expect(ticketsApi.getList(token)).resolves.toEqual([
+      summary,
+      {
+        ...summary,
+        id: '8',
+        subject: 'Second ticket',
+        priority: 'high',
+        status: 'closed',
+      },
+    ])
+    expect(request).toHaveBeenCalledWith('/api/v1/tickets', {
+      method: 'GET',
+      accessToken: token,
+    })
+  })
+
+  it('accepts an empty list and every public priority/status', async () => {
+    const request = vi.spyOn(apiClient, 'authenticatedRequest')
+    request.mockResolvedValueOnce({ tickets: [] })
+    await expect(ticketsApi.getList(token)).resolves.toEqual([])
+
+    request.mockResolvedValueOnce({
+      tickets: [
+        { ...summary, priority: 'low', status: 'open' },
+        { ...summary, id: '8', priority: 'normal', status: 'closed' },
+        { ...summary, id: '9', priority: 'high', status: 'open' },
+      ],
+    })
+    await expect(ticketsApi.getList(token)).resolves.toHaveLength(3)
+  })
+
+  it.each([
+    { ...summary, id: '0' },
+    { ...summary, id: '2147483648' },
+    { ...summary, subject: '' },
+    { ...summary, priority: 'urgent' },
+    { ...summary, status: 'pending' },
+    { ...summary, createdAt: 'not-a-date' },
+    { ...summary, updatedAt: '2026-09-13' },
+  ])('rejects malformed ticket summaries', async (ticket) => {
+    vi.spyOn(apiClient, 'authenticatedRequest').mockResolvedValue({
+      tickets: [ticket],
+    })
+    await expect(ticketsApi.getList(token)).rejects.toMatchObject({
+      code: 'MALFORMED_RESPONSE',
+    } satisfies Partial<ApiError>)
+  })
+
+  it('requests exact detail, preserves message order, and strips private fields', async () => {
+    const request = vi
+      .spyOn(apiClient, 'authenticatedRequest')
+      .mockResolvedValue({
+        ...detail,
+        staffName: 'private-agent',
+        user_id: 99,
+        messages: detail.messages.map((message) => ({
+          ...message,
+          ticket_id: 7,
+          admin_id: 3,
+          email: 'private@example.com',
+        })),
+      })
+
+    await expect(ticketsApi.getDetail(token, '7')).resolves.toEqual(detail)
+    expect(request).toHaveBeenCalledWith('/api/v1/tickets/7', {
+      method: 'GET',
+      accessToken: token,
+    })
+  })
+
+  it.each([
+    { ...detail.messages[0], id: undefined },
+    { ...detail.messages[0], content: undefined },
+    { ...detail.messages[0], fromMe: 'true' },
+    { ...detail.messages[0], createdAt: 'bad' },
+  ])('rejects malformed ticket messages', async (message) => {
+    vi.spyOn(apiClient, 'authenticatedRequest').mockResolvedValue({
+      ...detail,
+      messages: [message],
+    })
+    await expect(ticketsApi.getDetail(token, '7')).rejects.toMatchObject({
+      code: 'MALFORMED_RESPONSE',
+    } satisfies Partial<ApiError>)
+  })
+
+  it.each(['0', '-1', '1.5', '1e3', '01', 'ticket-7', '2147483648'])(
+    'rejects invalid local detail id %s before requesting',
+    async (id) => {
+      const request = vi.spyOn(apiClient, 'authenticatedRequest')
+      await expect(ticketsApi.getDetail(token, id)).rejects.toBeDefined()
+      expect(request).not.toHaveBeenCalled()
+    },
+  )
+})
