@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ticketsApi } from '@/features/tickets/tickets-api'
+import {
+  ticketCreateMutationOptions,
+  ticketsMutationKeys,
+} from '@/features/tickets/tickets-queries'
 import { apiClient } from '@/lib/api/client'
 import { ApiError } from '@/lib/api/errors'
 
@@ -147,4 +151,79 @@ describe('Tickets API', () => {
       expect(request).not.toHaveBeenCalled()
     },
   )
+
+  it.each([
+    ['x', 'low', 'm'],
+    ['s'.repeat(255), 'normal', 'm'.repeat(10_000)],
+    [
+      '  <img src=x onerror=alert(1)>  ',
+      'high',
+      ' first line\n<script>alert(1)</script> ',
+    ],
+  ] as const)(
+    'posts exact raw Create Ticket input with %s priority',
+    async (subject, priority, message) => {
+      const request = vi
+        .spyOn(apiClient, 'authenticatedRequest')
+        .mockResolvedValue({ created: true, private: 'strip-me' })
+
+      await expect(
+        ticketsApi.create(token, { subject, priority, message }),
+      ).resolves.toEqual({ created: true })
+      expect(request).toHaveBeenCalledWith('/api/v1/tickets', {
+        method: 'POST',
+        body: { subject, priority, message },
+        accessToken: token,
+      })
+    },
+  )
+
+  it.each([
+    { subject: '', priority: 'normal', message: 'm' },
+    { subject: 's'.repeat(256), priority: 'normal', message: 'm' },
+    { subject: 's', priority: 'normal', message: '' },
+    { subject: 's', priority: 'normal', message: 'm'.repeat(10_001) },
+    { subject: 's', priority: 'urgent', message: 'm' },
+    { subject: 's', priority: '普通', message: 'm' },
+    { subject: 's', priority: 'normal', message: 'm', level: 1 },
+    { subject: 's', priority: 'normal', message: 'm', status: 'open' },
+    { subject: 's', priority: 'normal', message: 'm', id: '7' },
+    { subject: 's', priority: 'normal', message: 'm', email: 'x@example.com' },
+  ])(
+    'rejects invalid or expanded Create Ticket input %# before POST',
+    async (input) => {
+      const request = vi.spyOn(apiClient, 'authenticatedRequest')
+
+      await expect(
+        ticketsApi.create(token, input as never),
+      ).rejects.toBeDefined()
+      expect(request).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each([{ created: false }, {}, { created: 'true' }, { created: 1 }])(
+    'rejects malformed Create Ticket success %#',
+    async (payload) => {
+      vi.spyOn(apiClient, 'authenticatedRequest').mockResolvedValue(payload)
+
+      await expect(
+        ticketsApi.create(token, {
+          subject: 'subject',
+          priority: 'normal',
+          message: 'message',
+        }),
+      ).rejects.toMatchObject({
+        code: 'MALFORMED_RESPONSE',
+      } satisfies Partial<ApiError>)
+    },
+  )
+
+  it('uses a credential- and content-free non-retrying mutation key', () => {
+    const options = ticketCreateMutationOptions(token)
+    expect(ticketsMutationKeys.create).toEqual(['tickets', 'create'])
+    expect(options.mutationKey).not.toContain(token)
+    expect(JSON.stringify(options.mutationKey)).not.toContain('subject')
+    expect(JSON.stringify(options.mutationKey)).not.toContain('message')
+    expect(options.retry).toBe(false)
+  })
 })

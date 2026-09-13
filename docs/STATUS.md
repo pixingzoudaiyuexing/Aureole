@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 8 - Support (`AUR-M8-001` Support Ticket Read Model)
+Milestone 8 - Support (`AUR-M8-002` Create Support Ticket)
 
 ## Contract baseline
 
@@ -60,12 +60,13 @@ Gift Card Redeem is COMPLETE and its Independent Gift Card/Account Mutation Revi
 passed. Production solution/V2Board Wallet, Deposit, Payment and Gift Card runtime is
 NOT TESTED and remains a Launch Readiness evidence gap.
 
-Milestone 8 is CURRENT. AUR-M8-001 Support Ticket Read Model is IMPLEMENTATION
-COMPLETE with INDEPENDENT REVIEW PENDING. It implements only Ticket List and lazy
-Ticket Detail reads with strict Public DTO parsing, server-order preservation,
-plain-text rendering and sealed Auth invalidation. AUR-M8-002 Create Ticket and
-AUR-M8-003 Reply + Close Ticket are NOT STARTED. Production solution/V2Board Ticket
-runtime is NOT TESTED.
+Milestone 8 is CURRENT. AUR-M8-001 Support Ticket Read Model is COMPLETE and its
+Independent Support Read Review passed. AUR-M8-002 Create Support Ticket is
+IMPLEMENTATION COMPLETE with INDEPENDENT REVIEW PENDING. It adds only strict raw-text
+Ticket Create, non-retrying/synchronously locked POST, authoritative List recovery,
+confirmed-success fail-closed reconciliation and guarded UNKNOWN resubmission.
+AUR-M8-003 Reply + Close Ticket is NOT STARTED. Production solution/V2Board Ticket
+Read/Create runtime is NOT TESTED.
 
 ## Current commit
 
@@ -79,12 +80,12 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (36 files, 743 tests)
+- `npm test`: PASS (37 files, 783 tests)
 - `npm run build`: PASS
 - `npm ls`: PASS
 - `git diff --check`: PASS
-- Build evidence: main JS 471.71 kB raw / 148.30 kB gzip; CSS 36.32 kB raw /
-  7.37 kB gzip; Support route 8.66 kB raw / 3.07 kB gzip; Wallet route 23.81 kB
+- Build evidence: main JS 471.72 kB raw / 148.30 kB gzip; CSS 36.39 kB raw /
+  7.39 kB gzip; Support route 19.24 kB raw / 6.05 kB gzip; Wallet route 23.81 kB
   raw / 7.06 kB gzip; Subscription route 20.18 kB raw / 5.83 kB gzip; Plans
   route 5.16 kB gzip; Orders route 13.17 kB gzip. Assets remain within budget;
   initial-route composition has not been measured by a dedicated analyzer.
@@ -249,14 +250,27 @@ operational source of truth.
   selected Ticket. No horizontal overflow, Create/Reply/Close control, raw upstream
   message, browser console warning/error or application page error was observed.
   Production solution/V2Board Ticket runtime is NOT TESTED.
+- AUR-M8-002 controlled-browser verification: PASS at exact 1280 x 720 and
+  390 x 844 in Light/Dark/System for Create open/cancel/focus restoration,
+  low/normal/high priority, 1/255/256 subject and 1/10000/10001 message
+  boundaries, multiline and HTML-like raw input, same-tick submit, pending form
+  locking, confirmed success, success reconciliation failure, TICKET_UNAVAILABLE,
+  TICKET_CREATE_FAILED, VALIDATION_ERROR, UNKNOWN List recovery success/failure,
+  keyboard manual recovery, acknowledgement reset after payload change, Create
+  and recovery Auth invalidation, and existing Ticket Detail read behavior.
+  Request evidence showed exact raw Public body, one POST under double submit,
+  GET-only reconciliation/manual recovery, no automatic Detail, and no inferred
+  Ticket selection/ID. No horizontal overflow, raw upstream message, Reply/Close
+  control, browser console warning/error or application page error was observed.
+  Production solution/V2Board Ticket Create runtime is NOT TESTED.
 
 ## Known gaps
 
-- Wallet Balance Read, Wallet Deposit Create and Gift Card Redeem are complete and
-  independently reviewed. Support Ticket List/Detail reads are implemented pending
-  independent review; Create/Reply/Close remain NOT STARTED. Referrals remains a
-  placeholder without mock business data.
-- Production solution/V2Board Ticket List and Detail behavior is NOT TESTED;
+- Wallet Balance Read, Wallet Deposit Create, Gift Card Redeem and Support Ticket
+  List/Detail reads are complete and independently reviewed. Support Ticket Create
+  is implemented pending independent review; Reply/Close remain NOT STARTED.
+  Referrals remains a placeholder without mock business data.
+- Production solution/V2Board Ticket List, Detail and Create behavior is NOT TESTED;
   controlled mock browser and automated contract/privacy tests are the current
   evidence.
 - Production solution/V2Board Order Create, Promotion and Cancel behavior is NOT
@@ -278,5 +292,5 @@ operational source of truth.
 
 ## Next milestone
 
-AUR-M8-001 implementation is complete. Exact-head CI verification and independent
-Support Read Review are the next required gates. AUR-M8-002 has not started.
+AUR-M8-002 implementation is complete. Exact-head CI verification and independent
+Create Ticket Mutation Review are the next required gates. AUR-M8-003 has not started.

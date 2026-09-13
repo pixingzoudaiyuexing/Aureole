@@ -236,8 +236,23 @@
 - List ordinary error 提供局部 Retry；Detail ordinary error 与 `TICKET_NOT_FOUND` 不清除或修改 List。
   两个 GET 的 AUTH_REQUIRED/AUTH_FAILED 均复用 sealed Session Core 清理 credential 与完整 Query cache。
 - Ticket 内容不进入 storage、URL、Zustand、analytics、console 或 Query key。本阶段不调用
-  `POST /api/v1/tickets`、reply/close route，也不实现 attachment、search/filter、unread/counter 或
-  Referral / Commission / Withdrawal。
+  reply/close route，也不实现 attachment、search/filter、unread/counter 或 Referral / Commission /
+  Withdrawal。
+- `POST /api/v1/tickets` 只接受并原样发送 strict `{ subject, priority, message }`；subject/message
+  仅做 1..255 / 1..10000 structural validation，不 trim、normalize、sanitize 或转换换行。Aureole
+  不发送 `level`、status、identity、timestamp 或其他字段，也不复制 V2Board create eligibility。
+- Create 使用 content/credential-free `['tickets', 'create']` mutation key、`retry: false` 和同步锁。
+  打开/填写/取消 Dialog 都不发 POST；只有显式“提交工单”会 POST，pending 时全部 form control 锁定。
+- Success 只接受 `{ created: true }`，清空 form 后重新读取 canonical `['tickets']`。Public success
+  没有 Ticket ID；Aureole 不按 List diff、subject/message、timestamp、priority、最高 ID 或首末行推断、
+  选择或打开所谓新 Ticket，也不自动请求 Detail。
+- Confirmed success、`TICKET_UNAVAILABLE` 与 UNKNOWN 后的 List reconciliation 都只发 GET。
+  Success reconciliation failure 保持 Create success，但 fail closed；`TICKET_UNAVAILABLE` 使用泛化
+  文案。`TICKET_CREATE_FAILED` / `VALIDATION_ERROR` 保留表单并要求新的显式提交。
+- NETWORK_ERROR、UPSTREAM_TIMEOUT、UPSTREAM_ERROR、MALFORMED_RESPONSE 与 non-ApiError 均视为
+  UNKNOWN。List recovery 成功不改变 UNKNOWN outcome；再次 Create 前需专用 acknowledgement，修改
+  payload 会清除 acknowledgement。Recovery 失败只允许手动 List GET，任何 recovery Auth failure
+  进入 sealed Session Core。
 
 ## Error and request rules
 

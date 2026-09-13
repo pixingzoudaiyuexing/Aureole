@@ -128,7 +128,8 @@ describe('Support tickets page', () => {
     expect(mocks.getList).toHaveBeenCalledWith('token')
     expect(mocks.getDetail).not.toHaveBeenCalled()
 
-    for (const command of ['新建工单', '回复', '关闭工单']) {
+    expect(screen.getByRole('button', { name: '新建工单' })).toBeInTheDocument()
+    for (const command of ['回复', '关闭工单']) {
       expect(screen.queryByRole('button', { name: command })).toBeNull()
     }
   })
@@ -138,7 +139,7 @@ describe('Support tickets page', () => {
     mocks.getList.mockResolvedValue([])
     renderSupport()
     expect(await screen.findByText('暂无支持工单。')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /新建/ })).toBeNull()
+    expect(screen.getByRole('button', { name: '新建工单' })).toBeEnabled()
   })
 
   it('loads only the selected detail, switches tickets, and restores focus', async () => {

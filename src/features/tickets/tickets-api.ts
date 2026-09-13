@@ -10,10 +10,11 @@ export const ticketPriorities = ['low', 'normal', 'high'] as const
 export const ticketStatuses = ['open', 'closed'] as const
 
 const timestampSchema = z.string().datetime({ offset: true })
+const subjectSchema = z.string().min(1).max(255)
 const ticketSummarySchema = z
   .object({
     id: ticketIdSchema,
-    subject: z.string().min(1).max(255),
+    subject: subjectSchema,
     priority: z.enum(ticketPriorities),
     status: z.enum(ticketStatuses),
     createdAt: timestampSchema,
@@ -34,12 +35,22 @@ const ticketsResponseSchema = z
 const ticketDetailSchema = ticketSummarySchema
   .extend({ messages: z.array(ticketMessageSchema) })
   .strip()
+export const createTicketRequestSchema = z
+  .object({
+    subject: subjectSchema,
+    priority: z.enum(ticketPriorities),
+    message: z.string().min(1).max(10_000),
+  })
+  .strict()
+const createdTicketSchema = z.object({ created: z.literal(true) }).strip()
 
 export type TicketPriority = (typeof ticketPriorities)[number]
 export type TicketStatus = (typeof ticketStatuses)[number]
 export type TicketSummary = z.infer<typeof ticketSummarySchema>
 export type TicketMessage = z.infer<typeof ticketMessageSchema>
 export type TicketDetail = z.infer<typeof ticketDetailSchema>
+export type CreateTicketInput = z.input<typeof createTicketRequestSchema>
+export type CreatedTicket = z.infer<typeof createdTicketSchema>
 
 function parse<T>(schema: z.ZodType<T>, data: unknown) {
   const result = schema.safeParse(data)
@@ -69,5 +80,14 @@ export const ticketsApi = {
       { method: 'GET', accessToken },
     )
     return parse(ticketDetailSchema, data)
+  },
+
+  async create(accessToken: string, input: CreateTicketInput) {
+    const body = createTicketRequestSchema.parse(input)
+    const data = await apiClient.authenticatedRequest<unknown>(
+      '/api/v1/tickets',
+      { method: 'POST', body, accessToken },
+    )
+    return parse(createdTicketSchema, data)
   },
 }

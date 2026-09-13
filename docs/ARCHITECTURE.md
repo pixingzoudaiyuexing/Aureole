@@ -313,8 +313,27 @@ Markdown 解释，不使用 `dangerouslySetInnerHTML` 或 sanitizer。Message �
 
 普通 List failure 保留 Support layout 并提供局部 Retry；Detail ordinary failure 与
 `TICKET_NOT_FOUND` 只影响 Detail，List 保持原样。List 或 Detail 的 AUTH_REQUIRED/AUTH_FAILED 继续复用
-sealed Auth Session Core 清理 credential 与完整 Query cache。本阶段不实现 Ticket create、reply、close、
+sealed Auth Session Core 清理 credential 与完整 Query cache。AUR-M8-001 不实现 Ticket mutation、
 attachment、unread、search/filter、counter 或任何 Referral / Commission / Withdrawal 能力。
+
+AUR-M8-002 在同一 `features/tickets` 边界增加 `POST /api/v1/tickets`。Create request 使用 strict
+schema，只原样发送 `subject`、Public `priority` 和 `message`；不 trim、normalize、sanitize、转换
+Markdown 或发送 V2Board `level`。Mutation key 是 credential/content-free 的
+`['tickets', 'create']`，显式 `retry: false`，并使用同步 action lock 阻止 same-tick 重复 POST。
+Form 与 UNKNOWN guard 仅由 React local state 持有，不进入 Zustand、Query key、storage、URL、
+analytics、console 或 error metadata。
+
+Create success 只接受 literal `{ created: true }`，不返回或推断 Ticket ID。Confirmed success 清空
+form、恢复默认 `normal`、关闭 Dialog，并重新读取 canonical Ticket List；不会按 subject、priority、
+timestamp、list diff、ID 或 server order 认领/打开某条 Ticket，也不会预取 Detail。Success 后 List
+reconciliation 失败仍保持“工单已提交”，但 Create fail closed，直到手动 List GET 成功。
+
+`TICKET_UNAVAILABLE` 使用泛化资格文案并重新读取 List；`TICKET_CREATE_FAILED` 与
+`VALIDATION_ERROR` 保留可编辑原文并要求新的显式提交。NETWORK_ERROR、UPSTREAM_TIMEOUT、
+UPSTREAM_ERROR、MALFORMED_RESPONSE 及 non-ApiError 都是 UNKNOWN：立即读取 List，但不从结果推断
+本次 Create outcome；List 成功后仍要求用户确认已检查列表，修改 payload 会清除 acknowledgement。
+List recovery 失败时只开放手动 GET recovery。Create 或任一 reconciliation/recovery GET 的 Auth
+failure 继续复用 sealed Session Core。本阶段仍不实现 reply、close 或后续 Milestone。
 
 ## Theme and presentation
 

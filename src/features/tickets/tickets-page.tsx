@@ -21,6 +21,7 @@ import type {
   TicketStatus,
   TicketSummary,
 } from './tickets-api'
+import { TicketCreateControl } from './ticket-create-control'
 import { useTicketDetail, useTickets } from './tickets-queries'
 
 const priorityLabels: Record<TicketPriority, string> = {
@@ -149,6 +150,7 @@ function TicketsContent({ accessToken }: { accessToken: string }) {
         <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
           查看你的支持工单和回复记录。
         </p>
+        <TicketCreateControl accessToken={accessToken} />
       </div>
 
       <section

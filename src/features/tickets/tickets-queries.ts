@@ -1,9 +1,14 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
+import type { CreateTicketInput } from './tickets-api'
 import { ticketIdSchema, ticketsApi } from './tickets-api'
 
 export const ticketsQueryKeys = {
   list: ['tickets'] as const,
   detail: (id: string) => ['tickets', 'detail', id] as const,
+}
+
+export const ticketsMutationKeys = {
+  create: ['tickets', 'create'] as const,
 }
 
 export function ticketsListOptions(accessToken: string) {
@@ -35,4 +40,13 @@ export function useTicketDetail(accessToken: string, id: string | null) {
         }),
     enabled: validId,
   })
+}
+
+export function ticketCreateMutationOptions(accessToken: string) {
+  return {
+    mutationKey: ticketsMutationKeys.create,
+    mutationFn: (input: CreateTicketInput) =>
+      ticketsApi.create(accessToken, input),
+    retry: false as const,
+  }
 }

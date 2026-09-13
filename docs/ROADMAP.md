@@ -56,10 +56,12 @@ Milestone 7 已完成并冻结。Production solution/V2Board Wallet、Deposit、
 
 Milestone 8 按以下边界推进：
 
-- AUR-M8-001 Support Ticket Read Model：IMPLEMENTATION COMPLETE，INDEPENDENT REVIEW PENDING
-- AUR-M8-002 Create Ticket：NOT STARTED
+- AUR-M8-001 Support Ticket Read Model：COMPLETE，Independent Support Read Review PASS
+- AUR-M8-002 Create Ticket：IMPLEMENTATION COMPLETE，INDEPENDENT REVIEW PENDING
 - AUR-M8-003 Reply + Close Ticket：NOT STARTED
 
-AUR-M8-001 只实现 `GET /api/v1/tickets` 与 `GET /api/v1/tickets/{id}`。List/Message 保持 server order，
-Detail lazy-load，Ticket text 只按不可信普通文本展示；不实现 create、reply、close、attachment、unread、
-search/filter 或任何 Referral / Commission / Withdrawal。Milestone 8 保持 CURRENT。
+AUR-M8-002 只增量实现 `POST /api/v1/tickets`。Create 原样提交 strict Public fields、禁止自动 retry，
+使用同步锁与 authoritative List recovery；confirmed success 不推断 Ticket ID，UNKNOWN 不推断结果且
+再次提交前要求用户核对 List。Reply、Close、attachment、unread、search/filter 及 Referral /
+Commission / Withdrawal 均未实现。Production Ticket Read/Create runtime 仍为 NOT TESTED；Milestone 8
+保持 CURRENT。
