@@ -154,6 +154,20 @@ server order，复用 Subscription byte formatter并显示 absolute recordedAt�
 rateMultiplier metadata；不聚合 total/billed/effective traffic，不计算 cost，不排序、不轮询、
 不绘制 chart，也不接触 subscription accessUrl 或 content endpoint。
 
+## Notices read model
+
+`features/notices` 持有 Notice List、Notice Detail 的 Public API parser、canonical query keys 与
+展示边界。列表使用固定 `pageSize=20` 和 React local page state，严格保持 solution 返回顺序；
+Dashboard 复用同一 List boundary 请求 page 1 / pageSize 1，只展示第一条 Summary，不请求正文，
+也不推断 unread、important 或其他 Contract 不存在的状态。
+
+Notice Detail 只在用户选择列表项后获取，并通过 Aureole-owned Radix Dialog 保留列表上下文。
+`SafeNoticeHtml` 是未信任正文进入 React DOM 的唯一边界：API parser 将通过长度与类型校验的
+HTML 保持为 opaque string，render boundary 再用 DOMPurify 的窄标签/属性 allowlist 清理。
+脚本、事件属性、unsafe URI、样式、图片、iframe、表单、SVG 与其他 embedded content 均不进入
+DOM，因此正文不会自动发起第三方资源请求。Detail 普通错误局部恢复，404 不退出 Session；
+AUTH_REQUIRED/AUTH_FAILED 继续清除 credential 与完整 Query cache。
+
 ## Theme and presentation
 
 Light、Dark、System 由 Theme Provider 管理；显式选择可保存为非敏感 local UI preference。CSS tokens 是颜色和 radius 的 SSOT，传统 `tailwind.config.js` 不是 token 核心。使用 system font 与 system monospace。

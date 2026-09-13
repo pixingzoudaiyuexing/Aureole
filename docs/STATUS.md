@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 4 - Read-only Core (`AUR-M4-002` Plans / Resources / Traffic)
+Milestone 4 - Read-only Core (`AUR-M4-003` Notices + Dashboard Completion)
 
 ## Contract baseline
 
@@ -31,11 +31,17 @@ M4-001 Subscription Read Model + Dashboard Core implementation and independent
 Subscription/Security review are COMPLETE with no required fixes. Its accepted
 production runtime gap remains non-blocking.
 
-M4-002 Plans + Resources + Traffic implementation is COMPLETE locally. Products
-and Account Config compose the Plans read model with safe minor-unit formatting;
-Resources exposes only Public DTO fields; ordered Traffic History extends the
-Subscription page without aggregation. Independent M4-002 Read-only Core review
-remains pending, so Milestone 4 remains CURRENT. M4-003 is NOT STARTED.
+M4-002 Plans + Resources + Traffic implementation and independent review are
+COMPLETE with no required fixes. Products and Account Config compose the Plans
+read model with safe minor-unit formatting; Resources exposes only Public DTO
+fields; ordered Traffic History extends the Subscription page without aggregation.
+
+M4-003 Notices + Dashboard Completion implementation is COMPLETE. Notice List
+and lazy Detail use canonical TanStack Query state; the Dashboard reuses the List
+boundary for its authoritative first Summary. `SafeNoticeHtml` sanitizes untrusted
+Detail HTML with DOMPurify before the only Notice raw-HTML render sink. Independent
+Security/Notice review remains PENDING, so Milestone 4 remains REVIEW PENDING.
+Milestone 5 is NOT STARTED.
 
 ## Current commit
 
@@ -49,11 +55,11 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (17 files, 248 tests)
+- `npm test`: PASS (19 files, 288 tests)
 - `npm run build`: PASS
-- Build evidence: main JS 469.44 kB raw / 147.64 kB gzip; CSS 30.03 kB raw /
-  6.36 kB gzip; Plans route 2.37 kB gzip; Resources route 1.46 kB gzip;
-  Subscription route 2.93 kB gzip.
+- Build evidence: main JS 469.57 kB raw / 147.71 kB gzip; CSS 32.38 kB raw /
+  6.80 kB gzip; Dashboard route 1.39 kB gzip; Notices query chunk 0.80 kB gzip;
+  Notices route including Dialog, Detail and DOMPurify 13.13 kB gzip.
   Assets remain within budget; initial-route composition has not been measured
   by a dedicated analyzer.
 - Browser verification: PASS at 1280 x 720 and 390 x 844 for Login Light/Dark,
@@ -110,16 +116,23 @@ operational source of truth.
   overflow, raw subscription fetch, private Resource field or mutation CTA was
   observed. The only active-flow console error was the existing local
   `/favicon.ico` 404. Production solution/V2Board is NOT TESTED.
+- M4-003 controlled-browser verification: PASS at exact 1280 x 720 and 390 x 844
+  in Light/Dark for Notice List, empty/pagination/long-title/many-tag states,
+  Detail safe formatting, hostile HTML, safe/unsafe links, 404, ordinary error
+  and Retry, close/focus restoration, Dashboard latest/empty/error isolation and
+  Notice list/detail Auth invalidation. No horizontal overflow, application
+  console/page error or external HTML resource request was observed. Production
+  solution/V2Board is NOT TESTED.
 
 ## Known gaps
 
-- Orders, Wallet, Notices, Support and Referrals remain placeholders without mock
-  business data.
-- Dashboard completion remains pending M4-003 Notices; no notice data or fake
-  unread/important state is shown by M4-001.
+- Orders, Wallet, Support and Referrals remain placeholders without mock business
+  data.
+- Production solution/V2Board Notice behavior is NOT TESTED; controlled mock
+  browser and automated contract/security tests are the current evidence.
 - Hosting provider is undecided; production requires SPA fallback.
 
 ## Next milestone
 
-M4-002 requires independent Read-only Core review before M4-003 can start. M4-003
-is NOT STARTED by this checkpoint.
+M4-003 requires independent Security/Notice review before Milestone 4 can close.
+Milestone 5 is NOT STARTED and requires separate authorization.

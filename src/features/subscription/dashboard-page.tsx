@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button'
 import { isInvalidSessionError } from '@/features/auth/auth-errors'
 import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invalid-session-error'
 import { ReadError } from '@/components/shared/read-error'
+import { useNoticeList } from '@/features/notices/notices-queries'
+import { formatAbsoluteDateTime } from './subscription-format'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
 import { DashboardSubscriptionDetails } from './subscription-overview'
 import { useSubscriptionOverview } from './subscription-queries'
@@ -16,9 +18,16 @@ export function DashboardPage() {
 
 function DashboardContent({ accessToken }: { accessToken: string }) {
   const overview = useSubscriptionOverview(accessToken)
-  useExitOnInvalidSessionError(overview.error)
+  const notices = useNoticeList(accessToken, 1, 1)
+  const invalid = isInvalidSessionError(overview.error)
+    ? overview.error
+    : isInvalidSessionError(notices.error)
+      ? notices.error
+      : null
+  useExitOnInvalidSessionError(invalid)
 
-  if (isInvalidSessionError(overview.error)) return null
+  if (invalid) return null
+  const latestNotice = notices.data?.items[0]
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -66,6 +75,61 @@ function DashboardContent({ accessToken }: { accessToken: string }) {
           />
         ) : (
           <DashboardSubscriptionDetails overview={overview.data} />
+        )}
+      </section>
+      <section
+        className="border-t border-border py-8"
+        aria-labelledby="dashboard-notice-title"
+      >
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h3 id="dashboard-notice-title" className="text-base font-semibold">
+              最新公告
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              查看服务公告摘要。
+            </p>
+          </div>
+          <Button asChild variant="outline">
+            <Link to="/notices">
+              查看全部公告
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+          </Button>
+        </div>
+        {notices.isPending ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            正在读取最新公告…
+          </p>
+        ) : notices.isError ? (
+          <ReadError
+            message="暂时无法读取最新公告。"
+            error={notices.error}
+            retry={() => void notices.refetch()}
+          />
+        ) : latestNotice ? (
+          <div className="border-y border-border py-4">
+            <p className="break-words text-sm font-semibold">
+              {latestNotice.title}
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {formatAbsoluteDateTime(latestNotice.createdAt)}
+            </p>
+            {latestNotice.tags.length ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {latestNotice.tags.map((tag, index) => (
+                  <span
+                    className="max-w-full break-words rounded-sm border border-border bg-muted px-2 py-1 text-xs"
+                    key={`${latestNotice.id}-${index}`}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">暂无公告。</p>
         )}
       </section>
     </div>

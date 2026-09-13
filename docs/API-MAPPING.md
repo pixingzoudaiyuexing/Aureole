@@ -83,6 +83,21 @@
 - Products、Resources、Traffic 均使用 protected authenticatedRequest 和独立 server-state query。
   普通 failure 局部 Retry；AUTH_REQUIRED/AUTH_FAILED 清除完整 authenticated state。
 
+## Notices mapping
+
+- `GET /api/v1/notices?page={page}&pageSize=20` 是 `/notices` 的唯一列表来源。Aureole 使用
+  credential-free `['notices', 'list', page, 20]` query key，保持 server order，并仅展示 Public
+  Summary 的 title、tags 与 absolute createdAt；分页只依据响应 page/pageSize/total。
+- `GET /api/v1/notices/{id}` 只在用户明确选择公告后请求，并使用
+  `['notices', 'detail', id]`。`NOTICE_NOT_FOUND` 只关闭在 Detail 错误边界内，不退出 Session；
+  普通 read error 可重试且不清除 Notice List。
+- Detail `content` 在 API boundary 保持经过类型与长度验证的 opaque HTML string，只能通过
+  `SafeNoticeHtml` 使用 DOMPurify 窄 allowlist 展示。Title 与 tags 仍由 React text escaping
+  处理；正文不得进入 storage、Zustand、URL、日志或其他 raw HTML sink。
+- Dashboard 的“最新公告”复用同一 List boundary 请求 page 1 / pageSize 1，并展示服务端返回的
+  第一条 Summary。它不请求 Detail、不解析 HTML、不根据 timestamp 重排，也不发明 unread 或
+  important 状态。
+
 ## Error and request rules
 
 - 业务分支依据稳定 `error.code`，禁止依据 message 文本包含关系。
