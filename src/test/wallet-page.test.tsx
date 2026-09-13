@@ -187,7 +187,7 @@ describe('Wallet page', () => {
     },
   )
 
-  it('contains deposit but no gift card or fake transaction UI', async () => {
+  it('contains deposit and Gift Card but no fake transaction UI', async () => {
     installMocks()
     renderWallet()
 
@@ -198,9 +198,13 @@ describe('Wallet page', () => {
     expect(
       screen.getByRole('button', { name: '创建充值订单' }),
     ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: '兑换礼品卡' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: '兑换礼品卡' }),
+    ).toBeInTheDocument()
     for (const text of [
-      'Gift Card',
-      '礼品卡',
       '交易流水',
       '交易记录',
       '充值记录',

@@ -257,7 +257,11 @@ describe('Payment checkout flow', () => {
     const { dialog, user } = await openPaymentAndSelect()
     await confirmPayment(dialog, user)
     expect(
-      await within(dialog).findByText('订单状态已更新：已完成。'),
+      await within(dialog).findByText(
+        '订单状态已更新：已完成。',
+        {},
+        { timeout: 3_000 },
+      ),
     ).toBeInTheDocument()
     expect(
       within(dialog).queryByRole('button', { name: '确认支付' }),

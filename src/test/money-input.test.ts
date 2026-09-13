@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { parseMoneyInputToMinor } from '@/features/catalog/money-format'
+import {
+  formatSignedMinorMoney,
+  parseMoneyInputToMinor,
+} from '@/features/catalog/money-format'
 
 describe('Exact human money input conversion', () => {
   it.each([
@@ -41,4 +44,38 @@ describe('Exact human money input conversion', () => {
     expect(parseMoneyInputToMinor('1', 'ZZZ')).toBeNull()
     expect(parseMoneyInputToMinor('1', 'not-a-currency')).toBeNull()
   })
+})
+
+describe('Signed minor-unit money formatting', () => {
+  it.each([
+    [100, 'CNY', '¥', '¥1.00 CNY'],
+    [-100, 'CNY', '¥', '-¥1.00 CNY'],
+    [0, 'CNY', '¥', '¥0.00 CNY'],
+    [100, 'JPY', '¥', '¥100 JPY'],
+    [-100, 'JPY', '¥', '-¥100 JPY'],
+  ] as const)(
+    'formats %i %s without changing the sign',
+    (amountMinor, currency, currencySymbol, expected) => {
+      expect(
+        formatSignedMinorMoney(amountMinor, { currency, currencySymbol }),
+      ).toBe(expected)
+    },
+  )
+
+  it.each([
+    [1, 'ZZZ'],
+    [Number.MAX_SAFE_INTEGER + 1, 'CNY'],
+    [2_147_483_648, 'CNY'],
+    [-2_147_483_649, 'CNY'],
+  ] as const)(
+    'fails closed for unsafe %i %s input',
+    (amountMinor, currency) => {
+      expect(
+        formatSignedMinorMoney(amountMinor, {
+          currency,
+          currencySymbol: '¥',
+        }),
+      ).toBeNull()
+    },
+  )
 })

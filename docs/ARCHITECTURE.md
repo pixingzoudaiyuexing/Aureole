@@ -246,7 +246,7 @@ MALFORMED_RESPONSE 先读取 Status/Detail/List，并要求用户显式确认已
 Payment Method fee 只显示 fixedMinor 和 percent metadata；fixedMinor 复用 Account Config 与
 `formatMinorMoney`，不得计算 percentage fee 或最终应付金额。
 
-## Wallet balance and deposit model
+## Wallet balance, deposit and Gift Card model
 
 `features/wallet` 持有 Wallet Public DTO parser、canonical `['wallet']` query 与 `/wallet`
 展示。`GET /api/v1/wallet` 是站内余额的唯一权威，`balanceMinor` 必须是
@@ -275,8 +275,24 @@ Checkout 或 Status。用户支付及状态确认继续由既有 Orders / Paymen
 UPSTREAM_ERROR 与 MALFORMED_RESPONSE 保持 UNKNOWN：只读取 Orders List，不按 amount、createdAt、
 list diff 或新 ID 推断因果；恢复失败时 fail closed，恢复成功后也必须先确认已检查订单，再重新进入标准
 金额确认。金额、created Order ID、UNKNOWN guard 与 feedback 只在 React local state，不进入 storage、
-URL、Zustand、console 或 analytics。Gift Card Redeem、充值记录、ledger、bonus、pending balance 与第二套
-Payment flow 均未实现。
+URL、Zustand、console 或 analytics。
+
+Gift Card Redeem 使用 credential-free `['gift-cards', 'redeem']` mutation key，并只向
+`POST /api/v1/gift-cards/redeem` 发送 strict `{ code }`。Code 按用户输入原样提交，不 trim、改变
+大小写或移除空格/连字符；只存在于当前 React input 与 mutation request 生命周期。输入默认 password，
+确认 Dialog 只显示 masked value，成功后立即清空 code 与 reveal state。
+
+Gift Card success 只接受 `redeemed: true` 与 balance、validity、traffic、trafficReset、plan 五种
+Public effect。Signed INT 原样展示，不 abs、clamp、round 或转换为新的账户状态；balance effect 使用
+同一 canonical currency fraction digits 的 `formatSignedMinorMoney`，Config 不可用时只显示 signed
+minor-unit fallback。Aureole 不计算新余额、到期时间、流量、reset day 或套餐。
+
+成功后重新读取 canonical Wallet、Me 与 Subscription Overview，并只 invalidate Subscription Access
+而不主动读取 accessUrl。必要 read 任一失败时仍保留“礼品卡已兑换”，但 fail closed 到三项全部读取
+成功。UNKNOWN 同样读取三项 authority，但绝不根据字段变化推断本次兑换成败；全部成功后仍需专用
+acknowledgement 与新的标准确认才能再次 POST。Deposit 与 Gift Card 共用页面级同步 Wallet mutation
+coordinator，最多一个金融 POST 处于活动状态。Gift Card history/preview、ledger、pending balance、
+bonus/fee、第二套 Payment flow 和其他后续里程碑能力均未实现。
 
 ## Theme and presentation
 

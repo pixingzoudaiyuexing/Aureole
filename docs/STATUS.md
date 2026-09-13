@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 7 - Wallet / Gift Card (`AUR-M7-002` Wallet Deposit Create + Payment Handoff)
+Milestone 7 - Wallet / Gift Card (`AUR-M7-003` Gift Card Redeem)
 
 ## Contract baseline
 
@@ -55,9 +55,10 @@ Subscription Rotation and Advance Period runtime remain NOT TESTED.
 
 Milestone 7 is CURRENT. AUR-M7-001 Wallet Balance Read Model is COMPLETE and its
 Independent Wallet/Auth Review passed. AUR-M7-002 Wallet Deposit Create + Payment
-Handoff is IMPLEMENTATION COMPLETE with INDEPENDENT REVIEW PENDING. AUR-M7-003
-Gift Card Redeem is NOT STARTED. Production solution/V2Board Wallet and Deposit
-runtime is NOT TESTED.
+Handoff is COMPLETE and its Independent Financial Mutation Review passed.
+AUR-M7-003 Gift Card Redeem is IMPLEMENTATION COMPLETE with INDEPENDENT REVIEW
+PENDING. Production solution/V2Board Wallet, Deposit, Payment and Gift Card runtime
+is NOT TESTED. Milestone 7 remains CURRENT pending independent review.
 
 ## Current commit
 
@@ -71,13 +72,13 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (32 files, 614 tests)
+- `npm test`: PASS (34 files, 711 tests)
 - `npm run build`: PASS
 - `npm ls`: PASS
 - `git diff --check`: PASS
-- Build evidence: main JS 471.65 kB raw / 148.29 kB gzip; CSS 34.96 kB raw /
-  7.16 kB gzip; Wallet route 12.15 kB raw / 4.18 kB gzip; Subscription route
-  20.72 kB raw / 6.10 kB gzip; Plans route 5.15 kB gzip; Orders route 13.17 kB gzip.
+- Build evidence: main JS 471.73 kB raw / 148.32 kB gzip; CSS 34.96 kB raw /
+  7.16 kB gzip; Wallet route 23.81 kB raw / 7.05 kB gzip; Subscription route
+  20.18 kB raw / 5.82 kB gzip; Plans route 5.16 kB gzip; Orders route 13.17 kB gzip.
   Assets remain within budget; initial-route composition has not been measured
   by a dedicated analyzer.
 - Browser verification: PASS at 1280 x 720 and 390 x 844 for Login Light/Dark,
@@ -215,12 +216,27 @@ operational source of truth.
   Status request. No horizontal overflow, false balance-credit claim, browser
   console warning/error or application page error was observed. Production
   solution/V2Board Wallet Deposit and Payment runtime is NOT TESTED.
+- AUR-M7-003 controlled-browser verification: PASS at exact 1280 x 720 and
+  390 x 844 in Light/Dark/System for password-masked code, explicit show/hide,
+  empty and 255-character boundaries, masked confirmation and acknowledgement,
+  all five Public effects, negative signed balance/validity/traffic, all eight
+  definitive errors, UNKNOWN recovery success/partial failure, manual recovery,
+  confirmed success with reconciliation failure, Auth invalidation and Deposit /
+  Gift Card pending mutual exclusion. No horizontal overflow, complete code in
+  visible UI/URL, raw upstream message, causal inference, browser console
+  warning/error or application page error was observed. Request evidence showed
+  Wallet/Me/Overview recovery and no active Subscription Access or subscription
+  content request. Automated tests additionally cover exact code preservation,
+  signed INT boundaries, malformed effects, same-tick locks, ALREADY_REDEEMED
+  after UNKNOWN and every recovery/Auth boundary. Production solution/V2Board
+  Gift Card runtime is NOT TESTED.
 
 ## Known gaps
 
-- Wallet Balance Read and Wallet Deposit Create are implemented; AUR-M7-002 still
-  requires independent Financial Mutation Review. Gift Card Redeem remains NOT
-  STARTED. Support and Referrals remain placeholders without mock business data.
+- Wallet Balance Read and Wallet Deposit Create are complete and independently
+  reviewed. Gift Card Redeem is implemented but still requires independent Gift
+  Card / Account Mutation Review. Support and Referrals remain placeholders without
+  mock business data.
 - Production solution/V2Board Order Create, Promotion and Cancel behavior is NOT
   TESTED; controlled mock browser and automated contract/privacy tests are the
   current evidence.
@@ -240,5 +256,6 @@ operational source of truth.
 
 ## Next milestone
 
-AUR-M7-002 implementation is complete. Exact-head CI verification and independent
-Financial Mutation Review are the next required gates. AUR-M7-003 has not started.
+AUR-M7-003 implementation is complete. Exact-head CI verification and independent
+Gift Card / Account Mutation Review are the next required gates. The next milestone
+has not started.

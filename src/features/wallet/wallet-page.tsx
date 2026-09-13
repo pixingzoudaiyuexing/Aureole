@@ -6,7 +6,9 @@ import { ReadError } from '@/components/shared/read-error'
 import { Button } from '@/components/ui/button'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
 import { useWallet } from './wallet-queries'
+import { GiftCardPanel } from './gift-card-panel'
 import { WalletDepositPanel } from './wallet-deposit-panel'
+import { useWalletMutationCoordinator } from './wallet-mutation-coordinator'
 
 export function WalletPage() {
   const accessToken = useAuthSessionStore((state) => state.accessToken)
@@ -17,6 +19,7 @@ export function WalletPage() {
 function WalletContent({ accessToken }: { accessToken: string }) {
   const wallet = useWallet(accessToken)
   const config = useAccountConfig(accessToken)
+  const mutationCoordinator = useWalletMutationCoordinator()
   const invalid = isInvalidSessionError(wallet.error)
     ? wallet.error
     : isInvalidSessionError(config.error)
@@ -96,7 +99,14 @@ function WalletContent({ accessToken }: { accessToken: string }) {
         accountConfig={config.data ?? null}
         configPending={config.isPending}
         configError={config.error}
+        mutationCoordinator={mutationCoordinator}
         retryConfig={() => void config.refetch()}
+      />
+
+      <GiftCardPanel
+        accessToken={accessToken}
+        accountConfig={config.data ?? null}
+        mutationCoordinator={mutationCoordinator}
       />
     </div>
   )

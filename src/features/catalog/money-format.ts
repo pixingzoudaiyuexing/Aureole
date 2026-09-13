@@ -75,3 +75,34 @@ export function formatMinorMoney(
 
   return `${currencySymbol}${groupedMajor}${decimal} ${currency}`
 }
+
+export function formatSignedMinorMoney(
+  amountMinor: number,
+  { currency, currencySymbol }: AccountConfig,
+) {
+  if (
+    !Number.isSafeInteger(amountMinor) ||
+    amountMinor < -2_147_483_648 ||
+    amountMinor > 2_147_483_647
+  ) {
+    return null
+  }
+  const fractionDigits = currencyFractionDigits(currency)
+  if (fractionDigits === null) return null
+
+  const amount = BigInt(amountMinor)
+  const negative = amount < 0n
+  const magnitude = negative ? -amount : amount
+  const scale = 10n ** BigInt(fractionDigits)
+  const major = magnitude / scale
+  const fraction = magnitude % scale
+  const groupedMajor = new Intl.NumberFormat('zh-CN', {
+    maximumFractionDigits: 0,
+  }).format(Number(major))
+  const decimal =
+    fractionDigits === 0
+      ? ''
+      : `.${fraction.toString().padStart(fractionDigits, '0')}`
+
+  return `${negative ? '-' : ''}${currencySymbol}${groupedMajor}${decimal} ${currency}`
+}

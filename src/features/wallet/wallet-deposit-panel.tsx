@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { LoaderCircle } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ReadError } from '@/components/shared/read-error'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,7 +14,6 @@ import { Input } from '@/components/ui/input'
 import type { AccountConfig } from '@/features/account/account-api'
 import { isInvalidSessionError } from '@/features/auth/auth-errors'
 import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invalid-session-error'
-import { useSynchronousActionLock } from '@/features/auth/use-synchronous-action-lock'
 import {
   formatMinorMoney,
   parseMoneyInputToMinor,
@@ -26,6 +25,7 @@ import {
 } from '@/features/orders/orders-queries'
 import { ApiError } from '@/lib/api/errors'
 import { walletDepositMutationOptions } from './wallet-queries'
+import type { WalletMutationCoordinator } from './wallet-mutation-coordinator'
 
 type DepositFeedback =
   | { kind: 'unavailable'; ordersRefreshed: boolean }
@@ -43,16 +43,18 @@ export function WalletDepositPanel({
   accountConfig,
   configError,
   configPending,
+  mutationCoordinator,
   retryConfig,
 }: {
   accessToken: string
   accountConfig: AccountConfig | null
   configError: unknown
   configPending: boolean
+  mutationCoordinator: WalletMutationCoordinator
   retryConfig: () => void
 }) {
   const queryClient = useQueryClient()
-  const actionLock = useSynchronousActionLock()
+  const sessionInvalidatedRef = useRef(false)
   const [amountText, setAmountText] = useState('')
   const [amountError, setAmountError] = useState<string | null>(null)
   const [confirmedAmount, setConfirmedAmount] =
@@ -91,7 +93,10 @@ export function WalletDepositPanel({
       })
       return true
     } catch (error) {
-      if (isInvalidSessionError(error)) setSessionError(error)
+      if (isInvalidSessionError(error)) {
+        sessionInvalidatedRef.current = true
+        setSessionError(error)
+      }
       return false
     }
   }
@@ -104,6 +109,7 @@ export function WalletDepositPanel({
     if (
       !accountConfig ||
       actionPending ||
+      mutationCoordinator.activeAction !== null ||
       unknownRecoveryFailed ||
       (requiresUnknownAcknowledgement && !unknownAcknowledged)
     ) {
@@ -130,7 +136,9 @@ export function WalletDepositPanel({
   }
 
   const createDeposit = async () => {
-    if (!confirmedAmount || !actionLock.tryAcquire()) return
+    if (!confirmedAmount || !mutationCoordinator.tryAcquire('deposit-create'))
+      return
+    sessionInvalidatedRef.current = false
     setActionPending(true)
     setFeedback(null)
     mutation.reset()
@@ -141,6 +149,7 @@ export function WalletDepositPanel({
       setCreatedOrder({ id: result.id, ordersRefreshed })
     } catch (error) {
       if (isInvalidSessionError(error)) {
+        sessionInvalidatedRef.current = true
         setSessionError(error)
         return
       }
@@ -181,7 +190,11 @@ export function WalletDepositPanel({
       setConfirmationOpen(false)
       setConfirmedAmount(null)
       setActionPending(false)
-      actionLock.release()
+      if (sessionInvalidatedRef.current) {
+        mutationCoordinator.releaseAfterSessionInvalidation()
+      } else {
+        mutationCoordinator.release()
+      }
     }
   }
 
@@ -189,6 +202,7 @@ export function WalletDepositPanel({
     if (feedback?.kind !== 'unknown' || feedback.ordersRefreshed) return
     setRecovering(true)
     const ordersRefreshed = await refreshOrders()
+    if (sessionInvalidatedRef.current) return
     setRecovering(false)
     if (ordersRefreshed) {
       setFeedback({ kind: 'unknown', ordersRefreshed: true })
@@ -255,7 +269,11 @@ export function WalletDepositPanel({
                 maxLength={32}
                 placeholder="例如 100"
                 value={amountText}
-                disabled={!accountConfig || actionPending}
+                disabled={
+                  !accountConfig ||
+                  actionPending ||
+                  mutationCoordinator.activeAction !== null
+                }
                 aria-invalid={Boolean(amountError)}
                 aria-describedby={
                   amountError
@@ -327,6 +345,7 @@ export function WalletDepositPanel({
               disabled={
                 !accountConfig ||
                 actionPending ||
+                mutationCoordinator.activeAction !== null ||
                 unknownRecoveryFailed ||
                 (requiresUnknownAcknowledgement && !unknownAcknowledged)
               }
@@ -392,7 +411,12 @@ export function WalletDepositPanel({
               </Button>
               <Button
                 type="button"
-                disabled={!confirmedAmount || actionPending}
+                disabled={
+                  !confirmedAmount ||
+                  actionPending ||
+                  (mutationCoordinator.activeAction !== null &&
+                    mutationCoordinator.activeAction !== 'deposit-create')
+                }
                 onClick={() => void createDeposit()}
               >
                 {actionPending ? (

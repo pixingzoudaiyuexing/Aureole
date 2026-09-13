@@ -14,7 +14,7 @@
 | Orders / Payment                    | Orders, billing, checkout, promotions   | 轮询权威订单状态；优惠仅 preview；不持有 callback 状态                  |
 | Subscription                        | Subscription overview and mutations     | Query owns state；mutation 后按 Contract invalidate；未知结果不盲目重试 |
 | Resources / Traffic                 | Resources, traffic logs                 | 只显示白名单字段；Traffic 使用 compact list                             |
-| Wallet / Gift Card                  | Wallet, deposits, gift card redeem      | 余额只认 Wallet；Deposit 只创建 Order 并移交既有支付流                  |
+| Wallet / Gift Card                  | Wallet, deposits, gift card redeem      | 余额只认 Wallet；Deposit/Gift Card 保持显式确认与权威恢复               |
 | Notices                             | Notices                                 | 不发明 unread 或 important 状态                                         |
 | Support                             | Tickets                                 | message 视为敏感用户内容，不记录 raw payload                            |
 | Referrals / Commission / Withdrawal | Referrals and guarded financial actions | 佣金、资格、minimum 与工单状态以上游为权威                              |
@@ -171,7 +171,7 @@
 - Payment Methods、Checkout、Status、Detail 或 List 任一边界返回 AUTH_REQUIRED/AUTH_FAILED 时，
   继续复用 sealed Auth Session Core 清理 credential 与完整 Query cache。
 
-## Wallet balance and deposit mapping
+## Wallet balance, deposit and Gift Card mapping
 
 - `GET /api/v1/wallet` 是 `/wallet` 唯一余额来源，使用 credential-free canonical `['wallet']`
   query。Public DTO 只接受 `balanceMinor` 为 `0..2147483647` 整数并 strip additive fields；负数、
@@ -199,8 +199,27 @@
 - Deposit POST、Orders recovery、Wallet read 或 Account Config read 的 AUTH_REQUIRED/AUTH_FAILED 均
   复用 sealed Session Core。金额文本、created Order ID、feedback 与 recovery guard 只在 React local
   state，不进入 URL、storage、Zustand、console 或 analytics。
-- AUR-M7-002 不调用 `POST /api/v1/gift-cards/redeem`，不实现 ledger、pending balance、bonus/fee
-  calculation、callback 或第二套 Payment flow。
+- `POST /api/v1/gift-cards/redeem` 的 strict request 只包含原样 `code`，长度为 `1..255`；不 trim、
+  normalize 或发送 V2Board `giftcard` alias。`['gift-cards', 'redeem']` mutation key 不包含 code、token、
+  effect 或账户字段，并显式 `retry: false`。
+- Success 只接受 `redeemed: true` 与 balance、validity、traffic、trafficReset、plan discriminated
+  effect；所有数值严格为 signed INT，plan 的 `0` 和 `null` 保持不同语义。Additive fields strip，unknown
+  type、raw numeric type、float、numeric string、缺失或越界均 fail closed 为 MALFORMED_RESPONSE。
+- Code input 默认 password，可显式 show/hide；第一次点击只打开 masked confirmation，acknowledgement
+  后才能 POST。成功清空 code/reveal，并原样展示 server effect；不计算新余额、expiresAt、traffic、
+  reset day、plan name 或 plan ID。
+- Confirmed success 与 UNKNOWN 都重新读取 canonical Wallet、Me、Subscription Overview，并以
+  `refetchType: none` invalidate Subscription Access。Wallet 页面不主动读取 accessUrl，也不 fetch
+  subscription content。成功 recovery 失败仍声明兑换成功但禁止再次兑换；UNKNOWN recovery 不根据
+  账户变化推断因果，全部 authority 恢复后仍需专用 acknowledgement 与新的标准确认。
+- GIFT_CARD_NOT_FOUND、NOT_ACTIVE、EXPIRED、USAGE_LIMIT_REACHED、ALREADY_REDEEMED、NOT_APPLICABLE、
+  REDEEM_FAILED 与 VALIDATION_ERROR 使用本地安全文案，不自动 retry、不 logout、不暴露 upstream raw
+  message。UNKNOWN 后再次得到 ALREADY_REDEEMED 只陈述当前事实，不推断上一次请求成功。
+- Deposit 与 Gift Card 共用页面级同步 Wallet action coordinator；两类 mutation pending 时互相禁用，
+  same-tick 只能有一个金融 POST。Gift Card code、masked value、effect、feedback 与 guard 不进入 URL、
+  storage、Zustand、Query key、console、analytics 或 error metadata。
+- AUR-M7-003 不实现 Gift Card list/history/preview、ledger、pending balance、bonus/fee、callback、第二套
+  Payment flow、Support、Referral、Commission、Withdrawal 或 Launch Readiness。
 
 ## Error and request rules
 

@@ -89,7 +89,7 @@ export function AuthProvider({
     status = 'unknown'
   } else if (!accessToken) {
     status = 'unauthenticated'
-  } else if (currentUserQuery.isSuccess) {
+  } else if (currentUserQuery.data) {
     status = 'authenticated'
   } else if (
     currentUserQuery.isError &&
