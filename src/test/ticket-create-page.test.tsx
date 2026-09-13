@@ -68,14 +68,14 @@ function renderSupport(queryClient: QueryClient = createQueryClient()) {
     }),
   }
   const router = createAppRouter({ initialEntries: ['/support'] })
-  render(
+  const rendered = render(
     <AppProviders
       router={router}
       authApi={authApi}
       queryClient={queryClient}
     />,
   )
-  return { queryClient, router }
+  return { queryClient, router, unmount: rendered.unmount }
 }
 
 async function openCreate(user = userEvent.setup()) {
@@ -128,6 +128,97 @@ function expectLoggedOut(
 }
 
 describe('Create Support Ticket form', () => {
+  it('keeps Create disabled during initial List loading and opens it after success', async () => {
+    const mocks = installMocks()
+    const list = deferred<(typeof ticket)[]>()
+    mocks.getList.mockReturnValue(list.promise)
+    renderSupport()
+
+    const createButton = await screen.findByRole('button', {
+      name: '新建工单',
+    })
+    expect(createButton).toBeDisabled()
+    fireEvent.click(createButton)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    act(() => list.resolve([ticket]))
+    await waitFor(() => expect(createButton).toBeEnabled())
+  })
+
+  it('keeps Create disabled after initial List error until List Retry succeeds', async () => {
+    const mocks = installMocks()
+    const listError = new ApiError({
+      status: 502,
+      code: 'UPSTREAM_ERROR',
+      message: 'private list error',
+    })
+    mocks.getList
+      .mockRejectedValueOnce(listError)
+      .mockRejectedValueOnce(listError)
+      .mockResolvedValueOnce([ticket])
+    renderSupport()
+    const user = userEvent.setup()
+
+    expect(
+      await screen.findByText('暂时无法读取支持工单。', {}, { timeout: 3_000 }),
+    ).toBeInTheDocument()
+    const createButton = screen.getByRole('button', { name: '新建工单' })
+    expect(createButton).toBeDisabled()
+    fireEvent.click(createButton)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(mocks.create).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: '重试' }))
+    await waitFor(() => expect(createButton).toBeEnabled())
+    expect(mocks.getList).toHaveBeenCalledTimes(3)
+
+    const form = await openCreate(user)
+    await fillCreate(form, {
+      subject: 'After List Retry',
+      message: 'Explicit submission after authority recovery',
+    })
+    expect(mocks.create).not.toHaveBeenCalled()
+    await submitCreate(form)
+    expect(await screen.findByText('工单已提交。')).toBeInTheDocument()
+    expect(mocks.create).toHaveBeenCalledOnce()
+  })
+
+  it('gates Create while stale cached List data is being authoritatively refetched', async () => {
+    const mocks = installMocks()
+    const list = deferred<(typeof ticket)[]>()
+    mocks.getList.mockReturnValue(list.promise)
+    const queryClient = createQueryClient()
+    queryClient.setQueryData(ticketsQueryKeys.list, [ticket], { updatedAt: 0 })
+    renderSupport(queryClient)
+
+    expect(await screen.findByText('Existing ticket')).toBeInTheDocument()
+    const createButton = screen.getByRole('button', { name: '新建工单' })
+    expect(createButton).toBeDisabled()
+    expect(mocks.getList).toHaveBeenCalledOnce()
+
+    act(() => list.resolve([ticket]))
+    await waitFor(() => expect(createButton).toBeEnabled())
+  })
+
+  it('keeps stale cached List fail-closed when its fresh refetch fails', async () => {
+    const mocks = installMocks()
+    const listError = new ApiError({
+      status: 502,
+      code: 'UPSTREAM_ERROR',
+      message: 'private list error',
+    })
+    mocks.getList.mockRejectedValue(listError)
+    const queryClient = createQueryClient()
+    queryClient.setQueryData(ticketsQueryKeys.list, [ticket], { updatedAt: 0 })
+    renderSupport(queryClient)
+
+    expect(await screen.findByText('Existing ticket')).toBeInTheDocument()
+    const createButton = screen.getByRole('button', { name: '新建工单' })
+    expect(createButton).toBeDisabled()
+    await waitFor(() => expect(mocks.getList).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(createButton).toBeDisabled())
+    expect(mocks.create).not.toHaveBeenCalled()
+  })
+
   it('opens and accepts input without POST, then cancels with focus restoration', async () => {
     const mocks = installMocks()
     renderSupport()
@@ -419,6 +510,115 @@ describe('Create Support Ticket definitive errors', () => {
 })
 
 describe('Create Support Ticket unknown-result recovery', () => {
+  it('survives UNKNOWN guard loss on remount by requiring a fresh authoritative List', async () => {
+    const mocks = installMocks()
+    const listError = new ApiError({
+      status: 502,
+      code: 'UPSTREAM_ERROR',
+      message: 'private list error',
+    })
+    mocks.create
+      .mockRejectedValueOnce(
+        new ApiError({
+          status: 0,
+          code: 'NETWORK_ERROR',
+          message: 'private unknown',
+        }),
+      )
+      .mockResolvedValueOnce({ created: true })
+    mocks.getList
+      .mockReset()
+      .mockResolvedValueOnce([ticket])
+      .mockRejectedValueOnce(listError)
+      .mockRejectedValueOnce(listError)
+      .mockRejectedValueOnce(listError)
+      .mockRejectedValueOnce(listError)
+      .mockResolvedValueOnce([ticket])
+      .mockResolvedValueOnce([ticket])
+    const firstMount = renderSupport()
+    const firstForm = await openCreate()
+    await fillCreate(firstForm)
+    await submitCreate(firstForm)
+    await screen.findByText(
+      '当前工单列表暂时无法重新读取。请先恢复列表，暂时不要再次提交工单。',
+      {},
+      { timeout: 3_000 },
+    )
+    expect(mocks.create).toHaveBeenCalledOnce()
+
+    firstMount.unmount()
+    renderSupport(firstMount.queryClient)
+    expect(
+      await screen.findByText('暂时无法读取支持工单。', {}, { timeout: 3_000 }),
+    ).toBeInTheDocument()
+    const remountedCreate = screen.getByRole('button', { name: '新建工单' })
+    expect(remountedCreate).toBeDisabled()
+    fireEvent.click(remountedCreate)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(mocks.create).toHaveBeenCalledOnce()
+
+    fireEvent.click(screen.getByRole('button', { name: '重试' }))
+    await waitFor(
+      () =>
+        expect(screen.getByRole('button', { name: '新建工单' })).toBeEnabled(),
+      { timeout: 3_000 },
+    )
+    const secondForm = await openCreate(userEvent.setup())
+    await fillCreate(secondForm, {
+      subject: 'Explicit second attempt',
+      message: 'Checked after authoritative List read',
+    })
+    expect(mocks.create).toHaveBeenCalledOnce()
+    await submitCreate(secondForm)
+    expect(await screen.findByText('工单已提交。')).toBeInTheDocument()
+    expect(mocks.create).toHaveBeenCalledTimes(2)
+  })
+
+  it('survives confirmed-success feedback loss on remount with the same List gate', async () => {
+    const mocks = installMocks()
+    const listError = new ApiError({
+      status: 502,
+      code: 'UPSTREAM_ERROR',
+      message: 'private list error',
+    })
+    mocks.getList
+      .mockReset()
+      .mockResolvedValueOnce([ticket])
+      .mockRejectedValueOnce(listError)
+      .mockRejectedValueOnce(listError)
+      .mockRejectedValueOnce(listError)
+      .mockRejectedValueOnce(listError)
+      .mockResolvedValueOnce([ticket])
+    const firstMount = renderSupport()
+    const form = await openCreate()
+    await fillCreate(form)
+    await submitCreate(form)
+    await screen.findByText(
+      '工单已提交，但暂时无法读取最新工单列表。',
+      {},
+      { timeout: 3_000 },
+    )
+    expect(mocks.create).toHaveBeenCalledOnce()
+
+    firstMount.unmount()
+    renderSupport(firstMount.queryClient)
+    expect(
+      await screen.findByText('暂时无法读取支持工单。', {}, { timeout: 3_000 }),
+    ).toBeInTheDocument()
+    const remountedCreate = screen.getByRole('button', { name: '新建工单' })
+    expect(remountedCreate).toBeDisabled()
+    fireEvent.click(remountedCreate)
+    expect(mocks.create).toHaveBeenCalledOnce()
+
+    fireEvent.click(screen.getByRole('button', { name: '重试' }))
+    await waitFor(
+      () =>
+        expect(screen.getByRole('button', { name: '新建工单' })).toBeEnabled(),
+      { timeout: 3_000 },
+    )
+    expect(mocks.create).toHaveBeenCalledOnce()
+  })
+
   it.each([
     new ApiError({ status: 0, code: 'NETWORK_ERROR', message: 'private' }),
     new ApiError({

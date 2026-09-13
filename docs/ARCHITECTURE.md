@@ -335,6 +335,13 @@ UPSTREAM_ERROR、MALFORMED_RESPONSE 及 non-ApiError 都是 UNKNOWN：立即读�
 List recovery 失败时只开放手动 GET recovery。Create 或任一 reconciliation/recovery GET 的 Auth
 failure 继续复用 sealed Session Core。本阶段仍不实现 reply、close 或后续 Milestone。
 
+Independent Review required fix 在 Create local guard 之外增加 authoritative Ticket List prerequisite。
+`TicketsContent` 只有在 canonical List query `isSuccess && !isFetching` 时才向 Create flow 声明 authority
+ready；初始 loading/error、List Retry、cached stale data 的 fresh refetch、以及任意 reconciliation 后的
+List failure/fetching 都会禁用 Create trigger 和最终 submit。这样即使 reload/remount 清除了 React local
+UNKNOWN 或 confirmed-success feedback，只要当前页面生命周期尚未成功完成新的 List read，就不能再次
+发送非幂等 POST。恢复继续复用现有 List Retry/GET，不持久化 mutation guard 或 Ticket 内容。
+
 ## Theme and presentation
 
 Light、Dark、System 由 Theme Provider 管理；显式选择可保存为非敏感 local UI preference。CSS tokens 是颜色和 radius 的 SSOT，传统 `tailwind.config.js` 不是 token 核心。使用 system font 与 system monospace。

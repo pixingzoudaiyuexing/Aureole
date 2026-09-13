@@ -141,6 +141,7 @@ function TicketsContent({ accessToken }: { accessToken: string }) {
   useExitOnInvalidSessionError(invalid)
 
   if (invalid) return null
+  const ticketListAuthorityReady = tickets.isSuccess && !tickets.isFetching
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -150,7 +151,10 @@ function TicketsContent({ accessToken }: { accessToken: string }) {
         <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
           查看你的支持工单和回复记录。
         </p>
-        <TicketCreateControl accessToken={accessToken} />
+        <TicketCreateControl
+          accessToken={accessToken}
+          listAuthorityReady={ticketListAuthorityReady}
+        />
       </div>
 
       <section

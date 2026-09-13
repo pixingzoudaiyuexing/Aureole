@@ -253,6 +253,11 @@
   UNKNOWN。List recovery 成功不改变 UNKNOWN outcome；再次 Create 前需专用 acknowledgement，修改
   payload 会清除 acknowledgement。Recovery 失败只允许手动 List GET，任何 recovery Auth failure
   进入 sealed Session Core。
+- Independent Review required fix 将 Create 额外 gate 在 canonical List 当前 authority 上：必须同时满足
+  List `isSuccess` 且 `!isFetching`。初始 loading/error、Retry/refetch in-flight、cached stale List 的 fresh
+  refetch、以及 UNKNOWN/confirmed-success/TICKET_UNAVAILABLE recovery failure 后的 remount 都不能 POST。
+  当前页面成功完成 List GET 后才重新开放 Create；现有 local UNKNOWN acknowledgement、same-tick lock、
+  `retry:false` 与 recovery fail-closed 继续保留，不使用 storage/URL/Zustand 持久化 guard。
 
 ## Error and request rules
 

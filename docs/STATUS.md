@@ -62,9 +62,11 @@ NOT TESTED and remains a Launch Readiness evidence gap.
 
 Milestone 8 is CURRENT. AUR-M8-001 Support Ticket Read Model is COMPLETE and its
 Independent Support Read Review passed. AUR-M8-002 Create Support Ticket is
-IMPLEMENTATION COMPLETE with INDEPENDENT REVIEW PENDING. It adds only strict raw-text
-Ticket Create, non-retrying/synchronously locked POST, authoritative List recovery,
-confirmed-success fail-closed reconciliation and guarded UNKNOWN resubmission.
+IMPLEMENTATION COMPLETE with INDEPENDENT REVIEW REQUIRED FIX APPLIED and RE-REVIEW
+PENDING. It adds only strict raw-text Ticket Create, non-retrying/synchronously locked
+POST, authoritative List recovery, confirmed-success fail-closed reconciliation and
+guarded UNKNOWN resubmission. The required fix gates Create on canonical List
+`isSuccess && !isFetching`, including initial/retry/cached-refetch and remount paths.
 AUR-M8-003 Reply + Close Ticket is NOT STARTED. Production solution/V2Board Ticket
 Read/Create runtime is NOT TESTED.
 
@@ -80,12 +82,12 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (37 files, 783 tests)
+- `npm test`: PASS (37 files, 789 tests)
 - `npm run build`: PASS
 - `npm ls`: PASS
 - `git diff --check`: PASS
 - Build evidence: main JS 471.72 kB raw / 148.30 kB gzip; CSS 36.39 kB raw /
-  7.39 kB gzip; Support route 19.24 kB raw / 6.05 kB gzip; Wallet route 23.81 kB
+  7.39 kB gzip; Support route 19.68 kB raw / 6.16 kB gzip; Wallet route 23.81 kB
   raw / 7.06 kB gzip; Subscription route 20.18 kB raw / 5.83 kB gzip; Plans
   route 5.16 kB gzip; Orders route 13.17 kB gzip. Assets remain within budget;
   initial-route composition has not been measured by a dedicated analyzer.
@@ -263,12 +265,27 @@ operational source of truth.
   Ticket selection/ID. No horizontal overflow, raw upstream message, Reply/Close
   control, browser console warning/error or application page error was observed.
   Production solution/V2Board Ticket Create runtime is NOT TESTED.
+- AUR-M8-002 required-fix automated regression: PASS for initial List loading/error,
+  cached stale List refetch success/failure, UNKNOWN recovery-failure remount and
+  confirmed-success reconciliation-failure remount. Create remains disabled while
+  the canonical List is not successful or is fetching, and reopens only after a
+  successful authoritative List read. These tests failed against the reviewed
+  implementation before the authority gate was applied.
+- AUR-M8-002 required-fix controlled-browser verification: PASS at 1280 x 720
+  Light/Dark and 390 x 844 System for initial List loading, initial ordinary error,
+  keyboard Retry, and UNKNOWN recovery-failure followed by reload/remount. When local
+  UNKNOWN state disappeared after reload and the fresh List failed, Create remained
+  disabled with an explanatory message and no Dialog; request evidence remained at
+  one POST until List Retry succeeded. No horizontal overflow or browser console
+  warning/error was observed. Cached stale List refetch is covered by the automated
+  real-page QueryClient regression because browser reload does not retain memory cache.
 
 ## Known gaps
 
 - Wallet Balance Read, Wallet Deposit Create, Gift Card Redeem and Support Ticket
   List/Detail reads are complete and independently reviewed. Support Ticket Create
-  is implemented pending independent review; Reply/Close remain NOT STARTED.
+  has its independent-review required fix applied and is pending re-review;
+  Reply/Close remain NOT STARTED.
   Referrals remains a placeholder without mock business data.
 - Production solution/V2Board Ticket List, Detail and Create behavior is NOT TESTED;
   controlled mock browser and automated contract/privacy tests are the current
@@ -292,5 +309,5 @@ operational source of truth.
 
 ## Next milestone
 
-AUR-M8-002 implementation is complete. Exact-head CI verification and independent
-Create Ticket Mutation Review are the next required gates. AUR-M8-003 has not started.
+AUR-M8-002 required fix is applied. Exact-head CI verification and independent Create
+Ticket Mutation re-review are the next required gates. AUR-M8-003 has not started.

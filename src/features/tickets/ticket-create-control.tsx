@@ -40,7 +40,13 @@ type CreateFeedback =
   | { kind: 'unavailable'; reconciled: boolean | null }
   | { kind: 'unknown'; reconciled: boolean | null }
 
-export function TicketCreateControl({ accessToken }: { accessToken: string }) {
+export function TicketCreateControl({
+  accessToken,
+  listAuthorityReady,
+}: {
+  accessToken: string
+  listAuthorityReady: boolean
+}) {
   const queryClient = useQueryClient()
   const sessionInvalidatedRef = useRef(false)
   const createLock = useSynchronousActionLock()
@@ -81,6 +87,7 @@ export function TicketCreateControl({ accessToken }: { accessToken: string }) {
   const unknownGuardActive =
     feedback?.kind === 'unknown' && feedback.reconciled === true
   const createDisabled =
+    !listAuthorityReady ||
     busy ||
     recovering ||
     recoveryFailed ||
@@ -141,7 +148,12 @@ export function TicketCreateControl({ accessToken }: { accessToken: string }) {
 
   const createTicket = async (values: CreateTicketInput) => {
     const parsed = setValidationErrors(values)
-    if (!parsed || (unknownGuardActive && !unknownAcknowledged)) return
+    if (
+      !parsed ||
+      !listAuthorityReady ||
+      (unknownGuardActive && !unknownAcknowledged)
+    )
+      return
     if (!createLock.tryAcquire()) return
 
     sessionInvalidatedRef.current = false
@@ -232,6 +244,12 @@ export function TicketCreateControl({ accessToken }: { accessToken: string }) {
         <Plus className="size-4" aria-hidden="true" />
         新建工单
       </Button>
+
+      {!listAuthorityReady ? (
+        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+          成功读取当前工单列表后才能新建工单，以避免重复提交。
+        </p>
+      ) : null}
 
       {feedback ? <CreateFeedbackMessage feedback={feedback} /> : null}
 
@@ -407,6 +425,15 @@ export function TicketCreateControl({ accessToken }: { accessToken: string }) {
               />
             ) : null}
 
+            {!listAuthorityReady ? (
+              <p
+                className="text-sm leading-6 text-muted-foreground"
+                role="status"
+              >
+                当前工单列表正在重新读取，成功后才能提交工单。
+              </p>
+            ) : null}
+
             {unknownGuardActive && !unknownAcknowledged ? (
               <UnknownAcknowledgement
                 checked={unknownAcknowledged}
@@ -426,7 +453,11 @@ export function TicketCreateControl({ accessToken }: { accessToken: string }) {
               </Button>
               <Button
                 type="submit"
-                disabled={busy || (unknownGuardActive && !unknownAcknowledged)}
+                disabled={
+                  !listAuthorityReady ||
+                  busy ||
+                  (unknownGuardActive && !unknownAcknowledged)
+                }
               >
                 {busy ? (
                   <LoaderCircle
