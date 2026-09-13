@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { subscriptionApi } from '@/features/subscription/subscription-api'
+import {
+  rotateSubscriptionAccessMutationOptions,
+  subscriptionMutationKeys,
+  subscriptionQueryKeys,
+} from '@/features/subscription/subscription-queries'
 import { apiClient } from '@/lib/api/client'
 import { ApiError } from '@/lib/api/errors'
 
@@ -52,6 +57,58 @@ describe('Subscription API contract', () => {
       eligible: true,
       accessUrl: credentialUrl,
     })
+  })
+
+  it('rotates access with an exact bodyless POST and strips additive fields', async () => {
+    const request = vi
+      .spyOn(apiClient, 'authenticatedRequest')
+      .mockResolvedValue({
+        rotated: true,
+        accessUrl: credentialUrl,
+        token: 'must-be-stripped',
+      })
+
+    await expect(subscriptionApi.rotateAccess(accessToken)).resolves.toEqual({
+      rotated: true,
+      accessUrl: credentialUrl,
+    })
+    expect(request).toHaveBeenCalledWith('/api/v1/subscription/rotate-access', {
+      method: 'POST',
+      accessToken,
+    })
+    expect(request.mock.calls[0]?.[1]).not.toHaveProperty('body')
+  })
+
+  it.each([
+    { rotated: false, accessUrl: credentialUrl },
+    { accessUrl: credentialUrl },
+    { rotated: true },
+    { rotated: true, accessUrl: 'http://gateway.example/subscription' },
+    {
+      rotated: true,
+      accessUrl: 'https://user:password@gateway.example/subscription',
+    },
+    { rotated: true, accessUrl: 'not-a-url' },
+  ])('rejects malformed rotation data', async (payload) => {
+    vi.spyOn(apiClient, 'authenticatedRequest').mockResolvedValue(payload)
+
+    await expect(
+      subscriptionApi.rotateAccess(accessToken),
+    ).rejects.toMatchObject({
+      code: 'MALFORMED_RESPONSE',
+    } satisfies Partial<ApiError>)
+  })
+
+  it('keeps subscription query and mutation keys credential-free', () => {
+    const mutation = rotateSubscriptionAccessMutationOptions(accessToken)
+
+    expect(subscriptionQueryKeys.access).toEqual(['subscription', 'access'])
+    expect(subscriptionMutationKeys.rotateAccess).toEqual([
+      'subscription',
+      'rotate-access',
+    ])
+    expect(mutation.mutationKey).not.toContain(accessToken)
+    expect(mutation.retry).toBe(false)
   })
 
   it.each([

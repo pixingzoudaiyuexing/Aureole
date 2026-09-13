@@ -4,7 +4,7 @@ import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invali
 import { TrafficHistory } from '@/features/traffic/traffic-history'
 import { useTrafficLogs } from '@/features/traffic/traffic-queries'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
-import { SubscriptionCredential } from './subscription-access'
+import { SubscriptionAccessPanel } from './subscription-access-panel'
 import {
   CurrentSubscriptionDetails,
   DeviceAndPeriodDetails,
@@ -94,25 +94,21 @@ function SubscriptionContent({ accessToken }: { accessToken: string }) {
         title="订阅地址"
         description="此地址包含访问凭据，请仅复制到可信客户端。"
       >
-        {access.isPending ? (
+        {access.data ? (
+          <SubscriptionAccessPanel
+            access={access.data}
+            accessToken={accessToken}
+          />
+        ) : access.isPending ? (
           <p className="text-sm text-muted-foreground" role="status">
             正在读取订阅地址…
           </p>
-        ) : access.isError ? (
+        ) : (
           <ReadError
             message="暂时无法读取订阅地址。"
             error={access.error}
             retry={() => void access.refetch()}
           />
-        ) : access.data.eligible ? (
-          <SubscriptionCredential
-            key={access.data.accessUrl}
-            accessUrl={access.data.accessUrl}
-          />
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            当前没有可展示的订阅地址。
-          </p>
         )}
       </SubscriptionSection>
 

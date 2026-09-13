@@ -31,6 +31,13 @@ const subscriptionAccessSchema = z.union([
     .strip(),
 ])
 
+const subscriptionAccessRotationSchema = z
+  .object({
+    rotated: z.literal(true),
+    accessUrl: httpsCredentialUrlSchema,
+  })
+  .strip()
+
 const safeCountSchema = z
   .number()
   .int()
@@ -64,6 +71,9 @@ const subscriptionOverviewSchema = z
   .strip()
 
 export type SubscriptionAccess = z.infer<typeof subscriptionAccessSchema>
+export type SubscriptionAccessRotation = z.infer<
+  typeof subscriptionAccessRotationSchema
+>
 export type SubscriptionOverview = z.infer<typeof subscriptionOverviewSchema>
 
 function parseSubscriptionData<T>(schema: z.ZodType<T>, data: unknown) {
@@ -93,5 +103,13 @@ export const subscriptionApi = {
       { method: 'GET', accessToken },
     )
     return parseSubscriptionData(subscriptionOverviewSchema, data)
+  },
+
+  async rotateAccess(accessToken: string) {
+    const data = await apiClient.authenticatedRequest<unknown>(
+      '/api/v1/subscription/rotate-access',
+      { method: 'POST', accessToken },
+    )
+    return parseSubscriptionData(subscriptionAccessRotationSchema, data)
   },
 }

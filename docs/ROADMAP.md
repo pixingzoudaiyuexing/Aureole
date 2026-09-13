@@ -7,8 +7,8 @@
 | 2         | COMPLETE | Aureole repository, frontend foundation, app shell, quality and Git SSOT |
 | 3         | COMPLETE | Auth / Account                                                           |
 | 4         | COMPLETE | Read-only Core                                                           |
-| 5         | CURRENT  | Commerce / Payment                                                       |
-| 6         | PLANNED  | Subscription Mutations                                                   |
+| 5         | COMPLETE | Commerce / Payment                                                       |
+| 6         | CURRENT  | Subscription Mutations                                                   |
 | 7         | PLANNED  | Wallet / Gift Card                                                       |
 | 8         | PLANNED  | Support                                                                  |
 | 9         | PLANNED  | Referral / Commission / Withdrawal                                       |
@@ -31,7 +31,15 @@ Milestone 5 按以下边界推进：
 
 - M5-001 Orders Read Model：COMPLETE，Independent Review PASS
 - M5-002 Order Create + Promotion + Cancel：COMPLETE，Independent Review PASS
-- M5-003 Payment Methods + Checkout：IMPLEMENTATION COMPLETE，Independent Review PENDING
+- M5-003 Payment Methods + Checkout：COMPLETE，Independent Payment Review PASS
 
 M5-003 已实现 Payment Methods、Checkout、QR/redirect/finished action、权威 Order Status recovery
-与受控 polling。Milestone 5 在 M5-003 独立 Payment Review 完成前仍保持 CURRENT，不标记 COMPLETE。
+与受控 polling，并已通过独立 Payment Review。Milestone 5 已完成并冻结。
+
+Milestone 6 按以下边界推进：
+
+- AUR-M6-001 Rotate Subscription Access：IMPLEMENTATION COMPLETE，Independent Review PENDING
+- AUR-M6-002 Advance Period：NOT STARTED
+
+AUR-M6-001 仅实现危险 credential rotation、权威 Access 对账、UNKNOWN fail-closed recovery 与
+Auth invalidation。Production Subscription Rotation runtime 仍为 NOT TESTED。

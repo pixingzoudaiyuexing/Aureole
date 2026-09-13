@@ -112,7 +112,7 @@ form-local synchronous lock 防止 same-tick 重复提交。成功意味着上�
 失效；Aureole 复用 Auth `logout()` 清除 local credential 与完整 Query cache，再返回 Login。
 密码 mutation 结果不确定时采用同样的保守退出策略，不重提 POST，也不声称修改成功或失败。
 
-## Subscription read model
+## Subscription read model and access rotation
 
 `features/subscription` 持有 Subscription Access 与 Overview 的 Public API parser、canonical
 query keys 和 read-only presentation。Dashboard 与 Subscription Page 复用同一个 Overview
@@ -130,6 +130,20 @@ Overview 只展示 Public Contract 原始字段。Byte formatting 与 absolute d
 presentation；不得生成 remaining traffic、usage percentage、remaining days、expiry flag 或
 next reset date。`renewalAllowed` 只显示为“新周期功能已启用/未启用”，不表示当前用户可以执行
 Advance Period。
+
+AUR-M6-001 在同一 feature boundary 增加 `POST /api/v1/subscription/rotate-access`。该 mutation
+没有 request body、显式 `retry: false`，并使用 component-local synchronous lock 防止
+same-tick 重复提交。入口只依据 canonical Access read 的 `eligible=true` 与合法 `accessUrl`
+显示，但最终 eligibility 始终由 solution/V2Board 判断；用户必须阅读 credential 失效后果并勾选
+确认后才允许提交。
+
+成功 DTO 会先替换 canonical `['subscription', 'access']` credential，再立即重新读取
+`GET /api/v1/subscription` 对账，因此 credential component 通过新 URL key 清除旧 reveal/copy
+状态。409 与明确 rotation failure 同样执行权威读取。network、timeout、upstream 与 malformed
+response 均属于结果未知：不自动重提 POST，不根据 URL 是否变化判断因果；读取恢复成功后仍要求
+新的明确确认，读取失败则 fail closed，只提供重新读取。Mutation 或任何 recovery read 的
+AUTH_REQUIRED/AUTH_FAILED 都复用 sealed Auth Session Core 清除 credential、Query cache 并退出
+protected UI。AUR-M6-001 不请求 subscription content，也不实现 Advance Period。
 
 ## Read-only catalog, resources and traffic
 

@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 5 - Commerce / Payment (`AUR-M5-003` Payment Methods + Checkout)
+Milestone 6 - Subscription Mutations (`AUR-M6-001` Rotate Subscription Access)
 
 ## Contract baseline
 
@@ -41,12 +41,16 @@ Security/Notice review are COMPLETE with no Blocker, High, Medium or Low finding
 and no required fixes. The global DOMPurify hook NIT is non-blocking. Its accepted
 production runtime gap remains NOT TESTED and non-blocking. Milestone 4 is COMPLETE.
 
-Milestone 5 is CURRENT. AUR-M5-001 Orders Read Model implementation and
+Milestone 5 is COMPLETE and FROZEN. AUR-M5-001 Orders Read Model implementation and
 independent review are COMPLETE with no required fixes. Its production Orders
 runtime gap remains NOT TESTED and non-blocking. AUR-M5-002 Order Create +
 Promotion + Cancel implementation and independent review are COMPLETE.
 AUR-M5-003 Payment Methods + Checkout implementation is COMPLETE and its
-independent Payment review is PENDING. Milestone 5 is not yet marked COMPLETE.
+independent Payment review passed.
+
+Milestone 6 is CURRENT. AUR-M6-001 Rotate Subscription Access implementation is
+COMPLETE and its independent review is PENDING. AUR-M6-002 Advance Period is NOT
+STARTED. Production Subscription Rotation runtime is NOT TESTED.
 
 ## Current commit
 
@@ -60,14 +64,13 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (26 files, 468 tests)
+- `npm test`: PASS (27 files, 491 tests)
 - `npm run build`: PASS
 - `npm ls`: PASS
 - `git diff --check`: PASS
-- Build evidence: main JS 471.60 kB raw / 148.28 kB gzip; CSS 34.01 kB raw /
-  7.02 kB gzip; Plans route 5.16 kB gzip; Orders route 13.17 kB gzip.
-  Relative to the M5-002 baseline, main JS changed by about +0.02 kB gzip, CSS
-  by +0.07 kB gzip and the lazy Orders route by +9.62 kB gzip.
+- Build evidence: main JS 471.62 kB raw / 148.29 kB gzip; CSS 34.70 kB raw /
+  7.11 kB gzip; Subscription route 13.24 kB raw / 4.83 kB gzip; Plans route
+  5.15 kB gzip; Orders route 13.17 kB gzip.
   Assets remain within budget; initial-route composition has not been measured
   by a dedicated analyzer.
 - Browser verification: PASS at 1280 x 720 and 390 x 844 for Login Light/Dark,
@@ -166,6 +169,16 @@ operational source of truth.
   polling stops on close/non-pending/hard cap, manual status refresh works, and
   all required recovery/Auth boundaries hold. Production solution/V2Board Payment
   runtime is NOT TESTED.
+- AUR-M6-001 controlled-browser verification: PASS at exact 1280 x 720 and
+  390 x 844 in Light/Dark/System for eligible/ineligible Access, hidden/revealed
+  long credential, copy success, danger confirmation, acknowledgement gating,
+  same-action double click, success state reset, 409 unavailable, definitive
+  rotation failure, unknown-result recovery success/failure, guarded resubmit,
+  manual Access recovery, Escape focus restoration and recovery-read Auth
+  invalidation. No horizontal overflow or application console warning/error was
+  observed. Automated tests additionally cover clipboard failure, all four
+  UNKNOWN codes and all required mutation/recovery Auth boundaries. Production
+  solution/V2Board Subscription Rotation runtime is NOT TESTED.
 
 ## Known gaps
 
@@ -177,11 +190,14 @@ operational source of truth.
   callback processing and final Order Status behavior are NOT TESTED; controlled
   mock browser and automated Contract/privacy/recovery tests are the current
   evidence.
+- Production solution/V2Board Subscription Access Rotation behavior is NOT
+  TESTED; controlled mock browser and automated Contract/privacy/recovery tests
+  are the current evidence.
 - Production solution/V2Board Notice behavior is NOT TESTED; controlled mock
   browser and automated contract/security tests are the current evidence.
 - Hosting provider is undecided; production requires SPA fallback.
 
 ## Next milestone
 
-AUR-M5-003 implementation is complete. Independent Payment review is the next
-required gate. Milestone 6 and all later milestones remain NOT STARTED.
+AUR-M6-001 implementation is complete. Exact-head verification and independent
+Security Review are the next required gates. AUR-M6-002 remains NOT STARTED.

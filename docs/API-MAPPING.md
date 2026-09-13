@@ -64,8 +64,15 @@
 - Traffic 只做 human-readable byte formatting，不计算 remaining/percentage/over-quota；expiry
   只显示 absolute timestamp 或 neutral null state；device/reset nullable value 不转换为 0 或
   unlimited。
-- `renewalAllowed` 只翻译为“新周期功能已启用/未启用”。Rotate Access 与 Advance Period 均不在
-  M4-001 实现范围。
+- `renewalAllowed` 只翻译为“新周期功能已启用/未启用”，不作为 mutation eligibility。
+- `POST /api/v1/subscription/rotate-access` 是无 body 的非幂等 credential mutation，仅在已有
+  Access read 为 eligible 时显示入口，仍由 server 最终判断资格。Mutation 不 retry，并在 success、
+  409、明确失败或 UNKNOWN 后重新读取 canonical Access；UNKNOWN recovery 未成功时禁止再次 POST，
+  成功后也要求用户确认并保存当前地址再重新确认。
+- Rotate success 只接受 `rotated=true` 与安全 HTTPS `accessUrl`，additive fields 会被 strip。
+  `accessUrl` 不进入 query key、storage、URL、Zustand、console 或 analytics；Aureole 不 probe、
+  fetch 或解析 credential URL。
+- `POST /api/v1/subscription/advance-period` 属于 AUR-M6-002，当前 NOT STARTED。
 
 ## Catalog, resources and traffic mapping
 

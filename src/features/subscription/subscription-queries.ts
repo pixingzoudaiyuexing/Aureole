@@ -6,6 +6,10 @@ export const subscriptionQueryKeys = {
   overview: ['subscription', 'overview'] as const,
 }
 
+export const subscriptionMutationKeys = {
+  rotateAccess: ['subscription', 'rotate-access'] as const,
+}
+
 export function subscriptionAccessQueryOptions(accessToken: string) {
   return queryOptions({
     queryKey: subscriptionQueryKeys.access,
@@ -18,6 +22,14 @@ export function subscriptionOverviewQueryOptions(accessToken: string) {
     queryKey: subscriptionQueryKeys.overview,
     queryFn: () => subscriptionApi.getOverview(accessToken),
   })
+}
+
+export function rotateSubscriptionAccessMutationOptions(accessToken: string) {
+  return {
+    mutationKey: subscriptionMutationKeys.rotateAccess,
+    mutationFn: () => subscriptionApi.rotateAccess(accessToken),
+    retry: false as const,
+  }
 }
 
 export function useSubscriptionAccess(accessToken: string) {
