@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 8 - Support (`AUR-M8-002` Create Support Ticket)
+Milestone 8 - Support (`AUR-M8-003` Reply + Close Support Ticket)
 
 ## Contract baseline
 
@@ -61,14 +61,13 @@ passed. Production solution/V2Board Wallet, Deposit, Payment and Gift Card runti
 NOT TESTED and remains a Launch Readiness evidence gap.
 
 Milestone 8 is CURRENT. AUR-M8-001 Support Ticket Read Model is COMPLETE and its
-Independent Support Read Review passed. AUR-M8-002 Create Support Ticket is
-IMPLEMENTATION COMPLETE with INDEPENDENT REVIEW REQUIRED FIX APPLIED and RE-REVIEW
-PENDING. It adds only strict raw-text Ticket Create, non-retrying/synchronously locked
-POST, authoritative List recovery, confirmed-success fail-closed reconciliation and
-guarded UNKNOWN resubmission. The required fix gates Create on canonical List
-`isSuccess && !isFetching`, including initial/retry/cached-refetch and remount paths.
-AUR-M8-003 Reply + Close Ticket is NOT STARTED. Production solution/V2Board Ticket
-Read/Create runtime is NOT TESTED.
+Independent Support Read Review passed. AUR-M8-002 Create Support Ticket is COMPLETE
+and its Independent Create Ticket Mutation Review passed. AUR-M8-003 Reply + Close
+Ticket is IMPLEMENTATION COMPLETE with INDEPENDENT REVIEW PENDING. It adds only strict
+raw-text Reply and bodyless Close, shared synchronous locking, authoritative Detail/List
+reconciliation, fail-closed Detail authority and guarded UNKNOWN resubmission. No local
+message/status mutation or causal inference is used. Production solution/V2Board Ticket
+Read/Create/Reply/Close runtime is NOT TESTED.
 
 ## Current commit
 
@@ -82,12 +81,12 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (37 files, 789 tests)
+- `npm test`: PASS (38 files, 839 tests)
 - `npm run build`: PASS
 - `npm ls`: PASS
 - `git diff --check`: PASS
-- Build evidence: main JS 471.72 kB raw / 148.30 kB gzip; CSS 36.39 kB raw /
-  7.39 kB gzip; Support route 19.68 kB raw / 6.16 kB gzip; Wallet route 23.81 kB
+- Build evidence: main JS 471.72 kB raw / 148.31 kB gzip; CSS 36.91 kB raw /
+  7.42 kB gzip; Support route 31.36 kB raw / 8.40 kB gzip; Wallet route 23.81 kB
   raw / 7.06 kB gzip; Subscription route 20.18 kB raw / 5.83 kB gzip; Plans
   route 5.16 kB gzip; Orders route 13.17 kB gzip. Assets remain within budget;
   initial-route composition has not been measured by a dedicated analyzer.
@@ -279,17 +278,29 @@ operational source of truth.
   one POST until List Retry succeeded. No horizontal overflow or browser console
   warning/error was observed. Cached stale List refetch is covered by the automated
   real-page QueryClient regression because browser reload does not retain memory cache.
+- AUR-M8-003 controlled-browser verification: PASS against a local `/api/v1` mock at
+  exact 1280 x 720 and 390 x 844 in Light/Dark/System for open/closed Detail, initial
+  loading and ordinary-error authority gates, keyboard Retry, raw multiline/XSS-like
+  Reply success, `TICKET_REPLY_FAILED`, same-looking-message Reply UNKNOWN with
+  acknowledgement reset, Close confirmation/cancel, `TICKET_CLOSE_FAILED`, Close
+  UNKNOWN -> open acknowledgement/confirmation and Close UNKNOWN -> closed current-state
+  copy, plus Reply Auth invalidation. Request/UI evidence showed no action before fresh
+  Detail authority, no false success or causal claim, no HTML execution/resource element,
+  no raw upstream error, no horizontal overflow and no browser console warning/error.
+  Automated tests additionally cover same-tick Reply/Close locking, cached refetch,
+  reconciliation failure, manual GET-only recovery, remount safety, every required
+  UNKNOWN category, strict DTOs and full Session cache clearing. Production
+  solution/V2Board Ticket Reply/Close runtime is NOT TESTED.
 
 ## Known gaps
 
 - Wallet Balance Read, Wallet Deposit Create, Gift Card Redeem and Support Ticket
-  List/Detail reads are complete and independently reviewed. Support Ticket Create
-  has its independent-review required fix applied and is pending re-review;
-  Reply/Close remain NOT STARTED.
+  List/Detail reads and Create are complete and independently reviewed. Support Ticket
+  Reply/Close implementation is complete and pending independent review.
   Referrals remains a placeholder without mock business data.
-- Production solution/V2Board Ticket List, Detail and Create behavior is NOT TESTED;
-  controlled mock browser and automated contract/privacy tests are the current
-  evidence.
+- Production solution/V2Board Ticket List, Detail, Create, Reply and Close behavior is
+  NOT TESTED; controlled mock browser and automated contract/privacy tests are the
+  current evidence.
 - Production solution/V2Board Order Create, Promotion and Cancel behavior is NOT
   TESTED; controlled mock browser and automated contract/privacy tests are the
   current evidence.
@@ -309,5 +320,5 @@ operational source of truth.
 
 ## Next milestone
 
-AUR-M8-002 required fix is applied. Exact-head CI verification and independent Create
-Ticket Mutation re-review are the next required gates. AUR-M8-003 has not started.
+AUR-M8-003 exact-head CI verification and Independent Support Reply/Close Mutation
+Review are the next required gates. Milestone 9 has not started.

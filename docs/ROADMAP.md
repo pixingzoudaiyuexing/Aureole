@@ -57,15 +57,20 @@ Milestone 7 已完成并冻结。Production solution/V2Board Wallet、Deposit、
 Milestone 8 按以下边界推进：
 
 - AUR-M8-001 Support Ticket Read Model：COMPLETE，Independent Support Read Review PASS
-- AUR-M8-002 Create Ticket：IMPLEMENTATION COMPLETE，INDEPENDENT REVIEW REQUIRED FIX APPLIED，RE-REVIEW PENDING
-- AUR-M8-003 Reply + Close Ticket：NOT STARTED
+- AUR-M8-002 Create Ticket：COMPLETE，Independent Create Ticket Mutation Review PASS
+- AUR-M8-003 Reply + Close Ticket：IMPLEMENTATION COMPLETE，INDEPENDENT REVIEW PENDING
 
-AUR-M8-002 只增量实现 `POST /api/v1/tickets`。Create 原样提交 strict Public fields、禁止自动 retry，
-使用同步锁与 authoritative List recovery；confirmed success 不推断 Ticket ID，UNKNOWN 不推断结果且
-再次提交前要求用户核对 List。Reply、Close、attachment、unread、search/filter 及 Referral /
-Commission / Withdrawal 均未实现。Production Ticket Read/Create runtime 仍为 NOT TESTED；Milestone 8
-保持 CURRENT。
+AUR-M8-002 只增量实现 `POST /api/v1/tickets`，并已通过独立审查。Create 原样提交 strict Public
+fields、禁止自动 retry，使用同步锁与 authoritative List recovery；confirmed success 不推断 Ticket ID，
+UNKNOWN 不推断结果且再次提交前要求用户核对 List。
 
 Independent Create Ticket Mutation Review 的 required fix 已增加 canonical List authority gate：只有当前
 页面生命周期中的 List read 已成功且不在 fetching 时才允许 Create。初始/重试/缓存 refetch failure 与
-UNKNOWN/confirmed-success remount 均 fail closed；当前状态为 RE-REVIEW PENDING，不标记 PASS。
+UNKNOWN/confirmed-success remount 均 fail closed。
+
+AUR-M8-003 只增量实现 Reply 与 Close，并集成现有 Ticket Detail。两个 mutation 由 fresh authoritative
+Detail gate 与共享 synchronous lock 约束；confirmed success、definitive error 与 UNKNOWN 都通过 GET
+Detail/List 对账，不本地 append message 或改 status。UNKNOWN recovery 不依据相同消息或当前 status
+推断因果结果，再次执行需 acknowledgement，Close 另有独立 confirmation。Attachment、unread、
+search/filter 及 Referral / Commission / Withdrawal 均未实现。Production Ticket Read/Create/Reply/Close
+runtime 仍为 NOT TESTED；Milestone 8 保持 CURRENT，等待独立 Support Mutation Review。

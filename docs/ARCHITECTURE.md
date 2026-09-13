@@ -342,6 +342,33 @@ List failure/fetching 都会禁用 Create trigger 和最终 submit。这样即�
 UNKNOWN 或 confirmed-success feedback，只要当前页面生命周期尚未成功完成新的 List read，就不能再次
 发送非幂等 POST。恢复继续复用现有 List Retry/GET，不持久化 mutation guard 或 Ticket 内容。
 
+AUR-M8-002 已通过 Independent Create Ticket Mutation Review。AUR-M8-003 在同一 feature boundary
+增量加入 `POST /api/v1/tickets/{id}/reply` 与 `POST /api/v1/tickets/{id}/close`。Reply 复用既有
+Ticket ID schema，并原样提交 strict `{ message }`；Close 不发送业务 body。Success parser 只接受
+literal `{ replied: true }` / `{ closed: true }` 并 strip additive fields。两个 mutation 使用不含
+credential、Ticket ID 或内容的 `['tickets','reply']` / `['tickets','close']` key，均显式
+`retry: false`。
+
+Ticket Detail 是 Reply/Close 的 mutation authority。页面与执行函数都要求 canonical Detail query
+`isSuccess && !isFetching`、query fetch idle、返回 ID 等于当前 selection 且 authoritative status 为
+`open`；initial load、ordinary error、cached refetch、fresh refetch failure 与 remount recovery 均
+fail closed。Reply 与 Close 共享 feature-local synchronous action coordinator，same-tick 最多启动一个
+POST；mutation 与对账期间 Detail Dialog 不能关闭后重开绕过。Closed Detail 只展示已关闭事实，不提供
+Reply、Close 或 Reopen。
+
+Confirmed Reply/Close success 分别只证明 mutation receipt，随后重新读取 selected Detail 与 canonical
+List；不会 append message、生成 ID/time、改 status/updatedAt 或写 Query cache。Detail reconciliation
+失败不会把 confirmed success 改口为失败，只开放 GET-only manual recovery。`TICKET_REPLY_FAILED` 与
+`TICKET_CLOSE_FAILED` 使用泛化文案并重新读取 Detail；`TICKET_NOT_FOUND` 重新读取 List 而不本地删除
+row；`VALIDATION_ERROR` 保留 Reply 原文。
+
+NETWORK_ERROR、UPSTREAM_TIMEOUT、UPSTREAM_ERROR、MALFORMED_RESPONSE 与 non-ApiError 都视为
+UNKNOWN。Detail recovery 只建立当前事实，不按相同 content、message count/new ID、createdAt proximity
+或 status 变化推断刚才 mutation 的因果结果。Recovery 后 open 状态再次 Reply/Close 前分别要求专用
+acknowledgement，且 Close 仍需标准 confirmation；Reply payload 变化会清除 acknowledgement。Recovery
+失败只允许 GET Detail，所有 mutation/reconciliation/recovery 的 Auth error 继续进入 sealed Session
+Core。Reply draft 和 UNKNOWN guard 仅为 React local memory，不持久化。
+
 ## Theme and presentation
 
 Light、Dark、System 由 Theme Provider 管理；显式选择可保存为非敏感 local UI preference。CSS tokens 是颜色和 radius 的 SSOT，传统 `tailwind.config.js` 不是 token 核心。使用 system font 与 system monospace。

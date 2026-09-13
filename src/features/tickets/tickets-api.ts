@@ -42,7 +42,12 @@ export const createTicketRequestSchema = z
     message: z.string().min(1).max(10_000),
   })
   .strict()
+export const replyTicketRequestSchema = z
+  .object({ message: z.string().min(1).max(10_000) })
+  .strict()
 const createdTicketSchema = z.object({ created: z.literal(true) }).strip()
+const repliedTicketSchema = z.object({ replied: z.literal(true) }).strip()
+const closedTicketSchema = z.object({ closed: z.literal(true) }).strip()
 
 export type TicketPriority = (typeof ticketPriorities)[number]
 export type TicketStatus = (typeof ticketStatuses)[number]
@@ -50,7 +55,10 @@ export type TicketSummary = z.infer<typeof ticketSummarySchema>
 export type TicketMessage = z.infer<typeof ticketMessageSchema>
 export type TicketDetail = z.infer<typeof ticketDetailSchema>
 export type CreateTicketInput = z.input<typeof createTicketRequestSchema>
+export type ReplyTicketInput = z.input<typeof replyTicketRequestSchema>
 export type CreatedTicket = z.infer<typeof createdTicketSchema>
+export type RepliedTicket = z.infer<typeof repliedTicketSchema>
+export type ClosedTicket = z.infer<typeof closedTicketSchema>
 
 function parse<T>(schema: z.ZodType<T>, data: unknown) {
   const result = schema.safeParse(data)
@@ -89,5 +97,24 @@ export const ticketsApi = {
       { method: 'POST', body, accessToken },
     )
     return parse(createdTicketSchema, data)
+  },
+
+  async reply(accessToken: string, id: string, input: ReplyTicketInput) {
+    const validId = ticketIdSchema.parse(id)
+    const body = replyTicketRequestSchema.parse(input)
+    const data = await apiClient.authenticatedRequest<unknown>(
+      `/api/v1/tickets/${encodeURIComponent(validId)}/reply`,
+      { method: 'POST', body, accessToken },
+    )
+    return parse(repliedTicketSchema, data)
+  },
+
+  async close(accessToken: string, id: string) {
+    const validId = ticketIdSchema.parse(id)
+    const data = await apiClient.authenticatedRequest<unknown>(
+      `/api/v1/tickets/${encodeURIComponent(validId)}/close`,
+      { method: 'POST', accessToken },
+    )
+    return parse(closedTicketSchema, data)
   },
 }

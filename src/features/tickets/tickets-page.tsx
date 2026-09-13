@@ -22,6 +22,7 @@ import type {
   TicketSummary,
 } from './tickets-api'
 import { TicketCreateControl } from './ticket-create-control'
+import { TicketDetailActions } from './ticket-detail-actions'
 import { useTicketDetail, useTickets } from './tickets-queries'
 
 const priorityLabels: Record<TicketPriority, string> = {
@@ -131,6 +132,7 @@ export function TicketsPage() {
 function TicketsContent({ accessToken }: { accessToken: string }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const selectedTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const detailActionBusyRef = useRef(false)
   const tickets = useTickets(accessToken)
   const detail = useTicketDetail(accessToken, selectedId)
   const invalid = isInvalidSessionError(tickets.error)
@@ -142,6 +144,11 @@ function TicketsContent({ accessToken }: { accessToken: string }) {
 
   if (invalid) return null
   const ticketListAuthorityReady = tickets.isSuccess && !tickets.isFetching
+  const detailAuthorityReady =
+    selectedId !== null &&
+    detail.isSuccess &&
+    !detail.isFetching &&
+    detail.data?.id === selectedId
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -201,6 +208,7 @@ function TicketsContent({ accessToken }: { accessToken: string }) {
                   selected={selectedId === ticket.id}
                   onSelect={(trigger) => {
                     selectedTriggerRef.current = trigger
+                    detailActionBusyRef.current = false
                     setSelectedId(ticket.id)
                   }}
                 />
@@ -213,11 +221,17 @@ function TicketsContent({ accessToken }: { accessToken: string }) {
       <Dialog
         open={selectedId !== null}
         onOpenChange={(open) => {
-          if (!open) setSelectedId(null)
+          if (!open && !detailActionBusyRef.current) setSelectedId(null)
         }}
       >
         <DialogContent
           closeLabel="关闭工单详情"
+          onEscapeKeyDown={(event) => {
+            if (detailActionBusyRef.current) event.preventDefault()
+          }}
+          onInteractOutside={(event) => {
+            if (detailActionBusyRef.current) event.preventDefault()
+          }}
           onCloseAutoFocus={(event) => {
             event.preventDefault()
             selectedTriggerRef.current?.focus()
@@ -307,6 +321,19 @@ function TicketsContent({ accessToken }: { accessToken: string }) {
                   )}
                 </section>
               </>
+            ) : null}
+
+            {selectedId ? (
+              <TicketDetailActions
+                key={selectedId}
+                accessToken={accessToken}
+                authorityReady={detailAuthorityReady}
+                detail={detail.data}
+                ticketId={selectedId}
+                onBusyChange={(busy) => {
+                  detailActionBusyRef.current = busy
+                }}
+              />
             ) : null}
           </div>
         </DialogContent>

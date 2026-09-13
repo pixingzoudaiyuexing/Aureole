@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ticketsApi } from '@/features/tickets/tickets-api'
 import {
+  ticketCloseMutationOptions,
   ticketCreateMutationOptions,
+  ticketReplyMutationOptions,
   ticketsMutationKeys,
 } from '@/features/tickets/tickets-queries'
 import { apiClient } from '@/lib/api/client'
@@ -218,12 +220,107 @@ describe('Tickets API', () => {
     },
   )
 
+  it.each(['x', 'm'.repeat(10_000), ' first line\n<script>alert(1)</script> '])(
+    'posts exact raw Reply Ticket input',
+    async (message) => {
+      const request = vi
+        .spyOn(apiClient, 'authenticatedRequest')
+        .mockResolvedValue({ replied: true, private: 'strip-me' })
+
+      await expect(ticketsApi.reply(token, '7', { message })).resolves.toEqual({
+        replied: true,
+      })
+      expect(request).toHaveBeenCalledWith('/api/v1/tickets/7/reply', {
+        method: 'POST',
+        body: { message },
+        accessToken: token,
+      })
+    },
+  )
+
+  it.each(['', 'm'.repeat(10_001)])(
+    'rejects invalid Reply Ticket message before POST',
+    async (message) => {
+      const request = vi.spyOn(apiClient, 'authenticatedRequest')
+      await expect(
+        ticketsApi.reply(token, '7', { message }),
+      ).rejects.toBeDefined()
+      expect(request).not.toHaveBeenCalled()
+    },
+  )
+
+  it('rejects expanded Reply Ticket input before POST', async () => {
+    const request = vi.spyOn(apiClient, 'authenticatedRequest')
+    await expect(
+      ticketsApi.reply(token, '7', {
+        message: 'reply',
+        status: 'open',
+      } as never),
+    ).rejects.toBeDefined()
+    expect(request).not.toHaveBeenCalled()
+  })
+
+  it.each(['0', '-1', '1.5', '01', '2147483648'])(
+    'rejects invalid local Reply and Close id %s before POST',
+    async (id) => {
+      const request = vi.spyOn(apiClient, 'authenticatedRequest')
+      await expect(
+        ticketsApi.reply(token, id, { message: 'reply' }),
+      ).rejects.toBeDefined()
+      await expect(ticketsApi.close(token, id)).rejects.toBeDefined()
+      expect(request).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each([{ replied: false }, {}, { replied: 'true' }, { replied: 1 }])(
+    'rejects malformed Reply Ticket success %#',
+    async (payload) => {
+      vi.spyOn(apiClient, 'authenticatedRequest').mockResolvedValue(payload)
+      await expect(
+        ticketsApi.reply(token, '7', { message: 'reply' }),
+      ).rejects.toMatchObject({
+        code: 'MALFORMED_RESPONSE',
+      } satisfies Partial<ApiError>)
+    },
+  )
+
+  it('posts Close Ticket without a business body and strips additive fields', async () => {
+    const request = vi
+      .spyOn(apiClient, 'authenticatedRequest')
+      .mockResolvedValue({ closed: true, private: 'strip-me' })
+
+    await expect(ticketsApi.close(token, '7')).resolves.toEqual({
+      closed: true,
+    })
+    expect(request).toHaveBeenCalledWith('/api/v1/tickets/7/close', {
+      method: 'POST',
+      accessToken: token,
+    })
+  })
+
+  it.each([{ closed: false }, {}, { closed: 'true' }, { closed: 1 }])(
+    'rejects malformed Close Ticket success %#',
+    async (payload) => {
+      vi.spyOn(apiClient, 'authenticatedRequest').mockResolvedValue(payload)
+      await expect(ticketsApi.close(token, '7')).rejects.toMatchObject({
+        code: 'MALFORMED_RESPONSE',
+      } satisfies Partial<ApiError>)
+    },
+  )
+
   it('uses a credential- and content-free non-retrying mutation key', () => {
-    const options = ticketCreateMutationOptions(token)
+    const createOptions = ticketCreateMutationOptions(token)
+    const replyOptions = ticketReplyMutationOptions(token)
+    const closeOptions = ticketCloseMutationOptions(token)
     expect(ticketsMutationKeys.create).toEqual(['tickets', 'create'])
-    expect(options.mutationKey).not.toContain(token)
-    expect(JSON.stringify(options.mutationKey)).not.toContain('subject')
-    expect(JSON.stringify(options.mutationKey)).not.toContain('message')
-    expect(options.retry).toBe(false)
+    expect(ticketsMutationKeys.reply).toEqual(['tickets', 'reply'])
+    expect(ticketsMutationKeys.close).toEqual(['tickets', 'close'])
+    for (const options of [createOptions, replyOptions, closeOptions]) {
+      expect(options.mutationKey).not.toContain(token)
+      expect(JSON.stringify(options.mutationKey)).not.toContain('subject')
+      expect(JSON.stringify(options.mutationKey)).not.toContain('message')
+      expect(JSON.stringify(options.mutationKey)).not.toContain('7')
+      expect(options.retry).toBe(false)
+    }
   })
 })

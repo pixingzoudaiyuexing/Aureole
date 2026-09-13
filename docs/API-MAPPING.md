@@ -258,6 +258,30 @@
   refetch、以及 UNKNOWN/confirmed-success/TICKET_UNAVAILABLE recovery failure 后的 remount 都不能 POST。
   当前页面成功完成 List GET 后才重新开放 Create；现有 local UNKNOWN acknowledgement、same-tick lock、
   `retry:false` 与 recovery fail-closed 继续保留，不使用 storage/URL/Zustand 持久化 guard。
+- AUR-M8-002 已通过 Independent Create Ticket Mutation Review。
+- `POST /api/v1/tickets/{id}/reply` 复用 canonical Ticket ID schema，只原样发送 strict `{ message }`；
+  `POST /api/v1/tickets/{id}/close` 不发送业务 body。Reply/Close success 分别只接受 literal
+  `{ replied: true }` / `{ closed: true }` 并 strip additive fields；malformed success 统一为
+  `MALFORMED_RESPONSE`。Mutation key 是 content/credential/ID-free 的 `['tickets','reply']` 与
+  `['tickets','close']`，均为 `retry:false`。
+- Reply/Close 只在 selected canonical Detail `isSuccess && !isFetching`、query fetch idle、Detail ID
+  与 selection 一致且 status 为 `open` 时可执行。该 authority 在按钮和最终 mutation function 两层检查；
+  initial/error/cached-refetch/fresh-refetch-failure/remount 都 fail closed。两个动作共享同步锁，最多一个
+  same-tick POST；closed Detail 不提供 mutation 或 Reopen。
+- Reply success 清空 textarea，Close success 关闭 confirmation；两者随后只通过 GET Detail/List 对账，
+  不 append message、生成 ID/time、改 status/updatedAt 或调用 `setQueryData`。Detail reconciliation
+  failure 保留 confirmed success 并只开放 GET-only recovery；List failure 由 canonical List gate 继续
+  约束 Create。
+- `TICKET_REPLY_FAILED` / `TICKET_CLOSE_FAILED` 使用泛化文案并重新读取 Detail；`TICKET_NOT_FOUND`
+  重新读取 List 且不本地删 row；Reply `VALIDATION_ERROR` 保留可编辑原文。所有边界的 Auth error 复用
+  sealed Session Core。
+- Reply/Close 的 NETWORK_ERROR、UPSTREAM_TIMEOUT、UPSTREAM_ERROR、MALFORMED_RESPONSE 与
+  non-ApiError 都是 UNKNOWN。Detail recovery 后只展示当前 open/closed 事实，不按 message 内容、数量、
+  ID、createdAt 或 status 做因果推断；open 状态再次执行相同 mutation 前需专用 acknowledgement，Close
+  还需标准 confirmation。Reply payload change 清除 acknowledgement；recovery failure 只允许 GET。
+- Reply message 仅在 form/active mutation memory 中存在，保持空格、换行与 HTML-like 文本原样；不进入
+  storage、URL、Zustand、analytics、console、error metadata、Query/Mutation key。Detail 消息继续作为
+  plain React text node 展示。
 
 ## Error and request rules
 
