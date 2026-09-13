@@ -168,7 +168,7 @@ HTML 保持为 opaque string，render boundary 再用 DOMPurify 的窄标签/属
 DOM，因此正文不会自动发起第三方资源请求。Detail 普通错误局部恢复，404 不退出 Session；
 AUTH_REQUIRED/AUTH_FAILED 继续清除 credential 与完整 Query cache。
 
-## Orders read model
+## Orders and commerce mutations
 
 `features/orders` 持有 Order List、Order Detail 的 Public DTO parser、canonical query keys 与
 只读展示。List 使用 `['orders', 'list']`，Detail 使用 `['orders', 'detail', id]` 并只在用户
@@ -182,8 +182,24 @@ Public Order 只包含 id、status、amountMinor、createdAt、updatedAt 和 exp
 五种 status 使用 Contract 冻结的用户语义分别展示。createdAt 只进行 absolute date/time
 presentation；updatedAt/expiresAt 的 null 保持为明确未知状态，不根据当前时间、订单状态或其他
 数据推导 expiry。List/Detail 普通错误局部恢复，ORDER_NOT_FOUND 不退出 Session；
-AUTH_REQUIRED/AUTH_FAILED 继续清除 credential 与完整 Query cache。M5-001 不包含任何 Order
-mutation、status polling、Payment Method 或 Checkout boundary。
+AUTH_REQUIRED/AUTH_FAILED 继续清除 credential 与完整 Query cache。
+
+M5-002 在 `features/orders` 内增加 Product Detail、Promotion Preview、Order Create 与 Order
+Cancel 的前端边界。Plans 只负责选择 Product 并打开 Aureole-owned Order Create Dialog；Dialog
+按需读取 Product Detail，不能把 List 的价格或可用性当作下单资格。Promotion 只在用户明确操作时
+请求 preview；输入变化会丢弃旧 preview，UI 不计算折后价或最终应付金额。
+
+Create request 只允许 productId、billingPeriod 和可选 opaque promotionCode，Cancel request 只使用
+opaque Order ID 且无 body。两个 Order mutation 均显式禁用 retry，并使用 form-local synchronous
+lock 防止 same-tick 重复提交。Create 的 network、timeout、upstream 与 malformed response 结果均视为
+未知：先重新读取 Orders List，并在再次 POST 前要求用户明确确认已核对列表；该 guard 按 Product
+保留到 Dialog 关闭之后。明确业务拒绝只允许用户手动重试。
+
+Cancel 入口只对当前 Detail DTO 的 pending 状态显示，但 V2Board 仍是能否取消的唯一权威。用户必须
+二次确认；完成后按错误类别重新读取 Detail 和/或 List。结果未知时不再次开放 Cancel；明确失败也要
+先成功读取最新 Detail 才允许用户决定是否重试。恢复读取失败时保留最后已知 Detail 和安全提示，避免
+控件卸载后误导用户。任何 mutation 或恢复读取返回 AUTH_REQUIRED/AUTH_FAILED 都复用 Auth logout。
+M5-002 不调用 Order Status、Payment Methods 或 Checkout，也不持有 payment/callback state。
 
 ## Theme and presentation
 

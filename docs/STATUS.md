@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 5 - Commerce / Payment (`AUR-M5-001` Orders Read Model)
+Milestone 5 - Commerce / Payment (`AUR-M5-002` Order Create + Promotion + Cancel)
 
 ## Contract baseline
 
@@ -41,12 +41,11 @@ Security/Notice review are COMPLETE with no Blocker, High, Medium or Low finding
 and no required fixes. The global DOMPurify hook NIT is non-blocking. Its accepted
 production runtime gap remains NOT TESTED and non-blocking. Milestone 4 is COMPLETE.
 
-Milestone 5 is CURRENT. AUR-M5-001 Orders Read Model implementation is COMPLETE
-and its independent Order Read-Model review is PENDING. Order List and lazy
-Detail preserve the Public DTO and server order; amounts reuse canonical Account
-Config and `formatMinorMoney`; nullable timestamps remain non-derived. M5-002
-Order Create + Promotion + Cancel and M5-003 Payment Methods + Checkout are NOT
-STARTED.
+Milestone 5 is CURRENT. AUR-M5-001 Orders Read Model implementation and
+independent review are COMPLETE with no required fixes. Its production Orders
+runtime gap remains NOT TESTED and non-blocking. AUR-M5-002 Order Create +
+Promotion + Cancel implementation is COMPLETE and its independent Commerce
+Mutation review is PENDING. M5-003 Payment Methods + Checkout is NOT STARTED.
 
 ## Current commit
 
@@ -60,11 +59,10 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (21 files, 321 tests)
+- `npm test`: PASS (24 files, 412 tests)
 - `npm run build`: PASS
-- Build evidence: main JS 469.66 kB raw / 147.75 kB gzip; CSS 32.92 kB raw /
-  6.86 kB gzip; shared money formatter 0.41 kB gzip; shared Dialog 0.57 kB
-  gzip; Orders route 2.71 kB gzip.
+- Build evidence: main JS 471.57 kB raw / 148.26 kB gzip; CSS 33.61 kB raw /
+  6.95 kB gzip; Plans route 5.16 kB gzip; Orders route 3.55 kB gzip.
   Assets remain within budget; initial-route composition has not been measured
   by a dedicated analyzer.
 - Browser verification: PASS at 1280 x 720 and 390 x 844 for Login Light/Dark,
@@ -91,6 +89,8 @@ operational source of truth.
   implementation report.
 - M4-003 CI: PASS for `fd6ac4db4f093b6022063355ff004873ba4aac71`
   in workflow run `34735646641`.
+- M5-002 remote GitHub Actions is tracked by exact final SHA in the
+  implementation report.
 
 ## Runtime verification
 
@@ -139,17 +139,28 @@ operational source of truth.
   checkout request was observed. Application page errors were zero; the only
   normal-flow console error was the existing local `/favicon.ico` 404.
   Production solution/V2Board is NOT TESTED.
+- M5-002 controlled-browser verification: PASS at exact 1280 x 720 and 390 x 844
+  in Light/Dark for lazy Product Detail, month/year selection, fixed Promotion
+  preview, explicit Create, success state, pending-only Cancel, confirmation,
+  authoritative cancelled Detail/List recovery, close/focus restoration, System
+  theme selection and long Product/255-character Promotion/36-character Order
+  values. No horizontal overflow, Payment/Checkout UI or browser console/page
+  error was observed. Same-tick locks, percentage/stale Promotion, definitive and
+  unknown mutation recovery, guarded resubmit and Auth invalidation are covered
+  by automated behavior tests. The global reduced-motion CSS baseline remains in
+  effect. Production solution/V2Board is NOT TESTED.
 
 ## Known gaps
 
 - Wallet, Support and Referrals remain placeholders without mock business data.
-- Production solution/V2Board Order behavior is NOT TESTED; controlled mock
-  browser and automated contract/privacy tests are the current evidence.
+- Production solution/V2Board Order Create, Promotion and Cancel behavior is NOT
+  TESTED; controlled mock browser and automated contract/privacy tests are the
+  current evidence.
 - Production solution/V2Board Notice behavior is NOT TESTED; controlled mock
   browser and automated contract/security tests are the current evidence.
 - Hosting provider is undecided; production requires SPA fallback.
 
 ## Next milestone
 
-AUR-M5-001 is the only active implementation scope. Its independent Order
-Read-Model review is required before M5-002 or M5-003 may start.
+AUR-M5-002 implementation is complete. Independent Commerce Mutation review is
+the next required gate; M5-003 remains NOT STARTED and was not entered.

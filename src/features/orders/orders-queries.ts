@@ -17,10 +17,21 @@ export function useOrders(accessToken: string) {
   return useQuery(ordersListOptions(accessToken))
 }
 
+export function orderDetailOptions(accessToken: string, id: string) {
+  return queryOptions({
+    queryKey: ordersQueryKeys.detail(id),
+    queryFn: () => ordersApi.getDetail(accessToken, id),
+  })
+}
+
 export function useOrderDetail(accessToken: string, id: string | null) {
   return useQuery({
-    queryKey: id ? ordersQueryKeys.detail(id) : ['orders', 'detail', 'none'],
-    queryFn: () => ordersApi.getDetail(accessToken, id!),
+    ...(id
+      ? orderDetailOptions(accessToken, id)
+      : {
+          queryKey: ['orders', 'detail', 'none'] as const,
+          queryFn: () => Promise.reject(new Error('Order ID is required')),
+        }),
     enabled: id !== null,
   })
 }

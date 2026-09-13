@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { billingPeriods, productIdSchema } from '@/features/catalog/catalog-api'
 import { apiClient } from '@/lib/api/client'
 import { ApiError } from '@/lib/api/errors'
 
@@ -10,7 +11,7 @@ export const orderStatuses = [
   'adjusted',
 ] as const
 
-const orderIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,36}$/)
+export const orderIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,36}$/)
 const timestampSchema = z.string().datetime({ offset: true })
 const orderSchema = z
   .object({
@@ -23,9 +24,20 @@ const orderSchema = z
   })
   .strip()
 const ordersSchema = z.array(orderSchema)
+const promotionCodeSchema = z.string().trim().min(1).max(255)
+const createOrderRequestSchema = z
+  .object({
+    productId: productIdSchema,
+    billingPeriod: z.enum(billingPeriods),
+    promotionCode: promotionCodeSchema.optional(),
+  })
+  .strict()
+const createdOrderSchema = z.object({ id: orderIdSchema }).strip()
+const cancelledOrderSchema = z.object({ cancelled: z.literal(true) }).strip()
 
 export type OrderStatus = (typeof orderStatuses)[number]
 export type Order = z.infer<typeof orderSchema>
+export type CreateOrderInput = z.input<typeof createOrderRequestSchema>
 
 function parse<T>(schema: z.ZodType<T>, data: unknown) {
   const result = schema.safeParse(data)
@@ -55,5 +67,23 @@ export const ordersApi = {
       { method: 'GET', accessToken },
     )
     return parse(orderSchema, data)
+  },
+
+  async create(accessToken: string, input: CreateOrderInput) {
+    const body = createOrderRequestSchema.parse(input)
+    const data = await apiClient.authenticatedRequest<unknown>(
+      '/api/v1/orders',
+      { method: 'POST', body, accessToken },
+    )
+    return parse(createdOrderSchema, data)
+  },
+
+  async cancel(accessToken: string, id: string) {
+    const validId = orderIdSchema.parse(id)
+    const data = await apiClient.authenticatedRequest<unknown>(
+      `/api/v1/orders/${encodeURIComponent(validId)}/cancel`,
+      { method: 'POST', accessToken },
+    )
+    return parse(cancelledOrderSchema, data)
   },
 }

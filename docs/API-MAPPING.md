@@ -110,8 +110,24 @@
   ordinary failure 或 unsupported currency 只显示“金额暂无法安全格式化”，不猜测币种、金额
   exponent 或 `/100`。
 - pending、processing、cancelled、completed、adjusted 分别使用冻结的用户语义；nullable
-  updatedAt/expiresAt 不转换为本地 derived expiry。M5-001 不调用 Order Status、Promotion、
-  Cancel、Payment Methods 或 Checkout endpoints。
+  updatedAt/expiresAt 不转换为本地 derived expiry。
+
+## Commerce mutation mapping
+
+- `GET /api/v1/products/{id}` 在用户从 Plans 明确选择创建订单后按需读取。Product Detail 是 Create
+  Dialog 的套餐名称、规格和周期标价来源，但 `POST /api/v1/orders` 仍是购买/续费资格及最终金额权威。
+- `POST /api/v1/promotions/validate` 只在用户点击“验证优惠码”时调用。Aureole 只显示 Contract 返回的
+  fixed amount 或 percentage preview，不计算折后价；输入变化会清除旧结果，Create 会再次由上游最终
+  验证 promotionCode。
+- `POST /api/v1/orders` 只发送 productId、billingPeriod 和可选 promotionCode，不发送价格、余额、
+  payment method 或 V2Board 字段。Mutation 不自动 retry，并通过同步锁防重复提交。结果未知时先 GET
+  Orders List，并要求用户确认已核对列表后才能再次 POST；成功后同样刷新 List，并只显示返回的 ID。
+- `POST /api/v1/orders/{id}/cancel` 只从 pending Detail 提供入口，但是否可取消仍由服务端决定。操作需
+  明确二次确认且不自动 retry；成功、不可取消和未知结果读取 Detail/List，ORDER_NOT_FOUND 读取 List，
+  明确失败至少读取 Detail。恢复失败时不重新开放 Cancel。
+- 所有新增 API request/response 都经过 strict request schema 与 strip-additive response parser。
+  AUTH_REQUIRED/AUTH_FAILED 在 Product、Promotion、Create、Cancel 或恢复读取任一边界都会退出完整
+  authenticated state。M5-002 不调用 Order Status、Payment Methods 或 Checkout endpoints。
 
 ## Error and request rules
 

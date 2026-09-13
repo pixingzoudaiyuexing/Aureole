@@ -1,22 +1,16 @@
+import { useRef, useState } from 'react'
 import { isInvalidSessionError } from '@/features/auth/auth-errors'
 import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invalid-session-error'
 import type { AccountConfig } from '@/features/account/account-api'
 import { useAccountConfig } from '@/features/account/account-queries'
 import { ReadError } from '@/components/shared/read-error'
+import { Button } from '@/components/ui/button'
+import { OrderCreateDialog } from '@/features/orders/order-create-dialog'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
-import { type BillingPeriod, type Product } from './catalog-api'
+import type { Product } from './catalog-api'
+import { billingPeriodLabels } from './billing-periods'
 import { useProducts } from './catalog-queries'
 import { formatMinorMoney } from './money-format'
-
-const billingLabels: Record<BillingPeriod, string> = {
-  month: '月付',
-  quarter: '季付',
-  halfYear: '半年付',
-  year: '年付',
-  twoYears: '两年付',
-  threeYears: '三年付',
-  oneTime: '一次性',
-}
 
 export function PlansPage() {
   const accessToken = useAuthSessionStore((state) => state.accessToken)
@@ -25,6 +19,13 @@ export function PlansPage() {
 }
 
 function PlansContent({ accessToken }: { accessToken: string }) {
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(
+    null,
+  )
+  const [uncertainProductIds, setUncertainProductIds] = useState<Set<string>>(
+    () => new Set(),
+  )
+  const selectedTriggerRef = useRef<HTMLButtonElement | null>(null)
   const products = useProducts(accessToken)
   const config = useAccountConfig(accessToken)
   const invalidSessionError = isInvalidSessionError(products.error)
@@ -91,11 +92,37 @@ function PlansContent({ accessToken }: { accessToken: string }) {
                 product={product}
                 config={config.isSuccess ? config.data : null}
                 configPending={config.isPending}
+                onCreate={(productId, trigger) => {
+                  selectedTriggerRef.current = trigger
+                  setSelectedProductId(productId)
+                }}
               />
             ))}
           </div>
         )}
       </section>
+      {selectedProductId ? (
+        <OrderCreateDialog
+          accessToken={accessToken}
+          productId={selectedProductId}
+          requiresUnknownAcknowledgement={uncertainProductIds.has(
+            selectedProductId,
+          )}
+          onUnknownResultChange={(uncertain) => {
+            setUncertainProductIds((current) => {
+              const next = new Set(current)
+              if (uncertain) next.add(selectedProductId)
+              else next.delete(selectedProductId)
+              return next
+            })
+          }}
+          restoreFocus={() => {
+            selectedTriggerRef.current?.focus()
+            selectedTriggerRef.current = null
+          }}
+          onClosed={() => setSelectedProductId(null)}
+        />
+      ) : null}
     </div>
   )
 }
@@ -104,10 +131,12 @@ function ProductRow({
   product,
   config,
   configPending,
+  onCreate,
 }: {
   product: Product
   config: AccountConfig | null
   configPending: boolean
+  onCreate: (productId: string, trigger: HTMLButtonElement) => void
 }) {
   return (
     <article className="grid gap-5 py-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.85fr)] lg:gap-10">
@@ -148,17 +177,17 @@ function ProductRow({
           <p className="mt-3 text-sm text-muted-foreground">暂无周期价格。</p>
         ) : (
           <dl className="mt-2 divide-y divide-border border-y border-border">
-            {product.prices.map((price) => {
+            {product.prices.map((price, index) => {
               const formatted = config
                 ? formatMinorMoney(price.amountMinor, config)
                 : null
               return (
                 <div
                   className="flex min-h-11 items-center justify-between gap-4 py-2 text-sm"
-                  key={price.billingPeriod}
+                  key={`${price.billingPeriod}-${index}`}
                 >
                   <dt className="text-muted-foreground">
-                    {billingLabels[price.billingPeriod]}
+                    {billingPeriodLabels[price.billingPeriod]}
                   </dt>
                   <dd className="break-all text-right font-medium">
                     {configPending
@@ -170,6 +199,16 @@ function ProductRow({
             })}
           </dl>
         )}
+        {product.prices.length ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-4"
+            onClick={(event) => onCreate(product.id, event.currentTarget)}
+          >
+            创建订单
+          </Button>
+        ) : null}
       </div>
     </article>
   )

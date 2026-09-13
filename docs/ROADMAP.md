@@ -29,8 +29,9 @@ runtime 未验证是已接受的非阻塞证据缺口。Milestone 4 已完成。
 
 Milestone 5 按以下边界推进：
 
-- M5-001 Orders Read Model：IMPLEMENTATION COMPLETE，Independent Review PENDING
-- M5-002 Order Create + Promotion + Cancel：NOT STARTED
+- M5-001 Orders Read Model：COMPLETE，Independent Review PASS
+- M5-002 Order Create + Promotion + Cancel：IMPLEMENTATION COMPLETE，Independent Review PENDING
 - M5-003 Payment Methods + Checkout：NOT STARTED
 
-不得在 M5-001 中实现 mutation、订单状态轮询或 Checkout，也不得自动开始 M5-002/M5-003。
+M5-002 不包含 Order Status polling、Payment Methods 或 Checkout。Independent Commerce Mutation
+Review 完成前不得开始 M5-003。
