@@ -60,7 +60,7 @@ describe('Wallet page', () => {
     expect(
       screen.getByRole('heading', { name: '当前余额' }),
     ).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('正在读取余额…')
+    expect(screen.getByText('正在读取余额…')).toHaveAttribute('role', 'status')
   })
 
   it.each([
@@ -120,7 +120,7 @@ describe('Wallet page', () => {
       await screen.findByText('暂时无法读取结算币种，余额无法安全格式化。'),
     ).toBeInTheDocument()
     expect(screen.queryByText('12345')).toBeNull()
-    await user.click(screen.getByRole('button', { name: '重试' }))
+    await user.click(screen.getAllByRole('button', { name: '重试' })[0]!)
     expect(await screen.findByText('¥123.45 CNY')).toBeInTheDocument()
     expect(mocks.getWallet).toHaveBeenCalledOnce()
   })
@@ -187,13 +187,18 @@ describe('Wallet page', () => {
     },
   )
 
-  it('contains no deposit, gift card, or fake transaction UI', async () => {
+  it('contains deposit but no gift card or fake transaction UI', async () => {
     installMocks()
     renderWallet()
 
     expect(await screen.findByText('¥123.45 CNY')).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: '充值余额' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: '创建充值订单' }),
+    ).toBeInTheDocument()
     for (const text of [
-      '充值',
       'Gift Card',
       '礼品卡',
       '交易流水',

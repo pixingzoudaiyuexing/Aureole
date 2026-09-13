@@ -246,10 +246,10 @@ MALFORMED_RESPONSE 先读取 Status/Detail/List，并要求用户显式确认已
 Payment Method fee 只显示 fixedMinor 和 percent metadata；fixedMinor 复用 Account Config 与
 `formatMinorMoney`，不得计算 percentage fee 或最终应付金额。
 
-## Wallet balance read model
+## Wallet balance and deposit model
 
 `features/wallet` 持有 Wallet Public DTO parser、canonical `['wallet']` query 与 `/wallet`
-只读展示。`GET /api/v1/wallet` 是站内余额的唯一权威，`balanceMinor` 必须是
+展示。`GET /api/v1/wallet` 是站内余额的唯一权威，`balanceMinor` 必须是
 `0..2147483647` 整数；Aureole 不从 Orders、Commission、pending Deposit 或其他客户端状态推导、
 累加或缓存余额，也不建立 Wallet ledger 或 transaction history。
 
@@ -259,8 +259,24 @@ Wallet 复用 Account canonical `['config', 'account']` query 和 `formatMinorMo
 server state，不进入 Zustand、storage、URL、console 或 analytics；普通 read failure 局部 Retry，
 AUTH_REQUIRED/AUTH_FAILED 继续复用 Auth Session Core 清除 credential 与完整 Query cache。
 
-AUR-M7-001 仅实现余额读取。Wallet Deposit、Gift Card Redeem、Payment Methods、Checkout、充值记录、
-bonus、pending balance 与交易流水均不在本任务中。
+Wallet Deposit 使用 credential-free `['wallet', 'deposit-create']` mutation key，并只向
+`POST /api/v1/wallet/deposits` 发送 strict `{ amountMinor }`。人类金额输入根据 Account Config currency
+的 canonical fraction digits，以 string/BigInt 精确转换为 `1..2147483647` minor unit；不使用浮点
+金额运算，也不复制 V2Board minimum、maximum、bonus、fee 或 pending-order 业务规则。成功 DTO 复用
+Orders 的 opaque order ID schema。
+
+Deposit Create 是非幂等金融 mutation：第一次操作只打开金额确认 Dialog，确认 POST 明确
+`retry: false` 并使用同步锁阻止 same-tick 重复。成功只保存当前页面临时 Order ID、重新读取 canonical
+Orders List 并提供 `/orders` handoff；不刷新、修改或预测 Wallet balance，不自动读取 Payment Methods、
+Checkout 或 Status。用户支付及状态确认继续由既有 Orders / Payment flow 持有。
+
+`WALLET_DEPOSIT_UNAVAILABLE`、`WALLET_DEPOSIT_AMOUNT_INVALID` 与
+`WALLET_DEPOSIT_CREATE_FAILED` 使用本地安全文案且不自动重试。NETWORK_ERROR、UPSTREAM_TIMEOUT、
+UPSTREAM_ERROR 与 MALFORMED_RESPONSE 保持 UNKNOWN：只读取 Orders List，不按 amount、createdAt、
+list diff 或新 ID 推断因果；恢复失败时 fail closed，恢复成功后也必须先确认已检查订单，再重新进入标准
+金额确认。金额、created Order ID、UNKNOWN guard 与 feedback 只在 React local state，不进入 storage、
+URL、Zustand、console 或 analytics。Gift Card Redeem、充值记录、ledger、bonus、pending balance 与第二套
+Payment flow 均未实现。
 
 ## Theme and presentation
 

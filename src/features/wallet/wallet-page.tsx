@@ -3,8 +3,10 @@ import { isInvalidSessionError } from '@/features/auth/auth-errors'
 import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invalid-session-error'
 import { formatMinorMoney } from '@/features/catalog/money-format'
 import { ReadError } from '@/components/shared/read-error'
+import { Button } from '@/components/ui/button'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
 import { useWallet } from './wallet-queries'
+import { WalletDepositPanel } from './wallet-deposit-panel'
 
 export function WalletPage() {
   const accessToken = useAuthSessionStore((state) => state.accessToken)
@@ -77,7 +79,25 @@ function WalletContent({ accessToken }: { accessToken: string }) {
             </p>
           )}
         </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-5"
+          disabled={wallet.isFetching}
+          onClick={() => void wallet.refetch()}
+        >
+          {wallet.isFetching && !wallet.isPending ? '正在刷新…' : '刷新余额'}
+        </Button>
       </section>
+
+      <WalletDepositPanel
+        accessToken={accessToken}
+        accountConfig={config.data ?? null}
+        configPending={config.isPending}
+        configError={config.error}
+        retryConfig={() => void config.refetch()}
+      />
     </div>
   )
 }

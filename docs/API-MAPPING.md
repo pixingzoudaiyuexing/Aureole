@@ -14,7 +14,7 @@
 | Orders / Payment                    | Orders, billing, checkout, promotions   | 轮询权威订单状态；优惠仅 preview；不持有 callback 状态                  |
 | Subscription                        | Subscription overview and mutations     | Query owns state；mutation 后按 Contract invalidate；未知结果不盲目重试 |
 | Resources / Traffic                 | Resources, traffic logs                 | 只显示白名单字段；Traffic 使用 compact list                             |
-| Wallet / Gift Card                  | Wallet, deposits, gift card redeem      | 不计算余额；兑换成功至少刷新 Wallet、Subscription Overview、Me          |
+| Wallet / Gift Card                  | Wallet, deposits, gift card redeem      | 余额只认 Wallet；Deposit 只创建 Order 并移交既有支付流                  |
 | Notices                             | Notices                                 | 不发明 unread 或 important 状态                                         |
 | Support                             | Tickets                                 | message 视为敏感用户内容，不记录 raw payload                            |
 | Referrals / Commission / Withdrawal | Referrals and guarded financial actions | 佣金、资格、minimum 与工单状态以上游为权威                              |
@@ -171,7 +171,7 @@
 - Payment Methods、Checkout、Status、Detail 或 List 任一边界返回 AUTH_REQUIRED/AUTH_FAILED 时，
   继续复用 sealed Auth Session Core 清理 credential 与完整 Query cache。
 
-## Wallet balance read mapping
+## Wallet balance and deposit mapping
 
 - `GET /api/v1/wallet` 是 `/wallet` 唯一余额来源，使用 credential-free canonical `['wallet']`
   query。Public DTO 只接受 `balanceMinor` 为 `0..2147483647` 整数并 strip additive fields；负数、
@@ -182,8 +182,25 @@
   币种、symbol、两位小数或 `/100`。Config 未知或无效时不伪装金额，并提供独立 Retry。
 - Wallet 普通 read error 只影响余额 section；Wallet 或 Account Config 的
   AUTH_REQUIRED/AUTH_FAILED 均复用 sealed Session Core 清除 credential 与完整 Query cache。
-- AUR-M7-001 不调用 `POST /api/v1/wallet/deposits`、`POST /api/v1/gift-cards/redeem`、Payment
-  Methods、Checkout 或其他资金 mutation。
+- `POST /api/v1/wallet/deposits` 的 strict request 只包含 `amountMinor`，范围为 `1..2147483647`；
+  success 只接受并 strip 为复用 `orderIdSchema` 的 `{ id }`。`['wallet', 'deposit-create']` mutation key
+  不包含 token、金额、订单号或余额，mutation 显式 `retry: false`。
+- 人类金额输入使用 Account Config currency 的 Intl canonical fraction digits，以 string/BigInt 转换；
+  不使用 `parseFloat`、`Number * 100`、`Math.round`、固定两位小数或前端业务限额。
+- 用户第一次点击只打开确认 Dialog。确认 POST 使用同步 action lock；pending 锁定输入与 Dialog action。
+  成功后只重新读取 canonical Orders List、显示临时 created Order ID 并导航 `/orders`，不本地修改或刷新
+  Wallet balance，也不自动读取 Payment Methods、Checkout 或 Order Status。
+- `WALLET_DEPOSIT_UNAVAILABLE` 重新读取 Orders 并引导用户检查；
+  `WALLET_DEPOSIT_AMOUNT_INVALID` 保留可编辑金额；`WALLET_DEPOSIT_CREATE_FAILED` 不声明成功。三者均不
+  logout、不自动 POST retry，用户再次提交仍需新的金额确认。
+- NETWORK_ERROR、UPSTREAM_TIMEOUT、UPSTREAM_ERROR 与 MALFORMED_RESPONSE 保持 UNKNOWN，并立即
+  GET Orders。List 只能供用户核对，不按 amount、createdAt、新 ID 或 list diff 自动推断本次 Deposit
+  outcome。读取失败时禁止第二次 POST；读取成功后仍需专用 acknowledgement 和标准金额确认。
+- Deposit POST、Orders recovery、Wallet read 或 Account Config read 的 AUTH_REQUIRED/AUTH_FAILED 均
+  复用 sealed Session Core。金额文本、created Order ID、feedback 与 recovery guard 只在 React local
+  state，不进入 URL、storage、Zustand、console 或 analytics。
+- AUR-M7-002 不调用 `POST /api/v1/gift-cards/redeem`，不实现 ledger、pending balance、bonus/fee
+  calculation、callback 或第二套 Payment flow。
 
 ## Error and request rules
 

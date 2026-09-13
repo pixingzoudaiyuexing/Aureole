@@ -33,6 +33,26 @@ function currencyFractionDigits(currency: string) {
   }
 }
 
+export function parseMoneyInputToMinor(input: string, currency: string) {
+  const fractionDigits = currencyFractionDigits(currency)
+  if (fractionDigits === null) return null
+
+  const normalizedInput = input.trim()
+  const pattern =
+    fractionDigits === 0
+      ? /^\d+$/
+      : new RegExp(`^\\d+(?:\\.\\d{1,${fractionDigits}})?$`)
+  if (!pattern.test(normalizedInput)) return null
+
+  const [major = '', fraction = ''] = normalizedInput.split('.')
+  const scale = 10n ** BigInt(fractionDigits)
+  const amountMinor =
+    BigInt(major) * scale + BigInt(fraction.padEnd(fractionDigits, '0') || '0')
+
+  if (amountMinor < 1n || amountMinor > 2_147_483_647n) return null
+  return Number(amountMinor)
+}
+
 export function formatMinorMoney(
   amountMinor: number,
   { currency, currencySymbol }: AccountConfig,

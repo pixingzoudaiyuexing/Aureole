@@ -47,9 +47,10 @@ Advance Period runtime 仍为 NOT TESTED。
 
 Milestone 7 按以下边界推进：
 
-- AUR-M7-001 Wallet Balance Read Model：IMPLEMENTATION COMPLETE，REVIEW PENDING
-- AUR-M7-002 Wallet Deposit：NOT STARTED
+- AUR-M7-001 Wallet Balance Read Model：COMPLETE，Independent Wallet/Auth Review PASS
+- AUR-M7-002 Wallet Deposit Create + Payment Handoff：IMPLEMENTATION COMPLETE，INDEPENDENT REVIEW PENDING
 - AUR-M7-003 Gift Card Redeem：NOT STARTED
 
-AUR-M7-001 只读取并安全格式化 solution 权威 Wallet balance，不包含 Deposit、Gift Card、Payment
-Methods、Checkout、ledger 或其他资金 mutation。
+AUR-M7-002 只创建 solution 权威 Deposit Order，并以明确导航移交既有 Orders / Payment flow。余额仍只
+由 `GET /api/v1/wallet` 决定；本任务不实现 Gift Card、第二套 Checkout、ledger、pending balance、
+bonus/fee 计算或 callback state。Production Wallet Deposit runtime 仍为 NOT TESTED。
