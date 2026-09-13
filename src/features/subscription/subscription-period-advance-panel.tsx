@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { LoaderCircle, RotateCcw } from 'lucide-react'
+import { CalendarClock, LoaderCircle } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,29 +12,35 @@ import {
 import { isInvalidSessionError } from '@/features/auth/auth-errors'
 import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invalid-session-error'
 import { ApiError } from '@/lib/api/errors'
-import { SubscriptionCredential } from './subscription-access'
-import type { SubscriptionAccess } from './subscription-api'
-import { isAmbiguousSubscriptionRotationError } from './subscription-errors'
+import type { SubscriptionOverview } from './subscription-api'
+import { isAmbiguousSubscriptionAdvanceError } from './subscription-errors'
 import type { SubscriptionMutationCoordinator } from './subscription-mutation-coordinator'
 import {
-  rotateSubscriptionAccessMutationOptions,
-  subscriptionAccessQueryOptions,
+  advanceSubscriptionPeriodMutationOptions,
+  subscriptionOverviewQueryOptions,
   subscriptionQueryKeys,
 } from './subscription-queries'
 
-type RotationFeedback =
-  | { kind: 'success'; reconciled: boolean }
-  | { kind: 'unavailable'; reconciled: boolean }
-  | { kind: 'failed'; reconciled: boolean }
-  | { kind: 'unknown'; reconciled: boolean }
+type AdvanceFeedbackKind =
+  | 'success'
+  | 'disabled'
+  | 'traffic-not-exhausted'
+  | 'unavailable'
+  | 'failed'
+  | 'unknown'
 
-export function SubscriptionAccessPanel({
-  access,
+interface AdvanceFeedback {
+  kind: AdvanceFeedbackKind
+  reconciled: boolean | null
+}
+
+export function SubscriptionPeriodAdvancePanel({
   accessToken,
+  overview,
   mutationCoordinator,
 }: {
-  access: SubscriptionAccess
   accessToken: string
+  overview: SubscriptionOverview
   mutationCoordinator: SubscriptionMutationCoordinator
 }) {
   const queryClient = useQueryClient()
@@ -42,12 +48,12 @@ export function SubscriptionAccessPanel({
   const [acknowledged, setAcknowledged] = useState(false)
   const [requiresResubmitAcknowledgement, setRequiresResubmitAcknowledgement] =
     useState(false)
-  const [feedback, setFeedback] = useState<RotationFeedback | null>(null)
+  const [feedback, setFeedback] = useState<AdvanceFeedback | null>(null)
   const [sessionError, setSessionError] = useState<unknown>(null)
   const [recovering, setRecovering] = useState(false)
   const sessionInvalidatedRef = useRef(false)
   const mutation = useMutation(
-    rotateSubscriptionAccessMutationOptions(accessToken),
+    advanceSubscriptionPeriodMutationOptions(accessToken),
   )
 
   const invalidSessionError = isInvalidSessionError(mutation.error)
@@ -65,14 +71,14 @@ export function SubscriptionAccessPanel({
     setAcknowledged(false)
   }
 
-  const refreshAccess = async () => {
+  const refreshOverview = async () => {
     await queryClient.invalidateQueries({
-      queryKey: subscriptionQueryKeys.access,
+      queryKey: subscriptionQueryKeys.overview,
       refetchType: 'none',
     })
     try {
       await queryClient.fetchQuery({
-        ...subscriptionAccessQueryOptions(accessToken),
+        ...subscriptionOverviewQueryOptions(accessToken),
         retry: false,
         staleTime: 0,
       })
@@ -86,30 +92,40 @@ export function SubscriptionAccessPanel({
     }
   }
 
-  const recoverCurrentAccess = async () => {
+  const recoverOverview = async () => {
     const feedbackKind = feedback?.kind
     if (!feedbackKind) return
     setRecovering(true)
-    const reconciled = await refreshAccess()
+    const reconciled = await refreshOverview()
     setRecovering(false)
     if (!reconciled) return
+    mutationCoordinator.setRecoveryBlocked(false)
     setRequiresResubmitAcknowledgement(feedbackKind === 'unknown')
     setFeedback({ kind: feedbackKind, reconciled: true })
   }
 
-  const rotate = async () => {
-    if (!acknowledged || !mutationCoordinator.tryAcquire('rotate-access'))
+  const setRecoveredFeedback = (
+    kind: Exclude<AdvanceFeedbackKind, 'success'>,
+    reconciled: boolean,
+  ) => {
+    if (!reconciled) mutationCoordinator.setRecoveryBlocked(true)
+    setRequiresResubmitAcknowledgement(kind === 'unknown' && reconciled)
+    setFeedback({ kind, reconciled })
+  }
+
+  const advance = async () => {
+    if (!acknowledged || !mutationCoordinator.tryAcquire('advance-period'))
       return
     sessionInvalidatedRef.current = false
     mutation.reset()
     setFeedback(null)
     try {
-      const result = await mutation.mutateAsync()
-      queryClient.setQueryData(subscriptionQueryKeys.access, {
-        eligible: true,
-        accessUrl: result.accessUrl,
-      } satisfies SubscriptionAccess)
-      const reconciled = await refreshAccess()
+      await mutation.mutateAsync()
+      setConfirmationOpen(false)
+      setAcknowledged(false)
+      setFeedback({ kind: 'success', reconciled: null })
+      const reconciled = await refreshOverview()
+      if (!reconciled) mutationCoordinator.setRecoveryBlocked(true)
       setRequiresResubmitAcknowledgement(false)
       setFeedback({ kind: 'success', reconciled })
     } catch (error) {
@@ -119,25 +135,23 @@ export function SubscriptionAccessPanel({
         return
       }
 
-      const reconciled = await refreshAccess()
-      if (
-        error instanceof ApiError &&
-        error.code === 'SUBSCRIPTION_ACCESS_UNAVAILABLE'
-      ) {
-        setRequiresResubmitAcknowledgement(false)
-        setFeedback({ kind: 'unavailable', reconciled })
-      } else if (
-        error instanceof ApiError &&
-        error.code === 'SUBSCRIPTION_ROTATION_FAILED'
-      ) {
-        setRequiresResubmitAcknowledgement(false)
-        setFeedback({ kind: 'failed', reconciled })
-      } else if (isAmbiguousSubscriptionRotationError(error)) {
-        setRequiresResubmitAcknowledgement(reconciled)
-        setFeedback({ kind: 'unknown', reconciled })
+      const reconciled = await refreshOverview()
+      if (error instanceof ApiError) {
+        if (error.code === 'SUBSCRIPTION_PERIOD_ADVANCE_DISABLED') {
+          setRecoveredFeedback('disabled', reconciled)
+        } else if (error.code === 'SUBSCRIPTION_TRAFFIC_NOT_EXHAUSTED') {
+          setRecoveredFeedback('traffic-not-exhausted', reconciled)
+        } else if (error.code === 'SUBSCRIPTION_PERIOD_ADVANCE_UNAVAILABLE') {
+          setRecoveredFeedback('unavailable', reconciled)
+        } else if (error.code === 'SUBSCRIPTION_PERIOD_ADVANCE_FAILED') {
+          setRecoveredFeedback('failed', reconciled)
+        } else if (isAmbiguousSubscriptionAdvanceError(error)) {
+          setRecoveredFeedback('unknown', reconciled)
+        } else {
+          setRecoveredFeedback('failed', reconciled)
+        }
       } else {
-        setRequiresResubmitAcknowledgement(false)
-        setFeedback({ kind: 'failed', reconciled })
+        setRecoveredFeedback('unknown', reconciled)
       }
     } finally {
       setConfirmationOpen(false)
@@ -150,35 +164,41 @@ export function SubscriptionAccessPanel({
     }
   }
 
-  const recoveryFailed = feedback !== null && !feedback.reconciled
-  const canStartRotation = access.eligible && !recoveryFailed
+  const recoveryFailed = feedback?.reconciled === false
+  const actionBusy = mutationCoordinator.activeAction !== null
+  const canStartAdvance =
+    overview.renewalAllowed &&
+    !recoveryFailed &&
+    !mutationCoordinator.recoveryBlocked
 
   return (
-    <div className="space-y-5">
-      {access.eligible ? (
-        <SubscriptionCredential
-          key={access.accessUrl}
-          accessUrl={access.accessUrl}
-        />
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          当前没有可展示的订阅地址。
+    <div className="space-y-4 border-t border-border pt-5">
+      <div>
+        <p className="text-sm font-semibold">提前进入下一周期</p>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          此操作不是延长订阅。进入下一周期后，本周期流量使用记录会按服务端规则重置，到期时间也可能提前。
         </p>
-      )}
+      </div>
 
-      {feedback ? <RotationFeedbackMessage feedback={feedback} /> : null}
+      {!overview.renewalAllowed && feedback?.kind !== 'disabled' ? (
+        <p className="text-sm text-muted-foreground">
+          当前未开启提前进入下一周期。
+        </p>
+      ) : null}
+
+      {feedback ? <AdvanceFeedbackMessage feedback={feedback} /> : null}
 
       {recoveryFailed ? (
         <Button
           type="button"
           variant="outline"
           disabled={recovering}
-          onClick={() => void recoverCurrentAccess()}
+          onClick={() => void recoverOverview()}
         >
           {recovering ? (
             <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
           ) : null}
-          {recovering ? '正在重新读取…' : '重新读取订阅地址'}
+          {recovering ? '正在重新读取…' : '重新读取订阅状态'}
         </Button>
       ) : null}
 
@@ -189,28 +209,24 @@ export function SubscriptionAccessPanel({
           else closeConfirmation()
         }}
       >
-        {canStartRotation ? (
+        {canStartAdvance ? (
           <DialogTrigger asChild>
             <Button
               type="button"
               variant="outline"
-              disabled={
-                mutation.isPending ||
-                mutationCoordinator.activeAction !== null ||
-                mutationCoordinator.recoveryBlocked
-              }
+              disabled={actionBusy}
               onClick={() => setAcknowledged(false)}
             >
-              <RotateCcw className="size-4" aria-hidden="true" />
+              <CalendarClock className="size-4" aria-hidden="true" />
               {requiresResubmitAcknowledgement
-                ? '再次重置订阅地址'
-                : '重置订阅地址'}
+                ? '再次进入下一周期'
+                : '提前进入下一周期'}
             </Button>
           </DialogTrigger>
         ) : null}
         <DialogContent
           className="max-w-lg"
-          closeLabel="关闭重置确认"
+          closeLabel="关闭周期确认"
           onEscapeKeyDown={(event) => {
             if (mutation.isPending) event.preventDefault()
           }}
@@ -220,10 +236,15 @@ export function SubscriptionAccessPanel({
         >
           <div className="overflow-y-auto px-5 pb-5 pt-6 sm:px-6 sm:pb-6">
             <DialogTitle className="pr-12 text-lg font-semibold">
-              确认重置订阅地址
+              确认进入下一周期
             </DialogTitle>
-            <DialogDescription className="mt-3 text-sm leading-6 text-muted-foreground">
-              重置后，当前订阅地址会失效。已导入客户端的旧节点凭据也可能失效，需要使用新的订阅地址重新获取订阅。
+            <DialogDescription className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
+              <span className="block font-medium text-foreground">
+                此操作不是延长订阅。
+              </span>
+              <span className="block">
+                执行后，本周期流量使用量会按服务端规则重置，到期时间可能提前。
+              </span>
             </DialogDescription>
 
             <label className="mt-5 flex cursor-pointer items-start gap-3 border-l-2 border-destructive bg-destructive/5 px-4 py-3 text-sm leading-6">
@@ -236,8 +257,8 @@ export function SubscriptionAccessPanel({
               />
               <span>
                 {requiresResubmitAcknowledgement
-                  ? '我已确认并保存当前订阅地址，仍要再次重置'
-                  : '我已理解旧订阅地址和旧节点凭据可能失效'}
+                  ? '我已核对当前订阅状态，仍要再次进入下一周期'
+                  : '我已理解此操作可能重置当前周期流量并使到期时间提前'}
               </span>
             </label>
 
@@ -254,7 +275,7 @@ export function SubscriptionAccessPanel({
                 type="button"
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 disabled={!acknowledged || mutation.isPending}
-                onClick={() => void rotate()}
+                onClick={() => void advance()}
               >
                 {mutation.isPending ? (
                   <LoaderCircle
@@ -262,7 +283,7 @@ export function SubscriptionAccessPanel({
                     aria-hidden="true"
                   />
                 ) : null}
-                {mutation.isPending ? '正在重置…' : '确认重置'}
+                {mutation.isPending ? '正在进入…' : '确认进入下一周期'}
               </Button>
             </div>
           </div>
@@ -272,7 +293,7 @@ export function SubscriptionAccessPanel({
   )
 }
 
-function RotationFeedbackMessage({ feedback }: { feedback: RotationFeedback }) {
+function AdvanceFeedbackMessage({ feedback }: { feedback: AdvanceFeedback }) {
   if (feedback.kind === 'success') {
     return (
       <div
@@ -280,62 +301,57 @@ function RotationFeedbackMessage({ feedback }: { feedback: RotationFeedback }) {
         role="status"
       >
         <p className="text-sm font-semibold">
-          订阅地址已重置，请使用新地址重新获取订阅。
+          {feedback.reconciled === null
+            ? '已进入下一周期，正在重新读取最新订阅状态。'
+            : feedback.reconciled
+              ? '已进入下一周期，已重新读取最新订阅状态。'
+              : '操作已提交成功，但暂时无法读取最新订阅状态。请先重新读取订阅状态。'}
         </p>
-        {!feedback.reconciled ? (
-          <p className="mt-1 text-sm text-muted-foreground">
-            当前地址暂时无法重新核对，请先保存页面显示的地址，再重新读取。
-          </p>
-        ) : null}
       </div>
     )
   }
 
-  if (feedback.kind === 'unavailable') {
+  if (feedback.kind === 'unknown') {
     return (
       <div
         className="border-l-2 border-foreground/40 bg-muted px-4 py-3"
         role="alert"
       >
-        <p className="text-sm">当前账户暂时不能重置订阅地址。</p>
-        <RecoveryStatus reconciled={feedback.reconciled} />
+        <p className="text-sm font-semibold">操作结果暂时无法确认。</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {feedback.reconciled
+            ? '已重新读取当前订阅状态。请先核对当前状态，避免重复操作。'
+            : '当前订阅状态也暂时无法重新读取。请先重新读取订阅状态，避免重复操作。'}
+        </p>
       </div>
     )
   }
 
-  if (feedback.kind === 'failed') {
-    return (
-      <div
-        className="border-l-2 border-destructive bg-destructive/5 px-4 py-3"
-        role="alert"
-      >
-        <p className="text-sm">订阅地址重置未完成。</p>
-        <RecoveryStatus reconciled={feedback.reconciled} />
-      </div>
-    )
+  const messages: Record<
+    Exclude<AdvanceFeedbackKind, 'success' | 'unknown'>,
+    string
+  > = {
+    disabled: '当前未开启提前进入下一周期。',
+    'traffic-not-exhausted': '当前周期仍有可用流量，暂时不能提前进入下一周期。',
+    unavailable: '当前订阅状态暂时不能提前进入下一周期。',
+    failed: '提前进入下一周期未完成。',
   }
 
   return (
     <div
-      className="border-l-2 border-foreground/40 bg-muted px-4 py-3"
+      className={
+        feedback.kind === 'failed'
+          ? 'border-l-2 border-destructive bg-destructive/5 px-4 py-3'
+          : 'border-l-2 border-foreground/40 bg-muted px-4 py-3'
+      }
       role="alert"
     >
-      <p className="text-sm font-semibold">重置请求结果暂时无法确认。</p>
+      <p className="text-sm">{messages[feedback.kind]}</p>
       <p className="mt-1 text-sm text-muted-foreground">
         {feedback.reconciled
-          ? '已重新读取当前订阅地址。请先确认并保存当前地址，避免重复重置。'
-          : '当前订阅地址也暂时无法重新读取。请先重新读取成功，暂时不要再次重置。'}
+          ? '已重新读取当前订阅状态。'
+          : '当前订阅状态暂时无法重新读取，请先恢复读取后再尝试。'}
       </p>
     </div>
-  )
-}
-
-function RecoveryStatus({ reconciled }: { reconciled: boolean }) {
-  return (
-    <p className="mt-1 text-sm text-muted-foreground">
-      {reconciled
-        ? '已重新读取当前订阅地址，请核对后再决定是否重试。'
-        : '当前订阅地址暂时无法重新读取，请先恢复读取后再重试。'}
-    </p>
   )
 }

@@ -38,8 +38,9 @@ M5-003 已实现 Payment Methods、Checkout、QR/redirect/finished action、权�
 
 Milestone 6 按以下边界推进：
 
-- AUR-M6-001 Rotate Subscription Access：IMPLEMENTATION COMPLETE，Independent Review PENDING
-- AUR-M6-002 Advance Period：NOT STARTED
+- AUR-M6-001 Rotate Subscription Access：COMPLETE，Independent Security Review PASS
+- AUR-M6-002 Advance Period：IMPLEMENTATION COMPLETE，Independent Review PENDING
 
-AUR-M6-001 仅实现危险 credential rotation、权威 Access 对账、UNKNOWN fail-closed recovery 与
-Auth invalidation。Production Subscription Rotation runtime 仍为 NOT TESTED。
+AUR-M6-002 仅实现危险 Advance Period、权威 Overview 对账、UNKNOWN fail-closed recovery、与
+Rotate 的互斥及 Auth invalidation。Milestone 6 暂未完成。Production Subscription Rotation 与
+Advance Period runtime 仍为 NOT TESTED。

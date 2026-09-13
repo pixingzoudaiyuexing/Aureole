@@ -72,7 +72,20 @@
 - Rotate success 只接受 `rotated=true` 与安全 HTTPS `accessUrl`，additive fields 会被 strip。
   `accessUrl` 不进入 query key、storage、URL、Zustand、console 或 analytics；Aureole 不 probe、
   fetch 或解析 credential URL。
-- `POST /api/v1/subscription/advance-period` 属于 AUR-M6-002，当前 NOT STARTED。
+- `POST /api/v1/subscription/advance-period` 是无 body 的非幂等周期 mutation。入口仅依据
+  authoritative Overview 的 `renewalAllowed` 功能开关；当前用户是否满足流量、reset policy 与
+  剩余有效期条件仍由 POST 最终判断，前端不计算 remaining traffic、使用百分比、剩余天数或
+  `canAdvance`。
+- Advance success 只接受 `advanced=true` 并 strip additive fields，随后只重新读取 canonical
+  Overview；不本地归零 traffic、不修改 expiresAt/resetDay，也不刷新或伪造 Traffic History。
+- `SUBSCRIPTION_PERIOD_ADVANCE_DISABLED`、`SUBSCRIPTION_TRAFFIC_NOT_EXHAUSTED`、
+  `SUBSCRIPTION_PERIOD_ADVANCE_UNAVAILABLE` 与 `SUBSCRIPTION_PERIOD_ADVANCE_FAILED` 使用安全本地
+  文案并恢复读取 Overview。NETWORK_ERROR、UPSTREAM_TIMEOUT、UPSTREAM_ERROR 与
+  MALFORMED_RESPONSE 属于 UNKNOWN；不声明成功或失败、不自动重试，并在再次提交前要求核对状态与
+  新的明确确认。
+- Advance 与 Rotate 共用 Subscription destructive-action synchronous lock。Advance 的权威读取
+  恢复失败时两类 destructive mutation 都 fail closed，直到手动 Overview read 成功；所有 Auth
+  failure 仍由 Session Core 清理 credential 与完整 Query cache。
 
 ## Catalog, resources and traffic mapping
 

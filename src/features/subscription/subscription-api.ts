@@ -38,6 +38,12 @@ const subscriptionAccessRotationSchema = z
   })
   .strip()
 
+const subscriptionPeriodAdvanceSchema = z
+  .object({
+    advanced: z.literal(true),
+  })
+  .strip()
+
 const safeCountSchema = z
   .number()
   .int()
@@ -73,6 +79,9 @@ const subscriptionOverviewSchema = z
 export type SubscriptionAccess = z.infer<typeof subscriptionAccessSchema>
 export type SubscriptionAccessRotation = z.infer<
   typeof subscriptionAccessRotationSchema
+>
+export type SubscriptionPeriodAdvance = z.infer<
+  typeof subscriptionPeriodAdvanceSchema
 >
 export type SubscriptionOverview = z.infer<typeof subscriptionOverviewSchema>
 
@@ -111,5 +120,13 @@ export const subscriptionApi = {
       { method: 'POST', accessToken },
     )
     return parseSubscriptionData(subscriptionAccessRotationSchema, data)
+  },
+
+  async advancePeriod(accessToken: string) {
+    const data = await apiClient.authenticatedRequest<unknown>(
+      '/api/v1/subscription/advance-period',
+      { method: 'POST', accessToken },
+    )
+    return parseSubscriptionData(subscriptionPeriodAdvanceSchema, data)
   },
 }

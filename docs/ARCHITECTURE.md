@@ -112,7 +112,7 @@ form-local synchronous lock 防止 same-tick 重复提交。成功意味着上�
 失效；Aureole 复用 Auth `logout()` 清除 local credential 与完整 Query cache，再返回 Login。
 密码 mutation 结果不确定时采用同样的保守退出策略，不重提 POST，也不声称修改成功或失败。
 
-## Subscription read model and access rotation
+## Subscription read model and mutations
 
 `features/subscription` 持有 Subscription Access 与 Overview 的 Public API parser、canonical
 query keys 和 read-only presentation。Dashboard 与 Subscription Page 复用同一个 Overview
@@ -132,7 +132,7 @@ next reset date。`renewalAllowed` 只显示为“新周期功能已启用/未�
 Advance Period。
 
 AUR-M6-001 在同一 feature boundary 增加 `POST /api/v1/subscription/rotate-access`。该 mutation
-没有 request body、显式 `retry: false`，并使用 component-local synchronous lock 防止
+没有 request body、显式 `retry: false`，并使用 Subscription Page 共享 synchronous lock 防止
 same-tick 重复提交。入口只依据 canonical Access read 的 `eligible=true` 与合法 `accessUrl`
 显示，但最终 eligibility 始终由 solution/V2Board 判断；用户必须阅读 credential 失效后果并勾选
 确认后才允许提交。
@@ -143,7 +143,20 @@ same-tick 重复提交。入口只依据 canonical Access read 的 `eligible=tru
 response 均属于结果未知：不自动重提 POST，不根据 URL 是否变化判断因果；读取恢复成功后仍要求
 新的明确确认，读取失败则 fail closed，只提供重新读取。Mutation 或任何 recovery read 的
 AUTH_REQUIRED/AUTH_FAILED 都复用 sealed Auth Session Core 清除 credential、Query cache 并退出
-protected UI。AUR-M6-001 不请求 subscription content，也不实现 Advance Period。
+protected UI。AUR-M6-001 不请求 subscription content。
+
+AUR-M6-002 增加 bodyless `POST /api/v1/subscription/advance-period`，成功只接受
+`advanced=true`，additive fields 在 API boundary 被 strip。Advance 与 Rotate 共用同一个同步锁，
+因此任一 mutation pending 时另一个不能提交，same-tick 跨操作确认也最多产生一个 destructive
+POST。`renewalAllowed` 只控制功能入口，不表示用户当前一定有资格；流量耗尽、reset policy 与剩余
+有效期均不在前端计算，最终由 POST 权威判断。
+
+Advance 成功、四类 definitive error 与四类 UNKNOWN 均重新读取 canonical
+`['subscription', 'overview']`，不本地归零流量或修改到期时间。成功 POST 后的 GET 失败不改变
+mutation 已成功的结论，但会 fail closed；UNKNOWN 不根据 Overview 变化推断因果，并在恢复成功后
+要求新的专用 acknowledgement 才允许再次提交。任何 recovery read 失败都会同时禁止 Advance 与
+Rotate，直到手动 Overview read 成功；任一边界的 AUTH_REQUIRED/AUTH_FAILED 继续复用 Auth Session
+Core。Advance 不 invalidate Access 或 Traffic History，也不请求 subscription content。
 
 ## Read-only catalog, resources and traffic
 

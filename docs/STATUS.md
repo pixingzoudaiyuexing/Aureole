@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 6 - Subscription Mutations (`AUR-M6-001` Rotate Subscription Access)
+Milestone 6 - Subscription Mutations (`AUR-M6-002` Advance Subscription Period)
 
 ## Contract baseline
 
@@ -48,9 +48,10 @@ Promotion + Cancel implementation and independent review are COMPLETE.
 AUR-M5-003 Payment Methods + Checkout implementation is COMPLETE and its
 independent Payment review passed.
 
-Milestone 6 is CURRENT. AUR-M6-001 Rotate Subscription Access implementation is
-COMPLETE and its independent review is PENDING. AUR-M6-002 Advance Period is NOT
-STARTED. Production Subscription Rotation runtime is NOT TESTED.
+Milestone 6 is CURRENT. AUR-M6-001 Rotate Subscription Access is COMPLETE and its
+independent Security Review passed. AUR-M6-002 Advance Period implementation is
+COMPLETE with independent review PENDING. Milestone 6 is not complete. Production
+Subscription Rotation and Advance Period runtime are NOT TESTED.
 
 ## Current commit
 
@@ -64,12 +65,12 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (27 files, 491 tests)
+- `npm test`: PASS (28 files, 524 tests)
 - `npm run build`: PASS
 - `npm ls`: PASS
 - `git diff --check`: PASS
 - Build evidence: main JS 471.62 kB raw / 148.29 kB gzip; CSS 34.70 kB raw /
-  7.11 kB gzip; Subscription route 13.24 kB raw / 4.83 kB gzip; Plans route
+  7.11 kB gzip; Subscription route 20.61 kB raw / 6.09 kB gzip; Plans route
   5.15 kB gzip; Orders route 13.17 kB gzip.
   Assets remain within budget; initial-route composition has not been measured
   by a dedicated analyzer.
@@ -179,6 +180,17 @@ operational source of truth.
   observed. Automated tests additionally cover clipboard failure, all four
   UNKNOWN codes and all required mutation/recovery Auth boundaries. Production
   solution/V2Board Subscription Rotation runtime is NOT TESTED.
+- AUR-M6-002 controlled-browser verification: PASS at exact 1280 x 720 and
+  390 x 844 in Light/Dark/System for renewalAllowed enabled/disabled, danger
+  confirmation, acknowledgement gating, cancel/Escape focus restoration,
+  same-action double click, success and authoritative Overview reconciliation,
+  success reconciliation failure, all four definitive errors, all four UNKNOWN
+  codes, UNKNOWN recovery success/failure, manual recovery, Auth invalidation and
+  Rotate/Advance pending mutual exclusion. Long product text did not overflow;
+  no horizontal overflow, raw upstream message or application console
+  warning/error was observed. Automated tests additionally prove same-tick
+  cross-action locking, all recovery/Auth boundaries and credential-free query
+  keys. Production solution/V2Board Advance Period runtime is NOT TESTED.
 
 ## Known gaps
 
@@ -193,11 +205,15 @@ operational source of truth.
 - Production solution/V2Board Subscription Access Rotation behavior is NOT
   TESTED; controlled mock browser and automated Contract/privacy/recovery tests
   are the current evidence.
+- Production solution/V2Board Advance Subscription Period behavior is NOT TESTED;
+  controlled mock browser and automated Contract/mutation/recovery tests are the
+  current evidence.
 - Production solution/V2Board Notice behavior is NOT TESTED; controlled mock
   browser and automated contract/security tests are the current evidence.
 - Hosting provider is undecided; production requires SPA fallback.
 
 ## Next milestone
 
-AUR-M6-001 implementation is complete. Exact-head verification and independent
-Security Review are the next required gates. AUR-M6-002 remains NOT STARTED.
+AUR-M6-002 implementation is complete. Exact-head CI verification and independent
+Subscription Mutation Review are the next required gates. The next milestone has
+not started.

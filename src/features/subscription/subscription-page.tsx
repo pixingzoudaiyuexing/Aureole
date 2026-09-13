@@ -5,6 +5,7 @@ import { TrafficHistory } from '@/features/traffic/traffic-history'
 import { useTrafficLogs } from '@/features/traffic/traffic-queries'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
 import { SubscriptionAccessPanel } from './subscription-access-panel'
+import { SubscriptionPeriodAdvancePanel } from './subscription-period-advance-panel'
 import {
   CurrentSubscriptionDetails,
   DeviceAndPeriodDetails,
@@ -14,6 +15,7 @@ import {
   useSubscriptionAccess,
   useSubscriptionOverview,
 } from './subscription-queries'
+import { useSubscriptionMutationCoordinator } from './subscription-mutation-coordinator'
 import { SubscriptionSection } from './subscription-state'
 
 export function SubscriptionPage() {
@@ -26,6 +28,7 @@ function SubscriptionContent({ accessToken }: { accessToken: string }) {
   const overview = useSubscriptionOverview(accessToken)
   const access = useSubscriptionAccess(accessToken)
   const traffic = useTrafficLogs(accessToken)
+  const mutationCoordinator = useSubscriptionMutationCoordinator()
   const invalidSessionError = isInvalidSessionError(overview.error)
     ? overview.error
     : isInvalidSessionError(access.error)
@@ -47,23 +50,7 @@ function SubscriptionContent({ accessToken }: { accessToken: string }) {
         </p>
       </div>
 
-      {overview.isPending ? (
-        <section className="border-t border-border py-8" aria-live="polite">
-          <p className="text-sm text-muted-foreground">正在读取订阅概览…</p>
-        </section>
-      ) : overview.isError ? (
-        <SubscriptionSection
-          id="subscription-overview-error"
-          title="订阅概览"
-          description="当前套餐与使用情况。"
-        >
-          <ReadError
-            message="暂时无法读取订阅概览。"
-            error={overview.error}
-            retry={() => void overview.refetch()}
-          />
-        </SubscriptionSection>
-      ) : (
+      {overview.data ? (
         <>
           <SubscriptionSection
             id="current-subscription-title"
@@ -84,10 +71,33 @@ function SubscriptionContent({ accessToken }: { accessToken: string }) {
             title="设备与周期"
             description="设备数量与当前功能配置。"
           >
-            <DeviceAndPeriodDetails overview={overview.data} />
+            <div className="space-y-6">
+              <DeviceAndPeriodDetails overview={overview.data} />
+              <SubscriptionPeriodAdvancePanel
+                accessToken={accessToken}
+                overview={overview.data}
+                mutationCoordinator={mutationCoordinator}
+              />
+            </div>
           </SubscriptionSection>
         </>
-      )}
+      ) : overview.isPending ? (
+        <section className="border-t border-border py-8" aria-live="polite">
+          <p className="text-sm text-muted-foreground">正在读取订阅概览…</p>
+        </section>
+      ) : overview.isError ? (
+        <SubscriptionSection
+          id="subscription-overview-error"
+          title="订阅概览"
+          description="当前套餐与使用情况。"
+        >
+          <ReadError
+            message="暂时无法读取订阅概览。"
+            error={overview.error}
+            retry={() => void overview.refetch()}
+          />
+        </SubscriptionSection>
+      ) : null}
 
       <SubscriptionSection
         id="subscription-access-title"
@@ -98,6 +108,7 @@ function SubscriptionContent({ accessToken }: { accessToken: string }) {
           <SubscriptionAccessPanel
             access={access.data}
             accessToken={accessToken}
+            mutationCoordinator={mutationCoordinator}
           />
         ) : access.isPending ? (
           <p className="text-sm text-muted-foreground" role="status">

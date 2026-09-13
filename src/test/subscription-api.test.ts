@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { subscriptionApi } from '@/features/subscription/subscription-api'
 import {
+  advanceSubscriptionPeriodMutationOptions,
   rotateSubscriptionAccessMutationOptions,
   subscriptionMutationKeys,
   subscriptionQueryKeys,
@@ -99,16 +100,59 @@ describe('Subscription API contract', () => {
     } satisfies Partial<ApiError>)
   })
 
+  it('advances a period with an exact bodyless POST and strips additive fields', async () => {
+    const request = vi
+      .spyOn(apiClient, 'authenticatedRequest')
+      .mockResolvedValue({
+        advanced: true,
+        newExpiresAt: 'must-be-stripped',
+        newTraffic: 'must-be-stripped',
+      })
+
+    await expect(subscriptionApi.advancePeriod(accessToken)).resolves.toEqual({
+      advanced: true,
+    })
+    expect(request).toHaveBeenCalledWith(
+      '/api/v1/subscription/advance-period',
+      { method: 'POST', accessToken },
+    )
+    expect(request.mock.calls[0]?.[1]).not.toHaveProperty('body')
+  })
+
+  it.each([
+    { advanced: false },
+    {},
+    { advanced: 'true' },
+    { newExpiresAt: '2030-01-01T00:00:00.000Z' },
+  ])('rejects malformed period advance data', async (payload) => {
+    vi.spyOn(apiClient, 'authenticatedRequest').mockResolvedValue(payload)
+
+    await expect(
+      subscriptionApi.advancePeriod(accessToken),
+    ).rejects.toMatchObject({
+      code: 'MALFORMED_RESPONSE',
+    } satisfies Partial<ApiError>)
+  })
+
   it('keeps subscription query and mutation keys credential-free', () => {
-    const mutation = rotateSubscriptionAccessMutationOptions(accessToken)
+    const rotationMutation =
+      rotateSubscriptionAccessMutationOptions(accessToken)
+    const advanceMutation =
+      advanceSubscriptionPeriodMutationOptions(accessToken)
 
     expect(subscriptionQueryKeys.access).toEqual(['subscription', 'access'])
     expect(subscriptionMutationKeys.rotateAccess).toEqual([
       'subscription',
       'rotate-access',
     ])
-    expect(mutation.mutationKey).not.toContain(accessToken)
-    expect(mutation.retry).toBe(false)
+    expect(subscriptionMutationKeys.advancePeriod).toEqual([
+      'subscription',
+      'advance-period',
+    ])
+    expect(rotationMutation.mutationKey).not.toContain(accessToken)
+    expect(advanceMutation.mutationKey).not.toContain(accessToken)
+    expect(rotationMutation.retry).toBe(false)
+    expect(advanceMutation.retry).toBe(false)
   })
 
   it.each([
