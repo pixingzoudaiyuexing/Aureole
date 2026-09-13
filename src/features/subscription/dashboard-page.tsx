@@ -2,11 +2,11 @@ import { Link } from '@tanstack/react-router'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { isInvalidSessionError } from '@/features/auth/auth-errors'
+import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invalid-session-error'
+import { ReadError } from '@/components/shared/read-error'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
 import { DashboardSubscriptionDetails } from './subscription-overview'
 import { useSubscriptionOverview } from './subscription-queries'
-import { SubscriptionReadError } from './subscription-state'
-import { useExitOnInvalidSubscriptionError } from './use-subscription-auth-failure'
 
 export function DashboardPage() {
   const accessToken = useAuthSessionStore((state) => state.accessToken)
@@ -16,7 +16,7 @@ export function DashboardPage() {
 
 function DashboardContent({ accessToken }: { accessToken: string }) {
   const overview = useSubscriptionOverview(accessToken)
-  useExitOnInvalidSubscriptionError(overview.error)
+  useExitOnInvalidSessionError(overview.error)
 
   if (isInvalidSessionError(overview.error)) return null
 
@@ -59,7 +59,7 @@ function DashboardContent({ accessToken }: { accessToken: string }) {
             正在读取订阅概览…
           </p>
         ) : overview.isError ? (
-          <SubscriptionReadError
+          <ReadError
             message="暂时无法读取订阅概览。"
             error={overview.error}
             retry={() => void overview.refetch()}

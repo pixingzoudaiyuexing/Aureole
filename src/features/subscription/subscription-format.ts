@@ -14,6 +14,10 @@ export function formatBytes(bytes: number) {
 
 export function formatSubscriptionExpiry(value: string | null) {
   if (!value) return '无固定到期时间'
+  return formatAbsoluteDateTime(value)
+}
+
+export function formatAbsoluteDateTime(value: string) {
   return new Intl.DateTimeFormat('zh-CN', {
     year: 'numeric',
     month: 'long',

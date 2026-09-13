@@ -131,6 +131,29 @@ presentation；不得生成 remaining traffic、usage percentage、remaining day
 next reset date。`renewalAllowed` 只显示为“新周期功能已启用/未启用”，不表示当前用户可以执行
 Advance Period。
 
+## Read-only catalog, resources and traffic
+
+Products、Resources 与 Traffic Logs 分别由 `features/catalog`、`features/resources` 和
+`features/traffic` 持有，并使用 credential-free canonical TanStack Query keys。Plans 复用
+Account 的 `['config', 'account']` query 获取 currency/currencySymbol，不建立第二套 config
+cache identity。跨 read feature 的 recoverable error 与 AUTH_REQUIRED/AUTH_FAILED 退出行为由
+共享 ReadError 和 Auth hook 提供；普通 read failure 不清空无关 query。
+
+Product `amountMinor` 始终作为整数 authority。Money formatter 先用
+`Intl.supportedValuesOf('currency')` 验证平台认识该 currency，再读取 Intl currency fraction
+digits，并通过 BigInt 拆分 major/minor 后组合 solution-provided currencySymbol；不得硬编码
+`/100`、手写 currency exponent table 或用 symbol 猜精度。平台能力、currency 或 amount 不安全
+时仅隐藏价格格式化结果，不隐藏 Product catalog。
+
+Resource response parser 只保留 id、name、category 和 online/offline status；UI 仅显示
+name/category/status，不推断协议或暴露 host、IP、port、key、UUID、SNI、path 或 raw server
+object。Resources 保持 authenticated route，Public Resource Status 仍是 post-v1。
+
+Traffic History 使用独立 `['traffic', 'logs']` query 并组合到 Subscription Page。Entries 保持
+server order，复用 Subscription byte formatter并显示 absolute recordedAt、upload、download 与
+rateMultiplier metadata；不聚合 total/billed/effective traffic，不计算 cost，不排序、不轮询、
+不绘制 chart，也不接触 subscription accessUrl 或 content endpoint。
+
 ## Theme and presentation
 
 Light、Dark、System 由 Theme Provider 管理；显式选择可保存为非敏感 local UI preference。CSS tokens 是颜色和 radius 的 SSOT，传统 `tailwind.config.js` 不是 token 核心。使用 system font 与 system monospace。

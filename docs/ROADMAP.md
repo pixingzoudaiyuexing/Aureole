@@ -20,8 +20,8 @@
 
 Milestone 3 的 Auth Session Core、Registration / Password Recovery 与 Account Self-Service 已完成实现及独立审查。Milestone 4 按以下边界推进：
 
-- M4-001 Subscription Read Model + Dashboard Core
-- M4-002 Plans + Resources + Traffic
-- M4-003 Notices + Dashboard Completion
+- M4-001 Subscription Read Model + Dashboard Core：COMPLETE，Independent Review PASS
+- M4-002 Plans + Resources + Traffic：IMPLEMENTATION COMPLETE，Independent Review PENDING
+- M4-003 Notices + Dashboard Completion：NOT STARTED
 
-M4-001 独立审查通过前不得自动开始 M4-002。每个后续子阶段必须以当前 solution Public Contract、风险边界和验收要求为输入。
+M4-002 独立审查通过前不得自动开始 M4-003。每个后续子阶段必须以当前 solution Public Contract、风险边界和验收要求为输入。

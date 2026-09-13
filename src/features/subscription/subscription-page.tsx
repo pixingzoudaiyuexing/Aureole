@@ -1,4 +1,8 @@
+import { ReadError } from '@/components/shared/read-error'
 import { isInvalidSessionError } from '@/features/auth/auth-errors'
+import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invalid-session-error'
+import { TrafficHistory } from '@/features/traffic/traffic-history'
+import { useTrafficLogs } from '@/features/traffic/traffic-queries'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
 import { SubscriptionCredential } from './subscription-access'
 import {
@@ -10,11 +14,7 @@ import {
   useSubscriptionAccess,
   useSubscriptionOverview,
 } from './subscription-queries'
-import {
-  SubscriptionReadError,
-  SubscriptionSection,
-} from './subscription-state'
-import { useExitOnInvalidSubscriptionError } from './use-subscription-auth-failure'
+import { SubscriptionSection } from './subscription-state'
 
 export function SubscriptionPage() {
   const accessToken = useAuthSessionStore((state) => state.accessToken)
@@ -25,12 +25,15 @@ export function SubscriptionPage() {
 function SubscriptionContent({ accessToken }: { accessToken: string }) {
   const overview = useSubscriptionOverview(accessToken)
   const access = useSubscriptionAccess(accessToken)
+  const traffic = useTrafficLogs(accessToken)
   const invalidSessionError = isInvalidSessionError(overview.error)
     ? overview.error
     : isInvalidSessionError(access.error)
       ? access.error
-      : null
-  useExitOnInvalidSubscriptionError(invalidSessionError)
+      : isInvalidSessionError(traffic.error)
+        ? traffic.error
+        : null
+  useExitOnInvalidSessionError(invalidSessionError)
 
   if (invalidSessionError) return null
 
@@ -54,7 +57,7 @@ function SubscriptionContent({ accessToken }: { accessToken: string }) {
           title="订阅概览"
           description="当前套餐与使用情况。"
         >
-          <SubscriptionReadError
+          <ReadError
             message="暂时无法读取订阅概览。"
             error={overview.error}
             retry={() => void overview.refetch()}
@@ -96,7 +99,7 @@ function SubscriptionContent({ accessToken }: { accessToken: string }) {
             正在读取订阅地址…
           </p>
         ) : access.isError ? (
-          <SubscriptionReadError
+          <ReadError
             message="暂时无法读取订阅地址。"
             error={access.error}
             retry={() => void access.refetch()}
@@ -111,6 +114,19 @@ function SubscriptionContent({ accessToken }: { accessToken: string }) {
             当前没有可展示的订阅地址。
           </p>
         )}
+      </SubscriptionSection>
+
+      <SubscriptionSection
+        id="traffic-history-title"
+        title="流量历史"
+        description="按服务返回顺序查看本期流量记录。"
+      >
+        <TrafficHistory
+          entries={traffic.data}
+          pending={traffic.isPending}
+          error={traffic.isError ? traffic.error : null}
+          retry={() => void traffic.refetch()}
+        />
       </SubscriptionSection>
     </div>
   )

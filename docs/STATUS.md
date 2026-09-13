@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 4 - Read-only Core (`AUR-M4-001` Subscription Read Model)
+Milestone 4 - Read-only Core (`AUR-M4-002` Plans / Resources / Traffic)
 
 ## Contract baseline
 
@@ -27,11 +27,15 @@ focused independent review passed with no required fixes. M3-003 Account
 Self-Service implementation and independent review are COMPLETE with no required
 fixes. Milestone 3 is COMPLETE.
 
-M4-001 Subscription Read Model + Dashboard Core implementation is COMPLETE
-locally. Subscription Access and Overview canonical reads, credential reveal/copy,
-independent section recovery, the real Subscription page and subscription-first
-Dashboard core are implemented. Independent M4-001 Subscription/Security review
-remains pending, so Milestone 4 remains CURRENT.
+M4-001 Subscription Read Model + Dashboard Core implementation and independent
+Subscription/Security review are COMPLETE with no required fixes. Its accepted
+production runtime gap remains non-blocking.
+
+M4-002 Plans + Resources + Traffic implementation is COMPLETE locally. Products
+and Account Config compose the Plans read model with safe minor-unit formatting;
+Resources exposes only Public DTO fields; ordered Traffic History extends the
+Subscription page without aggregation. Independent M4-002 Read-only Core review
+remains pending, so Milestone 4 remains CURRENT. M4-003 is NOT STARTED.
 
 ## Current commit
 
@@ -45,11 +49,11 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (15 files, 190 tests)
+- `npm test`: PASS (17 files, 248 tests)
 - `npm run build`: PASS
-- Build evidence: main JS 469.36 kB raw / 147.60 kB gzip; CSS 29.22 kB raw /
-  6.20 kB gzip; Dashboard route 1.04 kB gzip; Subscription route 2.02 kB gzip;
-  shared Subscription read chunk 2.02 kB gzip.
+- Build evidence: main JS 469.44 kB raw / 147.64 kB gzip; CSS 30.03 kB raw /
+  6.36 kB gzip; Plans route 2.37 kB gzip; Resources route 1.46 kB gzip;
+  Subscription route 2.93 kB gzip.
   Assets remain within budget; initial-route composition has not been measured
   by a dedicated analyzer.
 - Browser verification: PASS at 1280 x 720 and 390 x 844 for Login Light/Dark,
@@ -69,6 +73,10 @@ operational source of truth.
 - M3-003 CI: PASS for `8f09bbb3b8c0b99292c8b0a028efe637db12d767`
   in workflow run `34715266168`.
 - M4-001 remote GitHub Actions is tracked by exact final SHA in the
+  implementation report.
+- M4-001 CI: PASS for `fff36a332c4727cb3f1e407ba15c23fc5cd62998`
+  in workflow run `34717477883`.
+- M4-002 remote GitHub Actions is tracked by exact final SHA in the
   implementation report.
 
 ## Runtime verification
@@ -95,15 +103,23 @@ operational source of truth.
   invalidation. No horizontal overflow or raw subscription fetch was observed.
   The only console error was the existing local `/favicon.ico` 404; no
   application page error was observed. Production solution/V2Board is NOT TESTED.
+- M4-002 controlled-browser verification: PASS at 1280 x 720 and 390 x 844 in
+  Light/Dark for multi-product/multi-price Plans, unavailable capacity, long
+  content, online/offline Resources, ordered Traffic entries, all empty states,
+  config/catalog/resource/traffic errors and Auth invalidation. No horizontal
+  overflow, raw subscription fetch, private Resource field or mutation CTA was
+  observed. The only active-flow console error was the existing local
+  `/favicon.ico` 404. Production solution/V2Board is NOT TESTED.
 
 ## Known gaps
 
-- Non-Auth feature routes remain placeholders without mock business data.
+- Orders, Wallet, Notices, Support and Referrals remain placeholders without mock
+  business data.
 - Dashboard completion remains pending M4-003 Notices; no notice data or fake
   unread/important state is shown by M4-001.
 - Hosting provider is undecided; production requires SPA fallback.
 
 ## Next milestone
 
-M4-001 requires independent Subscription/Security review before M4-002 can start.
-M4-002 and M4-003 are NOT STARTED by this checkpoint.
+M4-002 requires independent Read-only Core review before M4-003 can start. M4-003
+is NOT STARTED by this checkpoint.

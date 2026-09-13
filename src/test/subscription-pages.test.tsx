@@ -11,6 +11,7 @@ import {
   type SubscriptionOverview,
 } from '@/features/subscription/subscription-api'
 import { subscriptionQueryKeys } from '@/features/subscription/subscription-queries'
+import { trafficApi } from '@/features/traffic/traffic-api'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
 
@@ -45,7 +46,8 @@ function installSubscriptionMocks() {
   const getOverview = vi
     .spyOn(subscriptionApi, 'getOverview')
     .mockResolvedValue(overview)
-  return { getAccess, getOverview }
+  const getTraffic = vi.spyOn(trafficApi, 'getLogs').mockResolvedValue([])
+  return { getAccess, getOverview, getTraffic }
 }
 
 function renderProtectedRoute(
@@ -255,6 +257,97 @@ describe('Subscription page', () => {
     expect(mocks.getAccess).toHaveBeenCalledOnce()
   })
 
+  it('renders traffic entries in server order with canonical byte formatting', async () => {
+    const mocks = installSubscriptionMocks()
+    mocks.getTraffic.mockResolvedValue([
+      {
+        uploadedBytes: 1_073_741_824,
+        downloadedBytes: 536_870_912,
+        recordedAt: '2026-09-11T00:00:00.000Z',
+        rateMultiplier: 1.5,
+      },
+      {
+        uploadedBytes: 0,
+        downloadedBytes: 1_024,
+        recordedAt: '2026-09-10T00:00:00.000Z',
+        rateMultiplier: 0,
+      },
+    ])
+    renderProtectedRoute('/subscription')
+
+    const first = await screen.findByText(/2026年9月11日/)
+    const second = screen.getByText(/2026年9月10日/)
+    expect(
+      first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(screen.getAllByText('1 GB').length).toBeGreaterThan(1)
+    expect(screen.getByText('512 MB')).toBeInTheDocument()
+    expect(screen.getByText('1 KB')).toBeInTheDocument()
+    expect(screen.getByText('×1.5')).toBeInTheDocument()
+    expect(screen.getByText('×0')).toBeInTheDocument()
+    expect(screen.queryByText('1.5 GB')).toBeNull()
+    expect(screen.queryByText(/合计|计费流量|费用/)).toBeNull()
+  })
+
+  it('shows an honest empty traffic state', async () => {
+    installSubscriptionMocks()
+    renderProtectedRoute('/subscription')
+
+    expect(await screen.findByText('暂无流量记录。')).toBeInTheDocument()
+  })
+
+  it('keeps Subscription reads visible when Traffic fails and retries only Traffic', async () => {
+    const mocks = installSubscriptionMocks()
+    mocks.getTraffic
+      .mockRejectedValueOnce(
+        new ApiError({
+          status: 200,
+          code: 'MALFORMED_RESPONSE',
+          message: 'Invalid response',
+          requestId: 'req-traffic',
+        }),
+      )
+      .mockResolvedValueOnce([])
+    renderProtectedRoute('/subscription')
+    const user = userEvent.setup()
+
+    expect(await screen.findByText('Pro Plan')).toBeInTheDocument()
+    expect(screen.getByLabelText('订阅地址已隐藏')).toBeInTheDocument()
+    expect(screen.getByText('暂时无法读取流量历史。')).toBeInTheDocument()
+    expect(screen.getByText('请求编号：req-traffic')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '重试' }))
+
+    expect(await screen.findByText('暂无流量记录。')).toBeInTheDocument()
+    expect(mocks.getTraffic).toHaveBeenCalledTimes(2)
+    expect(mocks.getOverview).toHaveBeenCalledOnce()
+    expect(mocks.getAccess).toHaveBeenCalledOnce()
+  })
+
+  it.each(['AUTH_REQUIRED', 'AUTH_FAILED'])(
+    'exits Subscription and clears credential cache when Traffic returns %s',
+    async (code) => {
+      const mocks = installSubscriptionMocks()
+      mocks.getTraffic.mockRejectedValue(
+        new ApiError({ status: 401, code, message: 'Authentication failed' }),
+      )
+      const queryClient = createQueryClient()
+      queryClient.setQueryData(subscriptionQueryKeys.access, {
+        eligible: true,
+        accessUrl: credentialUrl,
+      })
+      const { router } = renderProtectedRoute('/subscription', queryClient)
+
+      expect(
+        await screen.findByRole('heading', { name: '登录 Aureole' }),
+      ).toBeInTheDocument()
+      expect(router.state.location.pathname).toBe('/login')
+      expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
+      expect(
+        queryClient.getQueryData(subscriptionQueryKeys.access),
+      ).toBeUndefined()
+    },
+  )
+
   it.each([
     ['access', 'AUTH_REQUIRED'],
     ['access', 'AUTH_FAILED'],
@@ -390,5 +483,6 @@ describe('Dashboard subscription core', () => {
     expect(await screen.findByText('当前订阅')).toBeInTheDocument()
     expect(mocks.getOverview).toHaveBeenCalledOnce()
     expect(mocks.getAccess).toHaveBeenCalledOnce()
+    expect(mocks.getTraffic).toHaveBeenCalledOnce()
   })
 })

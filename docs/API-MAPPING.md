@@ -67,6 +67,22 @@
 - `renewalAllowed` 只翻译为“新周期功能已启用/未启用”。Rotate Access 与 Advance Period 均不在
   M4-001 实现范围。
 
+## Catalog, resources and traffic mapping
+
+- `GET /api/v1/products` 是 Plans catalog 的唯一来源。Aureole 保持 Product 与 price order，
+  只展示 name、data allowance、speed limit、capacity availability 和 billing prices；不读取
+  Product Detail、不结合 current Subscription 过滤、不声明购买资格，也不创建 Order CTA。
+- Product price 使用 `amountMinor` 与 canonical `GET /api/v1/config/account` currency metadata。
+  Formatter 由平台 Intl currency metadata 决定 standard minor exponent，并以整数/BigInt 拆分，
+  不硬编码 `/100`。无法安全识别 currency 时 fail closed，仅显示价格暂不可格式化。
+- `GET /api/v1/resources` 只映射 Public id/name/category/status。Resource UI 不显示或推断 host、
+  IP、port、credential、UUID、SNI、path、protocol config 或 raw V2Board server object。
+- `GET /api/v1/traffic/logs` 仅在 Subscription Page 展示 ordered compact list。uploadedBytes 与
+  downloadedBytes 复用 canonical byte formatter，recordedAt 显示 absolute local time，
+  rateMultiplier 仅作为 metadata；不聚合、不计费、不排序、不分页、不轮询。
+- Products、Resources、Traffic 均使用 protected authenticatedRequest 和独立 server-state query。
+  普通 failure 局部 Retry；AUTH_REQUIRED/AUTH_FAILED 清除完整 authenticated state。
+
 ## Error and request rules
 
 - 业务分支依据稳定 `error.code`，禁止依据 message 文本包含关系。
