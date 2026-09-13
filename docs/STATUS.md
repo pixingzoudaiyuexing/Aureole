@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 4 - Read-only Core (`AUR-M4-003` Notices + Dashboard Completion)
+Milestone 5 - Commerce / Payment (`AUR-M5-001` Orders Read Model)
 
 ## Contract baseline
 
@@ -36,12 +36,17 @@ COMPLETE with no required fixes. Products and Account Config compose the Plans
 read model with safe minor-unit formatting; Resources exposes only Public DTO
 fields; ordered Traffic History extends the Subscription page without aggregation.
 
-M4-003 Notices + Dashboard Completion implementation is COMPLETE. Notice List
-and lazy Detail use canonical TanStack Query state; the Dashboard reuses the List
-boundary for its authoritative first Summary. `SafeNoticeHtml` sanitizes untrusted
-Detail HTML with DOMPurify before the only Notice raw-HTML render sink. Independent
-Security/Notice review remains PENDING, so Milestone 4 remains REVIEW PENDING.
-Milestone 5 is NOT STARTED.
+M4-003 Notices + Dashboard Completion implementation and independent
+Security/Notice review are COMPLETE with no Blocker, High, Medium or Low findings
+and no required fixes. The global DOMPurify hook NIT is non-blocking. Its accepted
+production runtime gap remains NOT TESTED and non-blocking. Milestone 4 is COMPLETE.
+
+Milestone 5 is CURRENT. AUR-M5-001 Orders Read Model implementation is COMPLETE
+and its independent Order Read-Model review is PENDING. Order List and lazy
+Detail preserve the Public DTO and server order; amounts reuse canonical Account
+Config and `formatMinorMoney`; nullable timestamps remain non-derived. M5-002
+Order Create + Promotion + Cancel and M5-003 Payment Methods + Checkout are NOT
+STARTED.
 
 ## Current commit
 
@@ -55,11 +60,11 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (19 files, 288 tests)
+- `npm test`: PASS (21 files, 321 tests)
 - `npm run build`: PASS
-- Build evidence: main JS 469.57 kB raw / 147.71 kB gzip; CSS 32.38 kB raw /
-  6.80 kB gzip; Dashboard route 1.39 kB gzip; Notices query chunk 0.80 kB gzip;
-  Notices route including Dialog, Detail and DOMPurify 13.13 kB gzip.
+- Build evidence: main JS 469.66 kB raw / 147.75 kB gzip; CSS 32.92 kB raw /
+  6.86 kB gzip; shared money formatter 0.41 kB gzip; shared Dialog 0.57 kB
+  gzip; Orders route 2.71 kB gzip.
   Assets remain within budget; initial-route composition has not been measured
   by a dedicated analyzer.
 - Browser verification: PASS at 1280 x 720 and 390 x 844 for Login Light/Dark,
@@ -84,6 +89,8 @@ operational source of truth.
   in workflow run `34717477883`.
 - M4-002 remote GitHub Actions is tracked by exact final SHA in the
   implementation report.
+- M4-003 CI: PASS for `fd6ac4db4f093b6022063355ff004873ba4aac71`
+  in workflow run `34735646641`.
 
 ## Runtime verification
 
@@ -123,16 +130,26 @@ operational source of truth.
   Notice list/detail Auth invalidation. No horizontal overflow, application
   console/page error or external HTML resource request was observed. Production
   solution/V2Board is NOT TESTED.
+- M5-001 controlled-browser verification: PASS at exact 1280 x 720 and 390 x 844
+  in Light/Dark for ordered multiple Orders, all five statuses, empty state,
+  36-character ID, zero/large CNY amounts, JPY, unsupported currency, Config
+  error isolation/Retry, List error/Retry, lazy Detail, null dates, 404, Detail
+  error/Retry and List/Detail/Config Auth invalidation. No horizontal overflow,
+  private DTO field, mutation UI, non-GET Order request, status request or
+  checkout request was observed. Application page errors were zero; the only
+  normal-flow console error was the existing local `/favicon.ico` 404.
+  Production solution/V2Board is NOT TESTED.
 
 ## Known gaps
 
-- Orders, Wallet, Support and Referrals remain placeholders without mock business
-  data.
+- Wallet, Support and Referrals remain placeholders without mock business data.
+- Production solution/V2Board Order behavior is NOT TESTED; controlled mock
+  browser and automated contract/privacy tests are the current evidence.
 - Production solution/V2Board Notice behavior is NOT TESTED; controlled mock
   browser and automated contract/security tests are the current evidence.
 - Hosting provider is undecided; production requires SPA fallback.
 
 ## Next milestone
 
-M4-003 requires independent Security/Notice review before Milestone 4 can close.
-Milestone 5 is NOT STARTED and requires separate authorization.
+AUR-M5-001 is the only active implementation scope. Its independent Order
+Read-Model review is required before M5-002 or M5-003 may start.

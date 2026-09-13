@@ -142,6 +142,7 @@ function NoticesContent({ token }: { token: string }) {
         }}
       >
         <DialogContent
+          closeLabel="关闭公告"
           onCloseAutoFocus={(event) => {
             event.preventDefault()
             selectedTriggerRef.current?.focus()

@@ -98,6 +98,21 @@
   第一条 Summary。它不请求 Detail、不解析 HTML、不根据 timestamp 重排，也不发明 unread 或
   important 状态。
 
+## Orders read mapping
+
+- `GET /api/v1/orders` 是 `/orders` 的唯一 List 来源。Aureole 保持 server order，只展示 id、
+  status、amountMinor 和 Contract timestamps；不把订单连接到 Product catalog，也不推断订单
+  类型、套餐、billing period、payment method、promotion 或 callback。
+- `GET /api/v1/orders/{id}` 只在用户选择订单后请求；id 作为符合
+  `^[A-Za-z0-9_-]{1,36}$` 的 opaque Public identifier 处理。`ORDER_NOT_FOUND` 保留 List 和
+  Session，`ORDER_QUERY_FAILED` 及其他 ordinary read error 提供局部 Retry。
+- amountMinor 与 canonical `GET /api/v1/config/account` 组合，并复用 `formatMinorMoney`。Config
+  ordinary failure 或 unsupported currency 只显示“金额暂无法安全格式化”，不猜测币种、金额
+  exponent 或 `/100`。
+- pending、processing、cancelled、completed、adjusted 分别使用冻结的用户语义；nullable
+  updatedAt/expiresAt 不转换为本地 derived expiry。M5-001 不调用 Order Status、Promotion、
+  Cancel、Payment Methods 或 Checkout endpoints。
+
 ## Error and request rules
 
 - 业务分支依据稳定 `error.code`，禁止依据 message 文本包含关系。

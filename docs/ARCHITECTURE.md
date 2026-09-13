@@ -168,6 +168,23 @@ HTML 保持为 opaque string，render boundary 再用 DOMPurify 的窄标签/属
 DOM，因此正文不会自动发起第三方资源请求。Detail 普通错误局部恢复，404 不退出 Session；
 AUTH_REQUIRED/AUTH_FAILED 继续清除 credential 与完整 Query cache。
 
+## Orders read model
+
+`features/orders` 持有 Order List、Order Detail 的 Public DTO parser、canonical query keys 与
+只读展示。List 使用 `['orders', 'list']`，Detail 使用 `['orders', 'detail', id]` 并只在用户
+选择后获取；credential 不进入 query key，订单 state 不进入 Zustand 或 browser storage。
+
+Public Order 只包含 id、status、amountMinor、createdAt、updatedAt 和 expiresAt。Parser 强校验
+这些字段并 strip additive unknown fields；UI 不连接 Products，也不推断套餐购买、续费、充值、
+升级、降级、流量重置或支付方式。订单金额复用 Account canonical `['config', 'account']` query
+与 `formatMinorMoney`；币种不可用或平台不支持时只隐藏格式化金额，订单本身仍保持可见。
+
+五种 status 使用 Contract 冻结的用户语义分别展示。createdAt 只进行 absolute date/time
+presentation；updatedAt/expiresAt 的 null 保持为明确未知状态，不根据当前时间、订单状态或其他
+数据推导 expiry。List/Detail 普通错误局部恢复，ORDER_NOT_FOUND 不退出 Session；
+AUTH_REQUIRED/AUTH_FAILED 继续清除 credential 与完整 Query cache。M5-001 不包含任何 Order
+mutation、status polling、Payment Method 或 Checkout boundary。
+
 ## Theme and presentation
 
 Light、Dark、System 由 Theme Provider 管理；显式选择可保存为非敏感 local UI preference。CSS tokens 是颜色和 radius 的 SSOT，传统 `tailwind.config.js` 不是 token 核心。使用 system font 与 system monospace。
