@@ -8,8 +8,8 @@
 | 3         | COMPLETE | Auth / Account                                                           |
 | 4         | COMPLETE | Read-only Core                                                           |
 | 5         | COMPLETE | Commerce / Payment                                                       |
-| 6         | CURRENT  | Subscription Mutations                                                   |
-| 7         | PLANNED  | Wallet / Gift Card                                                       |
+| 6         | COMPLETE | Subscription Mutations                                                   |
+| 7         | CURRENT  | Wallet / Gift Card                                                       |
 | 8         | PLANNED  | Support                                                                  |
 | 9         | PLANNED  | Referral / Commission / Withdrawal                                       |
 | 10        | PLANNED  | Launch Readiness                                                         |
@@ -39,8 +39,17 @@ M5-003 已实现 Payment Methods、Checkout、QR/redirect/finished action、权�
 Milestone 6 按以下边界推进：
 
 - AUR-M6-001 Rotate Subscription Access：COMPLETE，Independent Security Review PASS
-- AUR-M6-002 Advance Period：IMPLEMENTATION COMPLETE，Independent Review PENDING
+- AUR-M6-002 Advance Period：COMPLETE，Independent Subscription Mutation Review PASS
 
 AUR-M6-002 仅实现危险 Advance Period、权威 Overview 对账、UNKNOWN fail-closed recovery、与
-Rotate 的互斥及 Auth invalidation。Milestone 6 暂未完成。Production Subscription Rotation 与
+Rotate 的互斥及 Auth invalidation。Milestone 6 已完成并冻结。Production Subscription Rotation 与
 Advance Period runtime 仍为 NOT TESTED。
+
+Milestone 7 按以下边界推进：
+
+- AUR-M7-001 Wallet Balance Read Model：IMPLEMENTATION COMPLETE，REVIEW PENDING
+- AUR-M7-002 Wallet Deposit：NOT STARTED
+- AUR-M7-003 Gift Card Redeem：NOT STARTED
+
+AUR-M7-001 只读取并安全格式化 solution 权威 Wallet balance，不包含 Deposit、Gift Card、Payment
+Methods、Checkout、ledger 或其他资金 mutation。

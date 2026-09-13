@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 6 - Subscription Mutations (`AUR-M6-002` Advance Subscription Period)
+Milestone 7 - Wallet / Gift Card (`AUR-M7-001` Wallet Balance Read Model)
 
 ## Contract baseline
 
@@ -48,10 +48,14 @@ Promotion + Cancel implementation and independent review are COMPLETE.
 AUR-M5-003 Payment Methods + Checkout implementation is COMPLETE and its
 independent Payment review passed.
 
-Milestone 6 is CURRENT. AUR-M6-001 Rotate Subscription Access is COMPLETE and its
-independent Security Review passed. AUR-M6-002 Advance Period implementation is
-COMPLETE with independent review PENDING. Milestone 6 is not complete. Production
-Subscription Rotation and Advance Period runtime are NOT TESTED.
+Milestone 6 is COMPLETE and FROZEN. AUR-M6-001 Rotate Subscription Access is
+COMPLETE and its Independent Security Review passed. AUR-M6-002 Advance Period is
+COMPLETE and its Independent Subscription Mutation Review passed. Production
+Subscription Rotation and Advance Period runtime remain NOT TESTED.
+
+Milestone 7 is CURRENT. AUR-M7-001 Wallet Balance Read Model is IMPLEMENTATION
+COMPLETE with REVIEW PENDING. AUR-M7-002 Wallet Deposit and AUR-M7-003 Gift Card
+Redeem are NOT STARTED. Production solution/V2Board Wallet runtime is NOT TESTED.
 
 ## Current commit
 
@@ -65,13 +69,13 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (28 files, 526 tests)
+- `npm test`: PASS (30 files, 551 tests)
 - `npm run build`: PASS
 - `npm ls`: PASS
 - `git diff --check`: PASS
-- Build evidence: main JS 471.62 kB raw / 148.29 kB gzip; CSS 34.70 kB raw /
-  7.11 kB gzip; Subscription route 20.72 kB raw / 6.10 kB gzip; Plans route
-  5.15 kB gzip; Orders route 13.17 kB gzip.
+- Build evidence: main JS 471.67 kB raw / 148.32 kB gzip; CSS 34.90 kB raw /
+  7.14 kB gzip; Wallet route 2.55 kB raw / 1.23 kB gzip; Subscription route
+  20.72 kB raw / 6.09 kB gzip; Plans route 5.17 kB gzip; Orders route 13.18 kB gzip.
   Assets remain within budget; initial-route composition has not been measured
   by a dedicated analyzer.
 - Browser verification: PASS at 1280 x 720 and 390 x 844 for Login Light/Dark,
@@ -191,10 +195,18 @@ operational source of truth.
   warning/error was observed. Automated tests additionally prove same-tick
   cross-action locking, all recovery/Auth boundaries and credential-free query
   keys. Production solution/V2Board Advance Period runtime is NOT TESTED.
+- AUR-M7-001 controlled-browser verification: PASS at exact 1280 x 720 and
+  390 x 844 in Light/Dark/System for Wallet loading, zero/normal/maximum balance,
+  JPY zero-fraction formatting, Account Config loading/error, Wallet read error,
+  keyboard Retry and Wallet Auth invalidation. No horizontal overflow, Deposit /
+  Gift Card / ledger UI, or browser console warning/error was observed. Automated
+  tests additionally cover malformed DTO boundaries, both Auth error codes and
+  Query cache clearing. Production solution/V2Board Wallet runtime is NOT TESTED.
 
 ## Known gaps
 
-- Wallet, Support and Referrals remain placeholders without mock business data.
+- Wallet Balance Read is implemented; Wallet Deposit and Gift Card Redeem remain
+  NOT STARTED. Support and Referrals remain placeholders without mock business data.
 - Production solution/V2Board Order Create, Promotion and Cancel behavior is NOT
   TESTED; controlled mock browser and automated contract/privacy tests are the
   current evidence.
@@ -214,6 +226,6 @@ operational source of truth.
 
 ## Next milestone
 
-AUR-M6-002 implementation is complete. Exact-head CI verification and independent
-Subscription Mutation Review are the next required gates. The next milestone has
-not started.
+AUR-M7-001 implementation is complete. Local acceptance, exact-head CI verification
+and independent Wallet review are the next required gates. AUR-M7-002 and
+AUR-M7-003 have not started.

@@ -171,6 +171,20 @@
 - Payment Methods、Checkout、Status、Detail 或 List 任一边界返回 AUTH_REQUIRED/AUTH_FAILED 时，
   继续复用 sealed Auth Session Core 清理 credential 与完整 Query cache。
 
+## Wallet balance read mapping
+
+- `GET /api/v1/wallet` 是 `/wallet` 唯一余额来源，使用 credential-free canonical `['wallet']`
+  query。Public DTO 只接受 `balanceMinor` 为 `0..2147483647` 整数并 strip additive fields；负数、
+  浮点、numeric string、null、缺失或超出上限均 fail closed 为 MALFORMED_RESPONSE。
+- Wallet 不从 Orders、Commission、pending Deposit 或其他数据计算、累加或推断余额，不建立 ledger、
+  transaction history、snapshot 或 persistent cache。
+- `balanceMinor` 只与 canonical `GET /api/v1/config/account` 组合并复用 `formatMinorMoney`；不硬编码
+  币种、symbol、两位小数或 `/100`。Config 未知或无效时不伪装金额，并提供独立 Retry。
+- Wallet 普通 read error 只影响余额 section；Wallet 或 Account Config 的
+  AUTH_REQUIRED/AUTH_FAILED 均复用 sealed Session Core 清除 credential 与完整 Query cache。
+- AUR-M7-001 不调用 `POST /api/v1/wallet/deposits`、`POST /api/v1/gift-cards/redeem`、Payment
+  Methods、Checkout 或其他资金 mutation。
+
 ## Error and request rules
 
 - 业务分支依据稳定 `error.code`，禁止依据 message 文本包含关系。

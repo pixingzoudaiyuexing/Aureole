@@ -246,6 +246,22 @@ MALFORMED_RESPONSE 先读取 Status/Detail/List，并要求用户显式确认已
 Payment Method fee 只显示 fixedMinor 和 percent metadata；fixedMinor 复用 Account Config 与
 `formatMinorMoney`，不得计算 percentage fee 或最终应付金额。
 
+## Wallet balance read model
+
+`features/wallet` 持有 Wallet Public DTO parser、canonical `['wallet']` query 与 `/wallet`
+只读展示。`GET /api/v1/wallet` 是站内余额的唯一权威，`balanceMinor` 必须是
+`0..2147483647` 整数；Aureole 不从 Orders、Commission、pending Deposit 或其他客户端状态推导、
+累加或缓存余额，也不建立 Wallet ledger 或 transaction history。
+
+Wallet 复用 Account canonical `['config', 'account']` query 和 `formatMinorMoney` 展示金额，
+不硬编码 currency、symbol、fraction digits 或 `/100`。Account Config loading、failure 或平台不支持
+该 currency 时均不猜测币种，只隐藏格式化金额并提供局部恢复。Wallet 与 Config 都是 TanStack Query
+server state，不进入 Zustand、storage、URL、console 或 analytics；普通 read failure 局部 Retry，
+AUTH_REQUIRED/AUTH_FAILED 继续复用 Auth Session Core 清除 credential 与完整 Query cache。
+
+AUR-M7-001 仅实现余额读取。Wallet Deposit、Gift Card Redeem、Payment Methods、Checkout、充值记录、
+bonus、pending balance 与交易流水均不在本任务中。
+
 ## Theme and presentation
 
 Light、Dark、System 由 Theme Provider 管理；显式选择可保存为非敏感 local UI preference。CSS tokens 是颜色和 radius 的 SSOT，传统 `tailwind.config.js` 不是 token 核心。使用 system font 与 system monospace。
