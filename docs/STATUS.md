@@ -65,12 +65,12 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (28 files, 524 tests)
+- `npm test`: PASS (28 files, 526 tests)
 - `npm run build`: PASS
 - `npm ls`: PASS
 - `git diff --check`: PASS
 - Build evidence: main JS 471.62 kB raw / 148.29 kB gzip; CSS 34.70 kB raw /
-  7.11 kB gzip; Subscription route 20.61 kB raw / 6.09 kB gzip; Plans route
+  7.11 kB gzip; Subscription route 20.72 kB raw / 6.10 kB gzip; Plans route
   5.15 kB gzip; Orders route 13.17 kB gzip.
   Assets remain within budget; initial-route composition has not been measured
   by a dedicated analyzer.

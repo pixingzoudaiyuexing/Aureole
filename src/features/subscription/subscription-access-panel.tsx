@@ -93,6 +93,7 @@ export function SubscriptionAccessPanel({
     const reconciled = await refreshAccess()
     setRecovering(false)
     if (!reconciled) return
+    mutationCoordinator.setRecoveryBlocked(false)
     setRequiresResubmitAcknowledgement(feedbackKind === 'unknown')
     setFeedback({ kind: feedbackKind, reconciled: true })
   }
@@ -110,6 +111,9 @@ export function SubscriptionAccessPanel({
         accessUrl: result.accessUrl,
       } satisfies SubscriptionAccess)
       const reconciled = await refreshAccess()
+      if (!reconciled && !sessionInvalidatedRef.current) {
+        mutationCoordinator.setRecoveryBlocked(true)
+      }
       setRequiresResubmitAcknowledgement(false)
       setFeedback({ kind: 'success', reconciled })
     } catch (error) {
@@ -120,6 +124,9 @@ export function SubscriptionAccessPanel({
       }
 
       const reconciled = await refreshAccess()
+      if (!reconciled && !sessionInvalidatedRef.current) {
+        mutationCoordinator.setRecoveryBlocked(true)
+      }
       if (
         error instanceof ApiError &&
         error.code === 'SUBSCRIPTION_ACCESS_UNAVAILABLE'

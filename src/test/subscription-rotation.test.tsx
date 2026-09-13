@@ -58,9 +58,12 @@ function installMocks() {
   const rotateAccess = vi
     .spyOn(subscriptionApi, 'rotateAccess')
     .mockResolvedValue({ rotated: true, accessUrl: newCredentialUrl })
+  const advancePeriod = vi
+    .spyOn(subscriptionApi, 'advancePeriod')
+    .mockResolvedValue({ advanced: true })
   vi.spyOn(subscriptionApi, 'getOverview').mockResolvedValue(overview)
   vi.spyOn(trafficApi, 'getLogs').mockResolvedValue([])
-  return { getAccess, rotateAccess }
+  return { advancePeriod, getAccess, rotateAccess }
 }
 
 function renderSubscription(queryClient: QueryClient = createQueryClient()) {
@@ -420,7 +423,11 @@ describe('Subscription access rotation', () => {
       ),
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /重置订阅地址/ })).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: '提前进入下一周期' }),
+    ).toBeNull()
     expect(mocks.rotateAccess).toHaveBeenCalledOnce()
+    expect(mocks.advancePeriod).not.toHaveBeenCalled()
 
     await first.user.click(
       screen.getByRole('button', { name: '重新读取订阅地址' }),
@@ -429,8 +436,82 @@ describe('Subscription access rotation', () => {
     expect(
       await screen.findByRole('button', { name: '再次重置订阅地址' }),
     ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: '提前进入下一周期' }),
+    ).toBeEnabled()
     expect(mocks.getAccess).toHaveBeenCalledTimes(3)
     expect(mocks.rotateAccess).toHaveBeenCalledOnce()
+    expect(mocks.advancePeriod).not.toHaveBeenCalled()
+  })
+
+  it('blocks Advance when definitive rotation failure cannot reconcile Access', async () => {
+    const mocks = installMocks()
+    mocks.rotateAccess.mockRejectedValue(
+      new ApiError({
+        status: 502,
+        code: 'SUBSCRIPTION_ROTATION_FAILED',
+        message: 'failed',
+      }),
+    )
+    mocks.getAccess
+      .mockResolvedValueOnce({
+        eligible: true,
+        accessUrl: oldCredentialUrl,
+      })
+      .mockRejectedValueOnce(
+        new ApiError({ status: 0, code: 'NETWORK_ERROR', message: 'offline' }),
+      )
+    renderSubscription()
+    const first = await openConfirmation()
+    await acknowledgeAndConfirm(first.dialog, first.user)
+
+    expect(await screen.findByText('订阅地址重置未完成。')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: '提前进入下一周期' }),
+    ).toBeNull()
+    expect(mocks.rotateAccess).toHaveBeenCalledOnce()
+    expect(mocks.advancePeriod).not.toHaveBeenCalled()
+  })
+
+  it('blocks Advance when confirmed rotation success cannot reconcile Access', async () => {
+    const mocks = installMocks()
+    mocks.getAccess
+      .mockResolvedValueOnce({
+        eligible: true,
+        accessUrl: oldCredentialUrl,
+      })
+      .mockRejectedValueOnce(
+        new ApiError({ status: 0, code: 'NETWORK_ERROR', message: 'offline' }),
+      )
+      .mockResolvedValueOnce({
+        eligible: true,
+        accessUrl: newCredentialUrl,
+      })
+    renderSubscription()
+    const first = await openConfirmation()
+    await acknowledgeAndConfirm(first.dialog, first.user)
+
+    expect(
+      await screen.findByText(
+        '当前地址暂时无法重新核对，请先保存页面显示的地址，再重新读取。',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: '提前进入下一周期' }),
+    ).toBeNull()
+    expect(mocks.rotateAccess).toHaveBeenCalledOnce()
+    expect(mocks.advancePeriod).not.toHaveBeenCalled()
+
+    await first.user.click(
+      screen.getByRole('button', { name: '重新读取订阅地址' }),
+    )
+
+    expect(
+      await screen.findByRole('button', { name: '提前进入下一周期' }),
+    ).toBeEnabled()
+    expect(mocks.getAccess).toHaveBeenCalledTimes(3)
+    expect(mocks.rotateAccess).toHaveBeenCalledOnce()
+    expect(mocks.advancePeriod).not.toHaveBeenCalled()
   })
 
   it.each([
