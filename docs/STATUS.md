@@ -534,6 +534,6 @@ Milestone 10 is IN PROGRESS.
 - AUR-M10-002 is COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT REVIEW PASS / FROZEN.
 - AUR-M10-002 CODE/CONFIG FREEZE: `8890ba0e8325828e27d2234a3f8b242561fbe801`
   (Historical pre-independent-review code/config checkpoint `bdaf39f4bbf462ab6729d86b83ea9afbf8421233` remains only as historical evidence)
-- AUR-M10-003 is NOT STARTED / AUTHORIZED FOR PLANNING AND PREPARATION.
+- AUR-M10-003 PLANNING / PREPARATION IN PROGRESS.
 
 Actual production testing remains NOT AUTHORIZED.
