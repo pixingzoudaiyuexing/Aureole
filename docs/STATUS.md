@@ -76,8 +76,10 @@ Independent Referral Read Review passed; it is frozen at
 its Independent Referral Code Mutation Review passed, and it is frozen at
 `ba106d1c7d7b69fbc9b5b52837c3abee939ef218`.
 
-AUR-M9-003 Commission Transfer is COMPLETE with INDEPENDENT FINANCIAL MUTATION REVIEW PASS and
-PRIMARY HARDENING PASS; it is frozen at `e8e83622abf38960ed41fd222a978f02323592df`. It adds only strict
+AUR-M9-003 Commission Transfer has a PREVIOUS INDEPENDENT REVIEW PASS and PRIMARY HARDENING PASS at
+historical reviewed SHA `e8e83622abf38960ed41fd222a978f02323592df`. A cross-cutting same-runtime
+financial concurrency hardening is now applied with TARGETED RE-REVIEW PENDING, so the historical SHA
+is not the current final frozen SHA. It adds only strict
 `POST /api/v1/referrals/commissions/transfer`, fresh Overview/Wallet/Account Config authority,
 exact money parsing, financial confirmation, execution-time QueryClient rechecks, same-tick
 locking and Overview + Wallet reconciliation. Its content-free uncertainty state now uses both
@@ -85,13 +87,20 @@ QueryClient and a session-scoped reload-persistent marker, synchronously pre-arm
 POST. This closes handled-UNKNOWN and in-flight full-reload duplicate windows without persisting
 financial data. It never predicts balances or infers mutation outcome from recovered deltas.
 
-AUR-M9-004 Withdrawal Request is IMPLEMENTATION COMPLETE with INDEPENDENT WITHDRAWAL FINANCIAL
-MUTATION REVIEW PENDING. It adds only strict `POST /api/v1/referrals/withdrawal-requests`, exact
+AUR-M9-004 Withdrawal Request is IMPLEMENTATION COMPLETE with INDEPENDENT REVIEW REQUIRED FIX APPLIED
+and TARGETED RE-REVIEW PENDING. It adds only strict `POST /api/v1/referrals/withdrawal-requests`, exact
 server-provided method selection, raw masked account handling, fresh Withdrawal Options authority,
 financial confirmation, execution-time QueryClient recheck, same-tick locking, synchronous persistent
 pre-arm and Options-only reconciliation. It never accepts or calculates a withdrawal amount and never
 infers request outcome from Options, commission, Wallet or Support Ticket state. Production
 solution/V2Board Referral Read, Create, Commission Transfer and Withdrawal Request runtime is NOT TESTED.
+
+The required shared fix adds exact-key MutationCache pending gates to Commission Transfer and Withdrawal
+Request. `useIsMutating` provides the UI-level same-runtime fact across SPA route unmount/remount, while a
+direct execution-time MutationCache check closes stale-render and same-tick paths. While an exact same-key
+mutation is pending, form submission, confirmation, acknowledgement and manual recovery remain fail closed.
+The two mutation keys remain isolated. MutationCache does not replace the separate sessionStorage markers,
+which continue to protect full-document reload and runtime replacement uncertainty.
 
 ## Current commit
 
@@ -105,12 +114,12 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (44 files, 1047 tests)
+- `npm test`: PASS (45 files, 1057 tests)
 - `npm run build`: PASS
 - `npm ls`: PASS
 - `git diff --check`: PASS
-- Build evidence: main JS 472.49 kB raw / 148.62 kB gzip; CSS 37.84 kB raw /
-  7.51 kB gzip; Referrals route 47.37 kB raw / 11.31 kB gzip; Support route
+- Build evidence: main JS 472.50 kB raw / 148.62 kB gzip; CSS 37.84 kB raw /
+  7.51 kB gzip; Referrals route 49.02 kB raw / 11.75 kB gzip; Support route
   31.19 kB raw / 8.29 kB gzip; Wallet route 22.81 kB raw / 6.84 kB gzip;
   Subscription route 19.89 kB raw / 5.68 kB gzip; Plans route 5.15 kB gzip;
   Orders route 13.17 kB gzip. Assets remain within budget; initial-route
@@ -400,13 +409,27 @@ operational source of truth.
   mobile Dialog; body/Dialog horizontal overflow was zero, Escape restored trigger focus, raw upstream
   and internal Ticket wording were absent, and browser console warning/error count was zero. This is
   controlled evidence, not production solution/V2Board runtime evidence.
+- AUR-M9 shared financial concurrency required-fix automated verification: PASS. Real Router SPA
+  navigation unmounted and remounted each Control while preserving the same QueryClient and a pending
+  Attempt A. Withdrawal and Commission both exposed the exact pending state, hid acknowledgement and
+  manual recovery, disabled only their own form and kept same-key POST count at one. Direct same-tick
+  MutationCache tripwires closed stale React confirmation and acknowledgement paths. Old Withdrawal
+  success, definitive rejection and UNKNOWN settle paths, plus old Commission success, restored the
+  required marker/reconciliation behavior. All previous full-runtime reload tests remained passing.
+- AUR-M9 shared financial concurrency controlled-browser verification: PASS against a local `/api/v1`
+  mock at 1280 x 720 and 390 x 844. Browser history navigation performed real same-runtime SPA route
+  unmount/remount while the POST response remained pending. Withdrawal pending disabled only Withdrawal,
+  hid acknowledgement and left Commission usable; Commission pending did the inverse. Mock evidence
+  recorded one POST per active attempt. Old success settlement restored the form only after authoritative
+  reads, horizontal overflow was zero and browser console warning/error count was zero. This is controlled
+  evidence, not production solution/V2Board runtime evidence.
 
 ## Known gaps
 
 - Wallet Balance Read, Wallet Deposit Create, Gift Card Redeem, all Support Ticket v1 work,
-  Referral / Commission Read Model, Referral Code Create and Commission Transfer are complete and
-  independently reviewed. Withdrawal Request implementation is complete with independent financial
-  mutation review pending.
+  Referral / Commission Read Model and Referral Code Create are complete and independently reviewed.
+  Commission Transfer has previous review approval plus new cross-cutting concurrency hardening; Withdrawal
+  Request has its independent review required fix applied. Both await targeted financial concurrency re-review.
 - Production solution/V2Board Referral Overview, Commission History, Withdrawal Options,
   Referral Code Create, Commission Transfer and Withdrawal Request behavior is NOT TESTED;
   controlled mock browser and automated contract/privacy/recovery tests are the current evidence.
@@ -432,5 +455,5 @@ operational source of truth.
 
 ## Next milestone
 
-AUR-M9-004 exact-head CI verification and Independent Withdrawal Financial Mutation Review are the
-next gates. Milestone 10 and Launch Readiness have not started.
+Exact-head CI verification and the Gemini Targeted Financial Concurrency Re-Review are the next gates.
+Milestone 10 and Launch Readiness have not started.

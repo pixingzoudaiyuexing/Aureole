@@ -170,6 +170,21 @@ async function confirmWithdrawal(
   )
 }
 
+async function navigateAwayAndBack(
+  router: ReturnType<typeof createAppRouter>,
+  heading: '提现状态与申请' | '佣金划转',
+) {
+  await act(async () => {
+    await router.navigate({ to: '/dashboard' })
+  })
+  await waitFor(() =>
+    expect(screen.queryByRole('heading', { name: heading })).toBeNull(),
+  )
+  await act(async () => {
+    await router.navigate({ to: '/referrals' })
+  })
+}
+
 describe('Withdrawal Request authority and confirmation', () => {
   it('keeps disabled and empty Options read-only with no request form', async () => {
     const mocks = installMocks()
@@ -736,6 +751,177 @@ describe('Withdrawal Request full-runtime and session safety', () => {
     expect(
       queryClient.getQueryData(referralCreateLocalGuardKeys.uncertainty),
     ).toBe('active')
+  })
+})
+
+describe('Withdrawal Request same-runtime pending safety', () => {
+  it('blocks acknowledgement and a second attempt after SPA remount while Attempt A is pending', async () => {
+    const mocks = installMocks()
+    const pendingRequest = deferred<{ requested: true }>()
+    mocks.requestWithdrawal.mockReturnValue(pendingRequest.promise)
+    const queryClient = createQueryClient()
+    const { router } = renderReferrals(queryClient)
+    const form = await openConfirmation()
+    await confirmWithdrawal(form)
+    await waitFor(() => expect(mocks.requestWithdrawal).toHaveBeenCalledOnce())
+    expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe('active')
+
+    await navigateAwayAndBack(router, '提现状态与申请')
+    const section = await withdrawalSection()
+    await section.findByText(
+      '上一笔提现申请仍在处理中，请等待结果，暂不能再次提交。',
+    )
+    expect(
+      section.queryByRole('checkbox', {
+        name: '我了解上一笔提现申请结果无法确认，仍需再次提交新的提现申请。',
+      }),
+    ).toBeNull()
+    expect(section.getByLabelText('提现账户')).toBeDisabled()
+    const transferSectionElement = (
+      await screen.findByRole('heading', { name: '佣金划转' })
+    ).closest('section')
+    expect(transferSectionElement).not.toBeNull()
+    await waitFor(() =>
+      expect(
+        within(transferSectionElement as HTMLElement).getByRole('textbox', {
+          name: '划转金额',
+        }),
+      ).toBeEnabled(),
+    )
+    expect(
+      queryClient.getMutationCache().findAll({
+        mutationKey: ['referrals', 'withdrawal-request'],
+        exact: true,
+        status: 'pending',
+      }),
+    ).toHaveLength(1)
+    expect(mocks.requestWithdrawal).toHaveBeenCalledOnce()
+  })
+
+  it.each([
+    [
+      'success',
+      { type: 'resolve' as const, value: { requested: true as const } },
+    ],
+    [
+      'definitive rejection',
+      {
+        type: 'reject' as const,
+        value: apiError('VALIDATION_ERROR', 400),
+      },
+    ],
+  ])(
+    'reopens only after old Attempt A %s settles and Options reconcile',
+    async (_name, settlement) => {
+      const mocks = installMocks()
+      const pendingRequest = deferred<{ requested: true }>()
+      mocks.requestWithdrawal.mockReturnValue(pendingRequest.promise)
+      const { router } = renderReferrals()
+      const form = await openConfirmation()
+      await confirmWithdrawal(form)
+      await waitFor(() =>
+        expect(mocks.requestWithdrawal).toHaveBeenCalledOnce(),
+      )
+
+      await navigateAwayAndBack(router, '提现状态与申请')
+      const section = await withdrawalSection()
+      await section.findByText(
+        '上一笔提现申请仍在处理中，请等待结果，暂不能再次提交。',
+      )
+      if (settlement.type === 'resolve') {
+        act(() => pendingRequest.resolve(settlement.value))
+      } else {
+        act(() => pendingRequest.reject(settlement.value))
+      }
+
+      await waitFor(() =>
+        expect(section.getByLabelText('提现账户')).toBeEnabled(),
+      )
+      expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBeNull()
+      expect(mocks.getWithdrawalOptions).toHaveBeenCalledTimes(3)
+      expect(mocks.requestWithdrawal).toHaveBeenCalledOnce()
+    },
+  )
+
+  it('exposes acknowledgement only after old Attempt A settles UNKNOWN and Options recover', async () => {
+    const mocks = installMocks()
+    const pendingRequest = deferred<{ requested: true }>()
+    mocks.requestWithdrawal.mockReturnValue(pendingRequest.promise)
+    const { router } = renderReferrals()
+    const form = await openConfirmation()
+    await confirmWithdrawal(form)
+    await waitFor(() => expect(mocks.requestWithdrawal).toHaveBeenCalledOnce())
+
+    await navigateAwayAndBack(router, '提现状态与申请')
+    const section = await withdrawalSection()
+    expect(section.queryByRole('checkbox')).toBeNull()
+    act(() => pendingRequest.reject(apiError('NETWORK_ERROR', 0)))
+
+    const acknowledgement = await section.findByRole('checkbox', {
+      name: '我了解上一笔提现申请结果无法确认，仍需再次提交新的提现申请。',
+    })
+    expect(acknowledgement).toBeEnabled()
+    expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe('active')
+    expect(mocks.getWithdrawalOptions).toHaveBeenCalledTimes(3)
+    expect(mocks.requestWithdrawal).toHaveBeenCalledOnce()
+  })
+
+  it('blocks Confirm through the direct MutationCache gate before pending UI renders', async () => {
+    const mocks = installMocks()
+    const { queryClient } = renderReferrals()
+    const form = await openConfirmation()
+    const blocker = deferred<never>()
+    const cachedMutation = queryClient.getMutationCache().build(queryClient, {
+      mutationKey: ['referrals', 'withdrawal-request'],
+      mutationFn: () => blocker.promise,
+      retry: false,
+    })
+
+    act(() => {
+      void cachedMutation.execute(undefined)
+      fireEvent.click(
+        within(form.dialog).getByRole('button', { name: '确认提交申请' }),
+      )
+    })
+
+    expect(mocks.requestWithdrawal).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(
+      await screen.findByText(
+        '上一笔提现申请仍在处理中，请等待结果，暂不能再次提交。',
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('blocks a same-tick acknowledgement when the exact mutation becomes pending', async () => {
+    installMocks()
+    window.sessionStorage.setItem(withdrawalSafetyKey, 'active')
+    const queryClient = createQueryClient()
+    renderReferrals(queryClient)
+    const acknowledgement = await screen.findByRole('checkbox', {
+      name: '我了解上一笔提现申请结果无法确认，仍需再次提交新的提现申请。',
+    })
+    const blocker = deferred<never>()
+    const cachedMutation = queryClient.getMutationCache().build(queryClient, {
+      mutationKey: ['referrals', 'withdrawal-request'],
+      mutationFn: () => blocker.promise,
+      retry: false,
+    })
+
+    act(() => {
+      void cachedMutation.execute(undefined)
+      fireEvent.click(acknowledgement)
+    })
+
+    expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe('active')
+    expect(
+      queryClient.getQueryData(withdrawalRequestLocalGuardKeys.uncertainty),
+    ).toBe('active')
+    expect(
+      await screen.findByText(
+        '上一笔提现申请仍在处理中，请等待结果，暂不能再次提交。',
+      ),
+    ).toBeInTheDocument()
   })
 })
 

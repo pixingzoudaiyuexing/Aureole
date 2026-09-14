@@ -32,6 +32,10 @@ import type { Wallet } from '@/features/wallet/wallet-api'
 import { ApiError } from '@/lib/api/errors'
 import { isAmbiguousCommissionTransferError } from './commission-transfer-errors'
 import {
+  hasExactPendingMutation,
+  useHasExactPendingMutation,
+} from './financial-mutation-pending'
+import {
   getCommissionTransferAuthority,
   getCommissionTransferUncertaintyStatus,
   useCommissionTransferUncertaintyGuard,
@@ -39,6 +43,7 @@ import {
 import {
   commissionTransferMutationOptions,
   referralOverviewOptions,
+  referralsMutationKeys,
   referralsQueryKeys,
   useReferralOverview,
 } from './referrals-queries'
@@ -78,6 +83,9 @@ export function CommissionTransferControl({
     refetchOnMount: 'always',
   })
   const mutation = useMutation(commissionTransferMutationOptions(accessToken))
+  const sameRuntimeMutationPending = useHasExactPendingMutation(
+    referralsMutationKeys.commissionTransfer,
+  )
   const uncertainty = useCommissionTransferUncertaintyGuard()
   const [amountText, setAmountText] = useState('')
   const [amountError, setAmountError] = useState<string | null>(null)
@@ -121,6 +129,7 @@ export function CommissionTransferControl({
   const unknownAcknowledged = uncertainty.status === 'acknowledged'
   const showUnknownAcknowledgement =
     transferAuthorityReady &&
+    !sameRuntimeMutationPending &&
     (keepAcknowledgementVisible ||
       feedback?.kind === 'unknown' ||
       unknownGuardActive)
@@ -134,7 +143,8 @@ export function CommissionTransferControl({
     recovering ||
     recoveryFailed ||
     Boolean(safetyStorageError) ||
-    unknownGuardActive
+    unknownGuardActive ||
+    sameRuntimeMutationPending
 
   const formattedAvailableCommission =
     overview.data && config.data
@@ -187,6 +197,15 @@ export function CommissionTransferControl({
 
   const openConfirmation = () => {
     if (transferDisabled) return
+    if (
+      hasExactPendingMutation(
+        queryClient,
+        referralsMutationKeys.commissionTransfer,
+      )
+    ) {
+      setAmountError(null)
+      return
+    }
     const authority = getCommissionTransferAuthority(queryClient)
     if (
       !authority ||
@@ -278,6 +297,18 @@ export function CommissionTransferControl({
       rejectStaleConfirmation('当前可用佣金已变化，请调整划转金额并重新确认。')
       return
     }
+    if (
+      hasExactPendingMutation(
+        queryClient,
+        referralsMutationKeys.commissionTransfer,
+      )
+    ) {
+      setConfirmationOpen(false)
+      setConfirmedTransfer(null)
+      setAmountError(null)
+      transferLock.release()
+      return
+    }
 
     if (!uncertainty.preArm()) {
       setSafetyStorageError(
@@ -350,6 +381,10 @@ export function CommissionTransferControl({
   const manualRecovery = async () => {
     if (
       recovering ||
+      hasExactPendingMutation(
+        queryClient,
+        referralsMutationKeys.commissionTransfer,
+      ) ||
       (!recoveryFailed && !(unknownGuardActive && !financialReadsReady))
     ) {
       return
@@ -418,13 +453,23 @@ export function CommissionTransferControl({
           <FinancialValue label="当前账户余额" value={formattedWalletBalance} />
         </dl>
 
-        {feedback ? (
+        {sameRuntimeMutationPending ? (
+          <div
+            className="border-l-2 border-foreground/40 bg-muted px-4 py-3"
+            role="status"
+          >
+            <p className="text-sm font-semibold">
+              上一笔佣金划转仍在处理中，请等待结果，暂不能再次划转。
+            </p>
+          </div>
+        ) : feedback ? (
           <TransferFeedbackMessage feedback={feedback} />
         ) : unknownGuardActive ? (
           <PersistedUnknownFeedback authorityReady={transferAuthorityReady} />
         ) : null}
 
-        {recoveryFailed || (unknownGuardActive && !financialReadsReady) ? (
+        {!sameRuntimeMutationPending &&
+        (recoveryFailed || (unknownGuardActive && !financialReadsReady)) ? (
           <Button
             type="button"
             variant="outline"
@@ -451,6 +496,14 @@ export function CommissionTransferControl({
               checked={unknownAcknowledged}
               disabled={actionPending || recovering}
               onChange={(event) => {
+                if (
+                  hasExactPendingMutation(
+                    queryClient,
+                    referralsMutationKeys.commissionTransfer,
+                  )
+                ) {
+                  return
+                }
                 setKeepAcknowledgementVisible(true)
                 const persisted = event.target.checked
                   ? uncertainty.acknowledge()
@@ -603,7 +656,8 @@ export function CommissionTransferControl({
                   !confirmedTransfer ||
                   !transferAuthorityReady ||
                   actionPending ||
-                  unknownGuardActive
+                  unknownGuardActive ||
+                  sameRuntimeMutationPending
                 }
                 onClick={() => void transferCommission()}
               >

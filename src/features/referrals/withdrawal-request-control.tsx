@@ -18,6 +18,10 @@ import { isInvalidSessionError } from '@/features/auth/auth-errors'
 import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invalid-session-error'
 import { useSynchronousActionLock } from '@/features/auth/use-synchronous-action-lock'
 import { ApiError } from '@/lib/api/errors'
+import {
+  hasExactPendingMutation,
+  useHasExactPendingMutation,
+} from './financial-mutation-pending'
 import type { WithdrawalOptions } from './referrals-api'
 import { isAmbiguousWithdrawalRequestError } from './withdrawal-request-errors'
 import {
@@ -66,6 +70,9 @@ export function WithdrawalRequestControl({
   const requestLock = useSynchronousActionLock()
   const sessionInvalidatedRef = useRef(false)
   const mutation = useMutation(withdrawalRequestMutationOptions(accessToken))
+  const sameRuntimeMutationPending = useHasExactPendingMutation(
+    referralsMutationKeys.withdrawalRequest,
+  )
   const uncertainty = useWithdrawalRequestUncertaintyGuard()
   const [selectedMethod, setSelectedMethod] = useState('')
   const [account, setAccount] = useState('')
@@ -114,8 +121,10 @@ export function WithdrawalRequestControl({
     recovering ||
     recoveryFailed ||
     Boolean(safetyStorageError) ||
-    unknownGuardActive
+    unknownGuardActive ||
+    sameRuntimeMutationPending
   const showUnknownAcknowledgement =
+    !sameRuntimeMutationPending &&
     optionsAuthorityReady &&
     safetyStateReady &&
     (keepAcknowledgementVisible ||
@@ -160,6 +169,15 @@ export function WithdrawalRequestControl({
 
   const openConfirmation = () => {
     if (formDisabled) return
+    if (
+      hasExactPendingMutation(
+        queryClient,
+        referralsMutationKeys.withdrawalRequest,
+      )
+    ) {
+      setFieldError(null)
+      return
+    }
     const authority = getWithdrawalOptionsAuthority(queryClient)
     if (
       !authority ||
@@ -216,6 +234,17 @@ export function WithdrawalRequestControl({
     }
     if (confirmation.account.length < 1 || confirmation.account.length > 1024) {
       rejectStaleConfirmation('提现账户内容已变化，请重新填写并确认。')
+      return
+    }
+    if (
+      hasExactPendingMutation(
+        queryClient,
+        referralsMutationKeys.withdrawalRequest,
+      )
+    ) {
+      closeConfirmation()
+      setFieldError(null)
+      requestLock.release()
       return
     }
 
@@ -285,7 +314,11 @@ export function WithdrawalRequestControl({
       mutation.reset()
       const mutationCache = queryClient.getMutationCache()
       mutationCache
-        .findAll({ mutationKey: referralsMutationKeys.withdrawalRequest })
+        .findAll({
+          mutationKey: referralsMutationKeys.withdrawalRequest,
+          exact: true,
+        })
+        .filter((entry) => entry.state.status !== 'pending')
         .forEach((entry) => mutationCache.remove(entry))
       setActionPending(false)
       requestLock.release()
@@ -295,6 +328,10 @@ export function WithdrawalRequestControl({
   const manualRecovery = async () => {
     if (
       recovering ||
+      hasExactPendingMutation(
+        queryClient,
+        referralsMutationKeys.withdrawalRequest,
+      ) ||
       (!recoveryFailed && !(unknownGuardActive && !optionsAuthorityReady))
     ) {
       return
@@ -386,13 +423,23 @@ export function WithdrawalRequestControl({
           </p>
         ) : null}
 
-        {feedback ? (
+        {sameRuntimeMutationPending ? (
+          <div
+            className="border-l-2 border-foreground/40 bg-muted px-4 py-3"
+            role="status"
+          >
+            <p className="text-sm font-semibold">
+              上一笔提现申请仍在处理中，请等待结果，暂不能再次提交。
+            </p>
+          </div>
+        ) : feedback ? (
           <WithdrawalFeedbackMessage feedback={feedback} />
         ) : unknownGuardActive ? (
           <PersistedUnknownFeedback authorityReady={optionsAuthorityReady} />
         ) : null}
 
-        {recoveryFailed || (unknownGuardActive && !optionsAuthorityReady) ? (
+        {!sameRuntimeMutationPending &&
+        (recoveryFailed || (unknownGuardActive && !optionsAuthorityReady)) ? (
           <Button
             type="button"
             variant="outline"
@@ -419,6 +466,14 @@ export function WithdrawalRequestControl({
               checked={unknownAcknowledged}
               disabled={actionPending || recovering}
               onChange={(event) => {
+                if (
+                  hasExactPendingMutation(
+                    queryClient,
+                    referralsMutationKeys.withdrawalRequest,
+                  )
+                ) {
+                  return
+                }
                 setKeepAcknowledgementVisible(true)
                 const persisted = event.target.checked
                   ? uncertainty.acknowledge()
@@ -634,7 +689,8 @@ export function WithdrawalRequestControl({
                   !confirmation ||
                   !requestAvailable ||
                   actionPending ||
-                  unknownGuardActive
+                  unknownGuardActive ||
+                  sameRuntimeMutationPending
                 }
                 onClick={() => void requestWithdrawal()}
               >

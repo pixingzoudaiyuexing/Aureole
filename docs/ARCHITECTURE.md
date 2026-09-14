@@ -455,8 +455,10 @@ Persistent marker 不包含金额、余额、币种、token、email、timestamp 
 hydrate 保留 marker；logout、Auth invalidation 与 `establishSession` 除清 QueryClient 外还显式清理 session safety state，
 防止跨 authenticated session 泄漏。Referral Code Create 仍保持原 memory-only guard，不被本 hardening 修改。
 
-AUR-M9-003 的 Independent Financial Mutation Review 与 Primary Hardening Review 均已通过，并冻结于
-`e8e83622abf38960ed41fd222a978f02323592df`。
+AUR-M9-003 的历史 Independent Financial Mutation Review 与 Primary Hardening Review 已通过，历史 reviewed SHA 为
+`e8e83622abf38960ed41fd222a978f02323592df`。AUR-M9-004 独立审查随后发现两类 financial mutation 共享的 SPA
+unmount / attempt-generation race，因此当前已应用 cross-cutting same-runtime concurrency hardening，targeted re-review pending；
+历史 SHA 不再代表当前最终封板 SHA。
 
 AUR-M9-004 增加 strict `POST /api/v1/referrals/withdrawal-requests`，只发送 `{method,account}`；两个字段分别严格限制为
 1..255 与 1..1024 个字符并保持原始字符串，success 只接受 `{requested:true}`。Public Contract 没有 amount，因此 UI、
@@ -488,6 +490,21 @@ account、method 与 confirmation snapshot 立即清空，persistent/local marke
 Withdrawal marker 与 Commission Transfer marker 独立，均只允许 `active` / `acknowledged` / absent。普通同 session credential
 hydrate 保留二者；logout、new session、Auth invalidation 通过 sealed Session Core 统一清除。AUR-M9-004 不修改 solution、不
 直接访问 V2Board、不读取 Withdrawal status/list/detail 或 Support Ticket，也不进入 Launch Readiness。
+
+Commission Transfer 与 Withdrawal Request 现在各自使用同一个轻量 shared pending helper，但仍按 exact mutation key 隔离。
+UI 层通过 exact `useIsMutating` 订阅同一 QueryClient 的 pending mutation；即使原 Control 因 SPA navigation unmount，只要旧
+mutation 仍 pending，新 Control 就显示处理中状态并禁用 form、Financial Confirmation、UNKNOWN acknowledgement 和 manual
+recovery。Withdrawal pending 不阻塞 Commission，Commission pending 也不阻塞 Withdrawal 或 Referral Code Create。
+
+真正 POST 前仍在同步 action lock 与 authority/validation 检查之后，直接读取 MutationCache 并要求 exact same-key pending
+不存在，避免 hook render 尚未更新时穿透。该 helper 只比较 mutation key 与 `state.status='pending'`，不读取 amount、method、
+account、token 或 mutation variables。Withdrawal settle cleanup 只移除 exact same-key 的非-pending entries，不能删除任何仍
+pending mutation。
+
+MutationCache 是 same-runtime in-flight fact；sessionStorage marker 是 cross-runtime/full-document reload uncertainty fact。
+same-runtime pending settle 为 success/definitive 后，旧 continuation 可清 marker 并执行原有 authority reconciliation，因为 gate
+保证不存在 Attempt B；UNKNOWN settle 则继续保留 active marker，fresh authority 后才开放 acknowledgement。full runtime replacement
+会丢失 MutationCache，但必须保留原有 persistent active/acknowledged reload 语义，不能因 pending count 为零自动清 marker。
 
 ## Theme and presentation
 

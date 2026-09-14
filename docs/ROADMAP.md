@@ -82,10 +82,11 @@ Milestone 9 按以下边界推进：
   `445ffac542d89977f2db5b631516b6c3bbdc955f`
 - AUR-M9-002 Create Referral Code：COMPLETE，INDEPENDENT REFERRAL CODE MUTATION REVIEW PASS，冻结于
   `ba106d1c7d7b69fbc9b5b52837c3abee939ef218`
-- AUR-M9-003 Commission Transfer：COMPLETE，INDEPENDENT FINANCIAL MUTATION REVIEW PASS，PRIMARY HARDENING
-  PASS，冻结于 `e8e83622abf38960ed41fd222a978f02323592df`
-- AUR-M9-004 Withdrawal Request：IMPLEMENTATION COMPLETE，INDEPENDENT WITHDRAWAL FINANCIAL MUTATION REVIEW
-  PENDING
+- AUR-M9-003 Commission Transfer：PREVIOUS INDEPENDENT REVIEW PASS，CROSS-CUTTING SAME-RUNTIME FINANCIAL
+  CONCURRENCY HARDENING APPLIED，TARGETED RE-REVIEW PENDING；historical reviewed SHA
+  `e8e83622abf38960ed41fd222a978f02323592df`
+- AUR-M9-004 Withdrawal Request：IMPLEMENTATION COMPLETE，INDEPENDENT REVIEW REQUIRED FIX APPLIED，TARGETED
+  RE-REVIEW PENDING
 
 AUR-M9-002 只增量实现 bodyless `POST /api/v1/referrals/codes`。Create 使用 fresh Overview authority、
 标准 confirmation、同步锁、`retry:false` 和 Overview-only reconciliation；confirmed success 不认领具体 code，
@@ -107,3 +108,8 @@ raw account，不采集或发送 amount。fresh Withdrawal Options、financial c
 error/UNKNOWN 都只 GET Withdrawal Options 恢复当前 authority，不从 Options、Commission、Wallet 或 Support Ticket 推断上一笔
 申请 outcome。Launch Readiness 与 Milestone 10 未开始。Production Referral / Commission / Withdrawal / Create / Transfer
 runtime 为 NOT TESTED。
+
+Independent Withdrawal review 的 Required Fix 为 shared same-runtime pending gate。Commission 与 Withdrawal 现在分别通过 exact
+MutationCache key 阻止 SPA unmount/remount 后仍 pending 的旧 attempt 与新 attempt 重叠；UI 同时隐藏 acknowledgement 和 manual
+recovery，执行边界直接 recheck MutationCache。该 same-runtime fact 不替代 sessionStorage 的 full-reload uncertainty marker，且
+两个 financial mutation 不互相阻塞。Milestone 9 仍为 CURRENT，等待 targeted financial concurrency re-review。

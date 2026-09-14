@@ -152,6 +152,18 @@ async function confirmTransfer(
   )
 }
 
+async function navigateAwayAndBack(router: ReturnType<typeof createAppRouter>) {
+  await act(async () => {
+    await router.navigate({ to: '/dashboard' })
+  })
+  await waitFor(() =>
+    expect(screen.queryByRole('heading', { name: '佣金划转' })).toBeNull(),
+  )
+  await act(async () => {
+    await router.navigate({ to: '/referrals' })
+  })
+}
+
 describe('Commission Transfer authority and confirmation', () => {
   it('shows current financial values and requires explicit confirmation', async () => {
     const mocks = installMocks()
@@ -302,6 +314,7 @@ describe('Commission Transfer authority and confirmation', () => {
     )
 
     expect(mocks.transferCommission).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(
       await screen.findByText(
         '当前资金状态已变化，请完成重新读取后重新确认金额。',
@@ -933,4 +946,117 @@ describe('Commission Transfer UNKNOWN safety', () => {
       ).toBeUndefined()
     },
   )
+})
+
+describe('Commission Transfer same-runtime pending safety', () => {
+  it('blocks acknowledgement and Attempt B after SPA remount until Attempt A settles', async () => {
+    const mocks = installMocks()
+    mocks.getWithdrawalOptions.mockResolvedValue({
+      enabled: true,
+      methods: ['bank_wire'],
+    })
+    const pendingTransfer = deferred<{ transferred: true }>()
+    mocks.transferCommission.mockReturnValue(pendingTransfer.promise)
+    const queryClient = createQueryClient()
+    const { router } = renderReferrals(queryClient)
+    const form = await openConfirmation()
+    await confirmTransfer(form)
+    await waitFor(() => expect(mocks.transferCommission).toHaveBeenCalledOnce())
+
+    await navigateAwayAndBack(router)
+    const section = await transferSection()
+    await section.findByText(
+      '上一笔佣金划转仍在处理中，请等待结果，暂不能再次划转。',
+    )
+    expect(
+      section.queryByRole('checkbox', {
+        name: '我已核对当前可用佣金和账户余额，仍需再次提交佣金划转。',
+      }),
+    ).toBeNull()
+    expect(section.getByRole('textbox', { name: '划转金额' })).toBeDisabled()
+    const withdrawalSectionElement = (
+      await screen.findByRole('heading', { name: '提现状态与申请' })
+    ).closest('section')
+    expect(withdrawalSectionElement).not.toBeNull()
+    await waitFor(() =>
+      expect(
+        within(withdrawalSectionElement as HTMLElement).getByLabelText(
+          '提现账户',
+        ),
+      ).toBeEnabled(),
+    )
+    expect(
+      queryClient.getMutationCache().findAll({
+        mutationKey: ['referrals', 'commission-transfer'],
+        exact: true,
+        status: 'pending',
+      }),
+    ).toHaveLength(1)
+    expect(mocks.transferCommission).toHaveBeenCalledOnce()
+
+    act(() => pendingTransfer.resolve({ transferred: true }))
+    await waitFor(() =>
+      expect(section.getByRole('textbox', { name: '划转金额' })).toBeEnabled(),
+    )
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
+    expect(mocks.transferCommission).toHaveBeenCalledOnce()
+  })
+
+  it('blocks Confirm through the direct MutationCache gate before pending UI renders', async () => {
+    const mocks = installMocks()
+    const { queryClient } = renderReferrals()
+    const form = await openConfirmation()
+    const blocker = deferred<never>()
+    const cachedMutation = queryClient.getMutationCache().build(queryClient, {
+      mutationKey: ['referrals', 'commission-transfer'],
+      mutationFn: () => blocker.promise,
+      retry: false,
+    })
+
+    act(() => {
+      void cachedMutation.execute(undefined)
+      fireEvent.click(
+        within(form.dialog).getByRole('button', { name: '确认划转' }),
+      )
+    })
+
+    expect(mocks.transferCommission).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(
+      await screen.findByText(
+        '上一笔佣金划转仍在处理中，请等待结果，暂不能再次划转。',
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('blocks a same-tick acknowledgement when the exact mutation becomes pending', async () => {
+    installMocks()
+    window.sessionStorage.setItem(commissionSafetyKey, 'active')
+    const queryClient = createQueryClient()
+    renderReferrals(queryClient)
+    const acknowledgement = await screen.findByRole('checkbox', {
+      name: '我已核对当前可用佣金和账户余额，仍需再次提交佣金划转。',
+    })
+    const blocker = deferred<never>()
+    const cachedMutation = queryClient.getMutationCache().build(queryClient, {
+      mutationKey: ['referrals', 'commission-transfer'],
+      mutationFn: () => blocker.promise,
+      retry: false,
+    })
+
+    act(() => {
+      void cachedMutation.execute(undefined)
+      fireEvent.click(acknowledgement)
+    })
+
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
+    expect(
+      queryClient.getQueryData(commissionTransferLocalGuardKeys.uncertainty),
+    ).toBe('active')
+    expect(
+      await screen.findByText(
+        '上一笔佣金划转仍在处理中，请等待结果，暂不能再次划转。',
+      ),
+    ).toBeInTheDocument()
+  })
 })
