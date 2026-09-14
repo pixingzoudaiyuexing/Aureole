@@ -304,8 +304,16 @@
   保持可见并显示明确 minor-unit fallback。`availableCommissionMinor` 不合并、累加或复制到 Wallet。
 - Overview、History、Withdrawal Options 与 Config ordinary failure 各自隔离并可 Retry；任一 GET 的
   AUTH_REQUIRED/AUTH_FAILED 都复用 sealed Session Core 清理 credential 与完整 Query cache。
-- AUR-M9-001 只调用以上三个 GET；不调用 Create Code、Commission Transfer、Withdrawal Request，不包含
-  `useMutation` 或 fake/disabled mutation control，也不直接访问 V2Board。
+- `POST /api/v1/referrals/codes` 是唯一 Create Code 写边界。请求没有 body 或人为 JSON Content-Type；成功只
+  接受并 strip `{created:true}`，`created:false`、缺失、错误类型或 raw V2Board `data:true` 均为
+  `MALFORMED_RESPONSE`。Mutation 使用 `['referrals','create-code']`、`retry:false` 与同步锁。
+- Create 由 fresh `['referrals','overview']` authority、标准 confirmation 和最终 execution recheck 三层约束。
+  success、`REFERRAL_CODE_LIMIT_REACHED`、UNKNOWN 均只 GET Overview 对账，不刷新 Commission、Withdrawal 或
+  Wallet，也不本地修改 code list。成功只说明服务端确认创建；UNKNOWN 即使 Overview 出现新 code 也不推断
+  因果。对账失败 fail closed；UNKNOWN 对账成功后需要先核对 acknowledgement，再重新打开 confirmation。
+- Create/recovery 的 AUTH_REQUIRED/AUTH_FAILED 复用 sealed Session Core。Code list、mutation state 与
+  acknowledgement 不进入 storage、URL、Zustand、analytics、console 或 Query/Mutation key。
+- AUR-M9-002 不调用 Commission Transfer、Withdrawal Request，也不直接访问 V2Board。
 
 ## Error and request rules
 

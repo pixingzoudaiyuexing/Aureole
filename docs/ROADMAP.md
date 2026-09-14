@@ -78,13 +78,13 @@ Readiness evidence gap。Milestone 8 已完成并冻结于
 
 Milestone 9 按以下边界推进：
 
-- AUR-M9-001 Referral / Commission Read Model：IMPLEMENTATION COMPLETE，INDEPENDENT REVIEW PENDING
-- AUR-M9-002 Create Referral Code：NOT STARTED
+- AUR-M9-001 Referral / Commission Read Model：COMPLETE，INDEPENDENT REVIEW PASS，冻结于
+  `445ffac542d89977f2db5b631516b6c3bbdc955f`
+- AUR-M9-002 Create Referral Code：IMPLEMENTATION COMPLETE，INDEPENDENT REVIEW PENDING
 - AUR-M9-003 Commission Transfer：NOT STARTED
 - AUR-M9-004 Withdrawal Request：NOT STARTED
 
-AUR-M9-001 只实现 `GET /api/v1/referrals`、分页 Commission History 与 Withdrawal Options。页面保持
-server order，金额复用 Account Config 与 canonical minor-unit formatter，Config 不可用时显示明确
-minor-unit fallback；三个业务读与 Config 独立失败、独立 Retry，Auth invalidation 复用 Session Core。
-`availableCommissionMinor` 不进入 Wallet。本 Task 没有 Create Code、Transfer、Withdrawal mutation 或
-Launch Readiness 工作。Production Referral / Commission / Withdrawal Options runtime 为 NOT TESTED。
+AUR-M9-002 只增量实现 bodyless `POST /api/v1/referrals/codes`。Create 使用 fresh Overview authority、
+标准 confirmation、同步锁、`retry:false` 和 Overview-only reconciliation；confirmed success 不认领具体 code，
+UNKNOWN 不根据 list diff 推断结果，对账失败保持 fail closed。Commission Transfer、Withdrawal Request 与
+Launch Readiness 未开始。Production Referral / Commission / Withdrawal / Create runtime 为 NOT TESTED。

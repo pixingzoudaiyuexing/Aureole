@@ -369,7 +369,7 @@ acknowledgement，且 Close 仍需标准 confirmation；Reply payload 变化会�
 失败只允许 GET Detail，所有 mutation/reconciliation/recovery 的 Auth error 继续进入 sealed Session
 Core。Reply draft 和 UNKNOWN guard 仅为 React local memory，不持久化。
 
-## Referral and commission read model
+## Referral and commission read model and code creation
 
 `features/referrals` 持有 Referral Overview、Commission History 与 Withdrawal Options 的 Public DTO
 parser、canonical Query 和 `/referrals` 只读页面边界。三个 authenticated GET 分别使用
@@ -395,8 +395,22 @@ Overview、Commission History、Withdrawal Options 与 Account Config 各自 loa
 排序、去重或生成 code。Withdrawal Options 只展示 enabled 与 ordered method identifiers，不推断品牌、
 手续费、minimum、额度或到账时间。
 
-AUR-M9-001 不实现 Create Referral Code、Commission Transfer、Withdrawal Request 或任何其他 mutation，
-也不修改 solution、直接访问 V2Board、复制 Commission 到 Wallet 或进入 Launch Readiness。
+AUR-M9-001 已完成并冻结于 `445ffac542d89977f2db5b631516b6c3bbdc955f`。
+AUR-M9-002 在同一 feature boundary 增加 bodyless `POST /api/v1/referrals/codes`；成功只接受
+`{created:true}` 并 strip additive fields。Mutation key 为 content/credential-free 的
+`['referrals','create-code']`，显式 `retry:false`，标准 confirmation 与同步 action lock 保证只有明确确认
+才发送一次 POST。
+
+Create 只在 canonical Overview `isSuccess && !isFetching` 时开放，Overview query 在页面 remount 时强制
+fresh read。confirmed success、`REFERRAL_CODE_LIMIT_REACHED` 与 UNKNOWN 都只重新读取
+`GET /api/v1/referrals`；不 invalidate Commission、Withdrawal 或 Wallet。成功 DTO 不含 code identity，
+因此页面不 append、生成、自动复制、高亮或通过 list diff/timestamp 推断某个 code 属于本次操作。成功对账
+失败保持 confirmed success 但 fail closed；UNKNOWN 对账成功后仍需 acknowledgement 和新的标准 confirmation，
+对账失败及 remount 则依靠 fresh Overview authority gate 继续 fail closed。所有 mutation/recovery Auth error
+复用 sealed Session Core，局部 feedback/acknowledgement 不持久化。
+
+AUR-M9-002 不实现 Commission Transfer、Withdrawal Request 或其他 mutation，也不修改 solution、直接访问
+V2Board、复制 Commission 到 Wallet 或进入 Launch Readiness。
 
 ## Theme and presentation
 

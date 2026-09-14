@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 9 - Referral / Commission / Withdrawal (`AUR-M9-001` Read Model)
+Milestone 9 - Referral / Commission / Withdrawal (`AUR-M9-002` Create Referral Code)
 
 ## Contract baseline
 
@@ -70,14 +70,14 @@ reconciliation, fail-closed Detail authority and guarded UNKNOWN resubmission. N
 message/status mutation or causal inference is used. Production solution/V2Board Ticket
 Read/Create/Reply/Close runtime is NOT TESTED.
 
-Milestone 9 is CURRENT. AUR-M9-001 Referral / Commission Read Model is IMPLEMENTATION
-COMPLETE with INDEPENDENT REVIEW PENDING. It replaces `/referrals` with strict ordered
-Referral Overview, paginated Commission History and Withdrawal Options reads, canonical
-Account Config money formatting with explicit minor-unit fallback, isolated recovery and
-sealed Session Core Auth invalidation. `availableCommissionMinor` remains separate from
-Wallet. AUR-M9-002 Create Referral Code, AUR-M9-003 Commission Transfer and AUR-M9-004
-Withdrawal Request are NOT STARTED. Production solution/V2Board Referral runtime is NOT
-TESTED.
+Milestone 9 is CURRENT. AUR-M9-001 Referral / Commission Read Model is COMPLETE and its
+Independent Referral Read Review passed; it is frozen at
+`445ffac542d89977f2db5b631516b6c3bbdc955f`. AUR-M9-002 Create Referral Code is
+IMPLEMENTATION COMPLETE with INDEPENDENT REVIEW PENDING. It adds only the bodyless Public
+Create route, fresh Overview authority gating, standard confirmation, same-tick locking,
+Overview-only reconciliation and fail-closed UNKNOWN handling without identifying a new
+code. AUR-M9-003 Commission Transfer and AUR-M9-004 Withdrawal Request are NOT STARTED.
+Production solution/V2Board Referral Read and Create runtime is NOT TESTED.
 
 ## Current commit
 
@@ -91,14 +91,14 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (40 files, 900 tests)
+- `npm test`: PASS (41 files, 929 tests)
 - `npm run build`: PASS
 - `npm ls`: PASS
 - `git diff --check`: PASS
-- Build evidence: main JS 471.75 kB raw / 148.37 kB gzip; CSS 37.80 kB raw /
-  7.51 kB gzip; Referrals route 11.09 kB raw / 3.46 kB gzip; Support route
-  31.32 kB raw / 8.39 kB gzip; Wallet route 23.81 kB raw / 7.06 kB gzip;
-  Subscription route 19.89 kB raw / 5.67 kB gzip; Plans route 5.15 kB gzip;
+- Build evidence: main JS 471.80 kB raw / 148.39 kB gzip; CSS 37.80 kB raw /
+  7.51 kB gzip; Referrals route 17.91 kB raw / 5.49 kB gzip; Support route
+  31.19 kB raw / 8.29 kB gzip; Wallet route 23.81 kB raw / 7.07 kB gzip;
+  Subscription route 19.89 kB raw / 5.68 kB gzip; Plans route 5.16 kB gzip;
   Orders route 13.16 kB gzip. Assets remain within budget; initial-route
   composition has not been measured by a dedicated analyzer.
 - Browser verification: PASS at 1280 x 720 and 390 x 844 for Login Light/Dark,
@@ -315,16 +315,29 @@ operational source of truth.
   copy/pagination activation was NOT TESTED in the controlled browser because the browser
   control layer stopped dispatching React click events after navigation; production
   solution/V2Board Referral runtime is NOT TESTED.
+- AUR-M9-002 controlled-browser verification: PASS against a local `/api/v1` mock at
+  exact 1280 x 720 and 390 x 844 in Light/Dark/System for initial authority gating,
+  standard confirmation, Cancel/Escape focus restoration, same-tick double confirm,
+  confirmed success, success reconciliation failure and GET-only manual recovery,
+  `REFERRAL_CODE_LIMIT_REACHED`, UNKNOWN recovery success/failure, guarded acknowledgement,
+  reload/remount fail-closed behavior and Create Auth invalidation. Request evidence showed
+  zero POST before confirm, one POST for double confirm, Overview-only reconciliation and no
+  automatic clipboard write or code identity claim. A 32-character code and confirmation
+  remained within the mobile viewport; no horizontal overflow, raw upstream message or
+  browser console warning/error was observed. Automated tests additionally cover strict
+  bodyless DTO parsing, every UNKNOWN category, authority loss while Dialog is open, cached
+  Overview refetch, every required recovery/Auth boundary and full Query cache clearing.
+  Production solution/V2Board Referral Code Create runtime is NOT TESTED.
 
 ## Known gaps
 
-- Wallet Balance Read, Wallet Deposit Create, Gift Card Redeem and all Support Ticket v1
-  work are complete and independently reviewed. Referral / Commission Read Model
-  implementation is complete and pending independent review; Referral Code Create,
-  Commission Transfer and Withdrawal Request are not started.
-- Production solution/V2Board Referral Overview, Commission History and Withdrawal Options
-  behavior is NOT TESTED; controlled mock browser and automated contract/privacy tests are
-  the current evidence.
+- Wallet Balance Read, Wallet Deposit Create, Gift Card Redeem, all Support Ticket v1 work
+  and the Referral / Commission Read Model are complete and independently reviewed. Referral
+  Code Create implementation is complete and pending independent review; Commission Transfer
+  and Withdrawal Request are not started.
+- Production solution/V2Board Referral Overview, Commission History, Withdrawal Options and
+  Referral Code Create behavior is NOT TESTED; controlled mock browser and automated
+  contract/privacy/recovery tests are the current evidence.
 - Production solution/V2Board Ticket List, Detail, Create, Reply and Close behavior is
   NOT TESTED; controlled mock browser and automated contract/privacy tests are the
   current evidence.
@@ -347,5 +360,5 @@ operational source of truth.
 
 ## Next milestone
 
-AUR-M9-001 exact-head CI verification and Independent Referral Read Review are the next
-required gates. AUR-M9-002, AUR-M9-003 and AUR-M9-004 have not started.
+AUR-M9-002 exact-head CI verification and Independent Referral Code Mutation Review are the
+next required gates. AUR-M9-003 and AUR-M9-004 have not started.

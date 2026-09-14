@@ -189,7 +189,7 @@ describe('Referrals page', () => {
     expect(screen.getByRole('button', { name: '下一页' })).toBeDisabled()
   })
 
-  it('shows honest empty and disabled withdrawal states without mutation controls', async () => {
+  it('shows honest empty and disabled withdrawal states without later mutation controls', async () => {
     const mocks = installMocks()
     mocks.getOverview.mockResolvedValue({ ...overview, codes: [] })
     mocks.getCommissions.mockResolvedValue({
@@ -208,7 +208,6 @@ describe('Referrals page', () => {
     expect(screen.getByText('暂无佣金记录。')).toBeInTheDocument()
     expect(screen.getByText('当前暂未开放提现。')).toBeInTheDocument()
     for (const command of [
-      '创建邀请码',
       '生成邀请码',
       '佣金划转',
       '转入钱包',

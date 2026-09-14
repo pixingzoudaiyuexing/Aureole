@@ -3,6 +3,10 @@ import {
   commissionPageRequestSchema,
   referralsApi,
 } from '@/features/referrals/referrals-api'
+import {
+  referralCodeCreateMutationOptions,
+  referralsMutationKeys,
+} from '@/features/referrals/referrals-queries'
 import { apiClient } from '@/lib/api/client'
 import { ApiError } from '@/lib/api/errors'
 
@@ -38,6 +42,42 @@ function validCommissionPage() {
 }
 
 describe('Referrals API contract', () => {
+  it('creates through the exact bodyless Public POST and strips additions', async () => {
+    const request = vi
+      .spyOn(apiClient, 'authenticatedRequest')
+      .mockResolvedValue({ created: true, code: 'PRIVATE', id: 7 })
+
+    await expect(referralsApi.createCode(token)).resolves.toEqual({
+      created: true,
+    })
+    expect(request).toHaveBeenCalledWith('/api/v1/referrals/codes', {
+      method: 'POST',
+      accessToken: token,
+    })
+    expect(request.mock.calls[0]?.[1]).not.toHaveProperty('body')
+  })
+
+  it.each([
+    ['created false', { created: false }],
+    ['missing created', {}],
+    ['wrong type', { created: 'true' }],
+    ['raw V2Board result', { data: true }],
+  ])('rejects malformed Create success: %s', async (_name, payload) => {
+    vi.spyOn(apiClient, 'authenticatedRequest').mockResolvedValue(payload)
+    await expect(referralsApi.createCode(token)).rejects.toMatchObject({
+      code: 'MALFORMED_RESPONSE',
+    } satisfies Partial<ApiError>)
+  })
+
+  it('uses a credential- and content-free non-retrying mutation key', () => {
+    const options = referralCodeCreateMutationOptions(token)
+    expect(options.mutationKey).toEqual(['referrals', 'create-code'])
+    expect(options.mutationKey).toBe(referralsMutationKeys.createCode)
+    expect(options.retry).toBe(false)
+    expect(JSON.stringify(options.mutationKey)).not.toContain(token)
+    expect(JSON.stringify(options.mutationKey)).not.toContain('FIRST123')
+  })
+
   it('reads the exact overview path, preserves code order, and strips additions', async () => {
     const request = vi
       .spyOn(apiClient, 'authenticatedRequest')

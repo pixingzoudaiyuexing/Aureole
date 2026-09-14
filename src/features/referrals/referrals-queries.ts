@@ -10,10 +10,15 @@ export const referralsQueryKeys = {
   withdrawalOptions: ['referrals', 'withdrawal-options'] as const,
 }
 
+export const referralsMutationKeys = {
+  createCode: ['referrals', 'create-code'] as const,
+}
+
 export function referralOverviewOptions(accessToken: string) {
   return queryOptions({
     queryKey: referralsQueryKeys.overview,
     queryFn: () => referralsApi.getOverview(accessToken),
+    refetchOnMount: 'always',
   })
 }
 
@@ -42,4 +47,12 @@ export function useReferralCommissions(accessToken: string, page: number) {
 
 export function useReferralWithdrawalOptions(accessToken: string) {
   return useQuery(referralWithdrawalOptions(accessToken))
+}
+
+export function referralCodeCreateMutationOptions(accessToken: string) {
+  return {
+    mutationKey: referralsMutationKeys.createCode,
+    mutationFn: () => referralsApi.createCode(accessToken),
+    retry: false as const,
+  }
 }

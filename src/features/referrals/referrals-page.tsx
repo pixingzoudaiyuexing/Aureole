@@ -10,6 +10,7 @@ import { ReadError } from '@/components/shared/read-error'
 import { Button } from '@/components/ui/button'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
 import type { CommissionPage, ReferralOverview } from './referrals-api'
+import { ReferralCreateControl } from './referral-create-control'
 import {
   useReferralCommissions,
   useReferralOverview,
@@ -231,6 +232,7 @@ function ReferralsContent({ accessToken }: { accessToken: string }) {
   useExitOnInvalidSessionError(invalid)
 
   if (invalid) return null
+  const overviewAuthorityReady = overview.isSuccess && !overview.isFetching
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -251,6 +253,18 @@ function ReferralsContent({ accessToken }: { accessToken: string }) {
         <h3 id="referral-overview-title" className="text-base font-semibold">
           推荐概览
         </h3>
+        <div className="mt-5" aria-labelledby="referral-codes-action-title">
+          <h4
+            id="referral-codes-action-title"
+            className="text-sm font-semibold"
+          >
+            邀请码操作
+          </h4>
+          <ReferralCreateControl
+            accessToken={accessToken}
+            overviewAuthorityReady={overviewAuthorityReady}
+          />
+        </div>
         <div className="mt-5 min-h-40" aria-live="polite">
           {overview.isPending ? (
             <p role="status" className="text-sm text-muted-foreground">
