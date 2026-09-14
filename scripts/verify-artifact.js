@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { execSync } from 'node:child_process'
 
 function verify() {
   const dist = 'dist'
@@ -24,10 +25,25 @@ function verify() {
   const releaseJson = path.join(dist, 'release.json')
   if (!fs.existsSync(releaseJson)) throw new Error('release.json missing')
   const metadata = JSON.parse(fs.readFileSync(releaseJson, 'utf8'))
-  if (!metadata.sha) throw new Error('Invalid release.json: missing SHA')
 
-  // Check that all assets referenced in index.html actually exist
-  // A crude regex for src="..." and href="..."
+  if (!metadata.sha || !/^[0-9a-f]{40}$/.test(metadata.sha)) {
+    throw new Error('Invalid release.json: missing or invalid 40-char SHA')
+  }
+
+  let headSha
+  try {
+    headSha = execSync('git rev-parse HEAD').toString().trim()
+  } catch {
+    // Standalone verification mode (not a git repository)
+    // Accept valid SHA shape without exact repository equality
+  }
+
+  if (headSha && metadata.sha !== headSha) {
+    throw new Error(
+      `release.json SHA (${metadata.sha}) does not match current Git HEAD (${headSha})`,
+    )
+  }
+
   const refs = [...indexHtml.matchAll(/(?:src|href)="\/([^"]+)"/g)].map(
     (m) => m[1],
   )
@@ -40,14 +56,11 @@ function verify() {
     }
   }
 
-  // Check for leakage
   for (const file of assets) {
     const content = fs.readFileSync(path.join(dist, 'assets', file), 'utf8')
     if (content.includes('gateway.example.com')) {
       throw new Error(`Baked-in backend hostname found in ${file}`)
     }
-    // Also ensure the V2Board explicit path (if we knew one) isn't there,
-    // but gateway.example.com covers the .env.example leakage.
   }
 
   console.log('Artifact verification passed.')

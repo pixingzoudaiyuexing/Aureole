@@ -120,7 +120,10 @@ runtime attempt registry 与 authenticated session generation：registry 在同 
 generation mismatch 则禁止旧 Session continuation 清 marker、使用旧 token 对账、污染新 Session canonical cache、退出新 Session 或
 显示旧 outcome。logout/new login/Auth invalidation 对 marker 执行 active -> active、acknowledged -> active、absent -> absent；若 logout
 后 full reload 导致 registry 消失，persistent active 仍要求 fresh authority 和新 acknowledgement。Milestone 10 IN PROGRESS；
-AUR-M10-001 已 COMPLETE / PRIMARY REVIEW PASS。
+AUR-M10-001 COMPLETE / PRIMARY REVIEW PASS。
+AUR-M10-001R1 COMPLETE。
+AUR-M10-002 IMPLEMENTATION COMPLETE / PRIMARY REVIEW FIXES APPLIED / PRIMARY RE-REVIEW PENDING。
+AUR-M10-003 NOT STARTED / NOT AUTHORIZED。
 
 Milestone 9：COMPLETE / PASS / FROZEN。其代码冻结 SHA 为
 `e408f83311c3557706ac9fc09ac06fe754ea71b8`；后续 documentation closure commit 不改变该 code freeze SHA。
@@ -133,4 +136,4 @@ Milestone 10：IN PROGRESS。AUR-M10-001 Launch Readiness Evidence Inventory 为
 审计建议后续按实际依赖顺序拆分：AUR-M10-002 Production Deployment Contract and Artifact Readiness、
 AUR-M10-003 Production Auth/Session and Read-Only Verification、AUR-M10-004 Controlled Non-Financial Mutation
 Verification、AUR-M10-005 Payment/Wallet/Financial Runtime Verification、AUR-M10-006 Final Browser/Rollback/Launch
-Gate。上述后续 Task 均未在 AUR-M10-001 中启动，必须等待 Primary 审核并分别授权。
+Gate。除 AUR-M10-002 外，上述后续 Task 均未启动，必须等待 Primary 审核并分别授权。

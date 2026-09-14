@@ -41,6 +41,10 @@ describe('API client', () => {
     ['ftp://example.com', undefined],
     ['https://user:pass@example.com', undefined],
     ['/api/v1', undefined],
+    ['http://api.example.com', undefined],
+    ['https://api.example.com/path', undefined],
+    ['https://api.example.com?x=1', undefined],
+    ['https://api.example.com#x', undefined],
   ])('rejects invalid or unsafe baseUrl overrides: %s', async (invalidUrl) => {
     const fetchImpl = vi.fn<typeof fetch>()
     const client = createApiClient({ baseUrl: invalidUrl, fetchImpl })
@@ -110,6 +114,28 @@ describe('API client', () => {
     } satisfies Partial<ApiError>)
     expect(fetchImpl).not.toHaveBeenCalled()
   })
+
+  it.each([
+    ['https://api.example.com', 'https://api.example.com/api/v1/me'],
+    ['https://api.example.com/', 'https://api.example.com/api/v1/me'],
+    ['http://localhost:8080', 'http://localhost:8080/api/v1/me'],
+    ['http://127.0.0.1:3000', 'http://127.0.0.1:3000/api/v1/me'],
+  ])(
+    'accepts valid baseUrl overrides: %s',
+    async (validUrl, expectedTarget) => {
+      const fetchImpl = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ ok: true, data: {} }), { status: 200 }),
+        )
+      const client = createApiClient({ baseUrl: validUrl, fetchImpl })
+      await client.request('/api/v1/me')
+      expect(fetchImpl).toHaveBeenCalledWith(
+        new URL(expectedTarget),
+        expect.anything(),
+      )
+    },
+  )
 
   it.each([
     [401, 'AUTH_REQUIRED', 'Authentication required', 'req-auth'],

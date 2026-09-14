@@ -144,8 +144,7 @@ controlled browser verification. No deployed Aureole production Auth, read,
 mutation or financial flow was exercised. The principal blockers are the missing
 production deployment contract and runtime environment, absent deployed Auth/Session
 acceptance, and missing approved runtime verification for exposed payment and
-financial flows. CI can currently build without `VITE_API_BASE_URL`, so a green
-build does not by itself prove a usable production artifact.
+financial flows. AUR-M10-002 resolved the `VITE_API_BASE_URL` absence by defaulting to a same-origin production artifact.
 
 AUR-M10-001 and AUR-M10-001R1 ran only SAFE-A local/documentation validation. They
 did not access production, deploy, mutate production state or perform a real
@@ -513,7 +512,4 @@ financial operation. No business source code or solution file was changed.
 
 ## Next milestone
 
-Milestone 10 is IN PROGRESS. AUR-M10-001 is COMPLETE / PRIMARY REVIEW PASS;
-its Launch Readiness work records the existing Production runtime evidence gaps.
-No production testing or Milestone 10 implementation was performed by this
-documentation reconciliation.
+Milestone 10 is IN PROGRESS. AUR-M10-002 is IMPLEMENTATION COMPLETE / PRIMARY REVIEW FIXES APPLIED / PRIMARY RE-REVIEW PENDING. AUR-M10-003 is NOT STARTED. Actual production testing remains NOT AUTHORIZED.

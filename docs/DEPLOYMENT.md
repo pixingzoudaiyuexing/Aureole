@@ -21,9 +21,16 @@ This ensures a standard build succeeds and produces a valid same-origin artifact
 ## 3. Cross-Origin Exception
 
 The `VITE_API_BASE_URL` variable may be provided to override the API origin.
-When set (e.g., `VITE_API_BASE_URL=https://api.example.com`), it validates the protocol (HTTP/HTTPS) and rejects credential-bearing URLs.
-This is an **exception mode** for development, controlled staging, or specific cross-origin deployments.
-In cross-origin mode, the deployment owner must ensure CORS is correctly configured on the solution Gateway.
+When set, it must be an HTTPS origin (e.g., `VITE_API_BASE_URL=https://api.example.com`). It validates the protocol, rejects credential-bearing URLs, and rejects any pathname, query, or hash.
+HTTP is only permitted for loopback addresses (`localhost`, `127.0.0.1`, `[::1]`) to support local development if required.
+
+This is an **exception mode**. For cross-origin production:
+
+- The override origin MUST be HTTPS.
+- The solution `FRONTEND_ORIGINS` configuration must contain the exact HTTPS frontend origin.
+- Wildcard `*` origins are forbidden.
+- Bearer authentication semantics remain unchanged.
+- Aureole still only calls solution `/api/v1` and must never call V2Board directly.
 
 ## 4. Multi-Domain Artifact Portability
 
@@ -72,7 +79,7 @@ This guarantees:
 ## 8. Release Identification
 
 Every successful build generates a static `dist/release.json`.
-It contains the source Git SHA and the build time.
+It contains exclusively the source Git SHA, making the release identity deterministic and independent of wall-clock build time.
 This non-secret, machine-readable identity enables static-host compatibility without exposing credentials or requiring a database.
 
 ## 9. Routing Contract (Precedence)
@@ -107,17 +114,24 @@ The deployment owner is responsible for mapping the source SHA to their provider
 
 ## 13. Security Headers and CSP Baseline
 
-A baseline Content-Security-Policy (CSP) should restrict execution to the origin.
-Deployments should avoid `unsafe-eval` and `*` sources unless explicitly required by an application feature.
+A baseline Content-Security-Policy (CSP) should restrict execution to the origin. Deployments should avoid broad wildcard (`*`) sources and avoid `unsafe-eval`.
+If `unsafe-inline` is necessary, it must be used as a weaker fallback rather than silently making it the baseline.
+
+Because `index.html` currently contains an inline theme bootstrap script, `script-src 'self'` alone is insufficient. The deployment strategy must configure a safe allowance for this inline bootstrap, preferably using a hash-based allowance or nonce strategy if applicable.
+
 Other recommended headers:
 
 - `X-Content-Type-Options: nosniff`
 - `Referrer-Policy: strict-origin-when-cross-origin`
-- `Strict-Transport-Security` (if HTTPS is fully adopted)
-- Frame control (e.g. `frame-ancestors 'none'`)
+- `Strict-Transport-Security` (Production HTTPS is REQUIRED. HSTS enablement depends on the deployment owner confirming the host is fully HTTPS and safe for the chosen scope.)
+- `Permissions-Policy` (configured as strictly as possible)
+- Frame control (e.g., `frame-ancestors 'none'`)
 
 **reCAPTCHA Conditional CSP:**
-If Google reCAPTCHA is enabled, the CSP must conditionally allow its required domains and inline script execution as dictated by the reCAPTCHA integration guidelines.
+If Google reCAPTCHA is enabled, document conditional additional Google origins required for script/frame/connect sources.
+
+**External Payment Method Icons:**
+The CSP must allow required image sources (e.g., `img-src`) for external payment method icons, without allowing unrelated script or connect origins. Do not invent actual provider hostnames until known.
 
 ## 14. No-Secret Rule
 

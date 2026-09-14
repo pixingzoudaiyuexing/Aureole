@@ -33,10 +33,23 @@ function resolveApiOrigin(configuredUrl?: string): string | undefined {
     try {
       const parsed = new URL(configuredUrl)
       if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        return undefined // Invalid protocol
+        return undefined
       }
       if (parsed.username || parsed.password) {
-        return undefined // No credential-bearing URLs allowed
+        return undefined
+      }
+      if (parsed.pathname !== '/' || parsed.search || parsed.hash) {
+        return undefined
+      }
+      if (parsed.protocol === 'http:') {
+        if (
+          parsed.hostname !== 'localhost' &&
+          parsed.hostname !== '127.0.0.1' &&
+          parsed.hostname !== '[::1]' &&
+          parsed.hostname !== '::1'
+        ) {
+          return undefined
+        }
       }
       return parsed.origin
     } catch {

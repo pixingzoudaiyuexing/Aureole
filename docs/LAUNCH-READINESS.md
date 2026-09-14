@@ -3,7 +3,7 @@
 ## Status and scope
 
 - Task: `AUR-M10-001`
-- Status: `COMPLETE / PRIMARY REVIEW PASS`
+- Status: `IMPLEMENTATION COMPLETE / PRIMARY REVIEW FIXES APPLIED / PRIMARY RE-REVIEW PENDING`
 - Milestone 10: `IN PROGRESS`
 - Audit date: 2026-09-14
 - Aureole audit base: `a2366ea08bc579e1368d52aaf8b5b5ee72aac195`
@@ -469,7 +469,7 @@ must remain `UNKNOWN` until the deployment owner supplies evidence.
 
 ### HIGH
 
-1. Same-origin `/api/v1` versus cross-origin CORS architecture is undecided.
+1. RESOLVED BY AUR-M10-002: Same-origin `/api/v1` is the DEFAULT. Cross-origin is an explicit exception.
 2. Production read authorities required for mutation recovery are unverified:
    Orders, Wallet, Subscription, Tickets, Referrals and Withdrawal Options.
 3. Non-financial destructive flows such as password change, Rotate Access and
@@ -488,7 +488,7 @@ must remain `UNKNOWN` until the deployment owner supplies evidence.
 
 ### MEDIUM
 
-1. RESOLVED BY AUR-M10-002: Tailwind source scanning boundary constrained to `src` and `index.html`. Documentation isolation proven.
+1. RESOLVED BY AUR-M10-002R1: Tailwind source(none) scanning boundary constrained explicitly to `src` and `index.html`. Documentation isolation rigorously proven.
 2. Historical L2 browser evidence is extensive but no committed/reproducible
    browser E2E suite exists; Safari/Firefox evidence is absent.
 3. There is no real initial-route analyzer or automated bundle budget gate.
