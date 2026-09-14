@@ -6,7 +6,7 @@ This document defines the exact minimum evidence required for Production Auth, S
 
 ## 2. Safety Boundary
 
-**Current Status:** PLANNING CORRECTIONS APPLIED. PENDING REVIEW.
+**Current Status:** PLAN READY FOR PRIMARY ACCEPTANCE. PENDING REVIEW.
 
 - PRODUCTION DEPLOYMENT IS **NOT AUTHORIZED**.
 - PRODUCTION ACCESS / LOGIN IS **NOT AUTHORIZED**.
@@ -24,9 +24,13 @@ Before deployment, the Primary will freeze one exact source commit as the **depl
 
 ## 4. Existing-vs-New Deployment Decision Model
 
-No active production deployment of Aureole exists yet.
-The execution of M10-003 depends entirely on the completion of **AUR-M10-002 Production Deployment Contract and Artifact Readiness**.
-M10-003 cannot begin until an authenticated deployment is fully established and authorized by the Primary.
+No production or production-equivalent Aureole deployment is currently documented and verified in repository evidence.
+
+The plan supports BOTH:
+A. The user already has a suitable deployment
+B. A new deployment must be created
+
+The Primary/User will determine which case applies. M10-003 execution depends entirely on the completion of **AUR-M10-002 Production Deployment Contract and Artifact Readiness** and cannot begin until an authenticated deployment is established and explicitly authorized by the Primary.
 
 ## 5. M10-003 Minimum Acceptance Evidence
 
@@ -38,104 +42,131 @@ The minimum required evidence to pass M10-003 is:
 
 ## 6. Required Owner Inputs
 
-The following information must be provided by the Primary/User before respective gates can be authorized:
+### OWNER INPUT — REQUIRED BEFORE DEPLOYMENT PREPARATION
 
-| Input Item                              | Requirement                |
-| --------------------------------------- | -------------------------- |
-| Frontend hostname                       | REQUIRED BEFORE DEPLOYMENT |
-| Hosting/CDN/provider                    | REQUIRED BEFORE DEPLOYMENT |
-| Deployment mechanism                    | REQUIRED BEFORE DEPLOYMENT |
-| Same-origin `/api/v1` routing mechanism | REQUIRED BEFORE DEPLOYMENT |
-| solution Gateway upstream hostname      | REQUIRED BEFORE DEPLOYMENT |
-| TLS status                              | REQUIRED BEFORE LOGIN      |
-| Current deployed release SHA            | REQUIRED BEFORE LOGIN      |
-| Rollback mechanism                      | REQUIRED BEFORE LOGIN      |
-| Dedicated test-account availability     | REQUIRED BEFORE LOGIN      |
-| Test-account subscription state         | REQUIRED BEFORE LOGIN      |
-| Anti-bot/reCAPTCHA mode                 | OPTIONAL                   |
-| Any production restrictions             | DISCOVERABLE SAFELY        |
+- Frontend hostname
+- Hosting/CDN/provider
+- Deployment mechanism
+- Same-origin `/api/v1` routing mechanism
+- solution Gateway upstream hostname
+- Deployment owner
+- Rollback mechanism / rollback target
+- Production restrictions / change-window constraints
+- Existing deployment: YES / NO / UNKNOWN
+
+### OWNER INPUT — REQUIRED BEFORE AUTHENTICATED EXECUTION
+
+- Dedicated test-account availability
+- Test-account subscription state
+- Account safety confirmation:
+  - no valuable balance
+  - no valuable commission
+  - no pending withdrawal
+  - no important orders/tickets
+  - ordinary user role
+
+### SAFELY DISCOVERABLE DURING AUTHORIZED STATIC/UNAUTHENTICATED VERIFICATION
+
+- DNS result
+- TLS validity
+- `release.json` SHA
+- security headers / CSP
+- cache behavior
+- SPA fallback
+- missing-asset 404
+- public onboarding capability / anti-bot mode
+- `/api/v1` public routing behavior where explicitly authorized
+
+_(These must PASS before Gate 4 login, but the user should not be required to manually supply them if they are discoverable.)_
 
 ## 7. Test Account Recommendation
 
-We recommend **two dedicated verification accounts** to properly test both empty states and active states. This is RECOMMENDED / OPTIONAL FOR BROADER COVERAGE, not mandatory.
+M10-003 minimum requires **ONE** safe dedicated test account.
 
-- **Account A:** No active plan.
-- **Account B:** Active low-value/test plan.
+**Preferred minimum:**
 
-**Strict characteristics for both:**
-
+- One ordinary dedicated account with an active low-value/test subscription.
 - NO valuable balance.
 - NO valuable commission.
 - NO pending withdrawal.
 - NO important orders/tickets.
-- Ordinary user permissions only.
+
+**Optional for broader coverage:**
+
+- A second account with no active plan is OPTIONAL for empty-state coverage, but not required to pass minimum M10-003.
 
 ## 8. Corrected solution GET Matrix
 
-Based strictly on the Public Contract SSOT. Execution is page-driven; detail endpoints (`{id}`) are conditional detail reads and are not artificially called if suitable IDs do not exist.
+Based strictly on the Public Contract SSOT. Execution is page-driven.
 
 **PUBLIC:**
 
-- `GET /api/v1/config/onboarding` (Required for M10-003 L3)
+- `GET /api/v1/config/onboarding` (Required for minimum M10-003 L3)
 
 **AUTHENTICATED:**
 
-- `GET /api/v1/config/account` (Required for M10-003 L3)
-- `GET /api/v1/me` (Required for M10-003 L3)
-- `GET /api/v1/me/preferences` (Required for M10-003 L3)
-- `GET /api/v1/me/stats` (Required for M10-003 L3)
-- `GET /api/v1/wallet` (Required for M10-003 L3)
-- `GET /api/v1/products` (Required for M10-003 L3)
-- `GET /api/v1/products/{id}` (Conditional detail read)
-- `GET /api/v1/orders` (Required for M10-003 L3)
-- `GET /api/v1/orders/{id}` (Conditional detail read)
-- `GET /api/v1/orders/{id}/status` (Conditional detail read)
-- `GET /api/v1/billing/methods` (Required for M10-003 L3)
-- `GET /api/v1/subscription` (Required for M10-003 L3)
-- `GET /api/v1/subscription/overview` (Required for M10-003 L3)
-- `GET /api/v1/resources` (Required for M10-003 L3)
-- `GET /api/v1/tickets` (Required for M10-003 L3)
-- `GET /api/v1/tickets/{id}` (Conditional detail read)
-- `GET /api/v1/notices` (Required for M10-003 L3)
-- `GET /api/v1/notices/{id}` (Conditional detail read)
-- `GET /api/v1/traffic/logs` (Required for M10-003 L3)
-- `GET /api/v1/referrals` (Required for M10-003 L3)
-- `GET /api/v1/referrals/commissions` (Required for M10-003 L3)
-- `GET /api/v1/referrals/withdrawal-options` (Required for M10-003 L3)
+_Minimum / Core M10-003:_
 
-**SPECIAL SENSITIVE CREDENTIAL ROUTE:**
+- `GET /api/v1/config/account`
+- `GET /api/v1/me`
+- `GET /api/v1/me/preferences`
+- `GET /api/v1/me/stats`
+- `GET /api/v1/wallet`
+- `GET /api/v1/products`
+- `GET /api/v1/orders`
+- `GET /api/v1/subscription`
+- `GET /api/v1/subscription/overview`
+- `GET /api/v1/resources`
+- `GET /api/v1/tickets`
+- `GET /api/v1/notices`
+- `GET /api/v1/traffic/logs`
+- `GET /api/v1/referrals`
+- `GET /api/v1/referrals/commissions`
+- `GET /api/v1/referrals/withdrawal-options`
 
-- `GET /api/v1/access/subscription`
-  _Decision:_ **EXCLUDE** from M10-003 browser L3 verification unless a later task has a specific justified requirement. Do not expose subscription credentials in evidence.
+_Conditional Safe Detail Reads:_
+
+- `GET /api/v1/orders/{id}`
+- `GET /api/v1/tickets/{id}`
+- `GET /api/v1/notices/{id}`
+
+_DEFER FROM M10-003 MINIMUM:_
+
+- `GET /api/v1/billing/methods` (Defer to Payment/Financial runtime phase)
+- `GET /api/v1/orders/{id}/status` (Defer to Payment/Financial runtime phase)
+- `GET /api/v1/products/{id}` (Defer to Commerce verification phase unless naturally required by normal `/plans` browsing)
+
+_SPECIAL EXCLUDED:_
+
+- `GET /api/v1/access/subscription` (Excluded to protect subscription credentials in evidence)
 
 ## 9. Corrected Aureole Page-to-API Matrix
 
 Based strictly on the current TanStack Router implementation and actual source code bindings.
 
-| Frontend Route     | Actual GET Endpoint(s)                                                                           | Required/Conditional |
-| ------------------ | ------------------------------------------------------------------------------------------------ | -------------------- |
-| `/login`           | `/api/v1/config/onboarding`                                                                      | Required             |
-| `/register`        | `/api/v1/config/onboarding`                                                                      | Required             |
-| `/forgot-password` | `/api/v1/config/onboarding`                                                                      | Required             |
-| `/dashboard`       | `/api/v1/me`<br>`/api/v1/subscription/overview`<br>`/api/v1/notices`                             | Required             |
-| `/notices`         | `/api/v1/notices`                                                                                | Required             |
-| `/orders`          | `/api/v1/orders`<br>`/api/v1/orders/{id}` (conditional)                                          | Required             |
-| `/plans`           | `/api/v1/products`<br>`/api/v1/config/account`                                                   | Required             |
-| `/referrals`       | `/api/v1/referrals`<br>`/api/v1/referrals/commissions`<br>`/api/v1/referrals/withdrawal-options` | Required             |
-| `/resources`       | `/api/v1/resources`<br>`/api/v1/traffic/logs`                                                    | Required             |
-| `/settings`        | `/api/v1/me/preferences`<br>`/api/v1/me/stats`<br>`/api/v1/config/account`                       | Required             |
-| `/subscription`    | `/api/v1/subscription`<br>`/api/v1/subscription/overview`                                        | Required             |
-| `/support`         | `/api/v1/tickets`<br>`/api/v1/tickets/{id}` (conditional)                                        | Required             |
-| `/wallet`          | `/api/v1/wallet`                                                                                 | Required             |
+| Frontend Route / Context                                     | Actual GET Endpoint(s)                                                                           | Required/Conditional |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | -------------------- |
+| **Global Auth Bootstrap**                                    | `/api/v1/me`                                                                                     | Required             |
+| **Public Pages** (`/login`, `/register`, `/forgot-password`) | `/api/v1/config/onboarding`                                                                      | Required             |
+| `/dashboard`                                                 | `/api/v1/subscription/overview`<br>`/api/v1/notices`                                             | Required             |
+| `/notices`                                                   | `/api/v1/notices`<br>`/api/v1/notices/{id}` (conditional)                                        | Required             |
+| `/orders`                                                    | `/api/v1/orders`<br>`/api/v1/orders/{id}` (conditional)                                          | Required             |
+| `/plans`                                                     | `/api/v1/products`<br>`/api/v1/config/account`                                                   | Required             |
+| `/referrals`                                                 | `/api/v1/referrals`<br>`/api/v1/referrals/commissions`<br>`/api/v1/referrals/withdrawal-options` | Required             |
+| `/resources`                                                 | `/api/v1/resources`                                                                              | Required             |
+| `/settings`                                                  | `/api/v1/me/preferences`<br>`/api/v1/me/stats`<br>`/api/v1/config/account`                       | Required             |
+| `/subscription`                                              | `/api/v1/subscription`<br>`/api/v1/subscription/overview`<br>`/api/v1/traffic/logs`              | Required             |
+| `/support`                                                   | `/api/v1/tickets`<br>`/api/v1/tickets/{id}` (conditional)                                        | Required             |
+| `/wallet`                                                    | `/api/v1/wallet`                                                                                 | Required             |
 
-_Note:_ The `/` (index) route is a root redirector component (`AuthBootstrapScreen`, `AuthRecoveryScreen`, or `Navigate`) to `/dashboard` or `/login`. It is not a standalone page.
+_Note:_ The `/` (index) route is a root redirector component. It is not a standalone page.
 
 ## 10. Anti-Bot / reCAPTCHA Capability
 
 - Uses: `GET /api/v1/config/onboarding` as the SSOT for capabilities.
 - Current codebase mapping supports only `provider: recaptcha` and `mode: v2-checkbox`.
 - Unknown provider/mode fails closed.
-- The deployment CSP must be derived from the actual enabled integration (no assumptions on `www.recaptcha.net` unless strictly required by official integration rules).
+- The deployment CSP must be derived from the actual enabled integration.
 - No challenge is solved during this planning phase.
 
 ## 11. Auth Negative-Test Evidence
@@ -147,19 +178,25 @@ For eventual production negative-auth behavior, a safe test must not mutate serv
 - Do NOT revoke or change production account credentials merely for this test.
 - This is **DEFERRED** unless explicitly required for M10-003 minimum acceptance.
 
-## 12. Token Storage Expectations
+## 12. Token Storage Architecture
 
-- In-memory auth state is used.
-- Where session-scoped browser storage is implemented, it must not leak.
-- **Verification Rule:** Explicitly verify there is NO `localStorage` credential persistence, NO token in logs, NO token in URLs, and NO token in analytics. Browser storage must not be overclaimed as inherently "secure."
+The plan verifies the expected implementation behavior without recording the token value. The exact architecture is:
+
+- **Zustand/in-memory** authenticated state.
+- Access token mirrored into browser `sessionStorage` under the key `aureole.auth.access-token`.
+- `sessionStorage` supports same-tab session restoration.
+- NO credential persistence in `localStorage`.
+- NO token in the URL.
+- NO token in logs.
+- NO token in analytics.
 
 ## 13. Authorization Gates
 
 Future actions require explicit staged authorization:
 
-1. **Gate 1:** PLAN ACCEPTED (Currently pending)
+1. **Gate 1:** PLAN ACCEPTED (Pending Primary Acceptance)
 2. **Gate 2:** DEPLOYMENT PREPARATION AUTHORIZED
-3. **Gate 3:** STATIC / UNAUTHENTICATED DEPLOYMENT VERIFICATION AUTHORIZED (DNS, TLS, `release.json`, static assets, SPA fallback, missing asset 404, security headers, cache, `/api/v1/config/onboarding`, routing plumbing)
+3. **Gate 3:** STATIC / UNAUTHENTICATED DEPLOYMENT VERIFICATION AUTHORIZED (DNS, TLS, `release.json`, static assets, SPA fallback, missing asset 404, security headers, cache, public onboarding capabilities, routing plumbing)
 4. **Gate 4:** PRODUCTION LOGIN + AUTHENTICATED READ L3 AUTHORIZED (Test account login, authenticated endpoints, page matrix)
 
-A deployment authorization (Gate 3) does **NOT** automatically authorize login (Gate 4).
+No gate is automatically implied by the previous gate.
