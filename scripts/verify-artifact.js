@@ -60,7 +60,9 @@ function verify() {
   let headSha
   try {
     headSha = execSync('git rev-parse HEAD').toString().trim()
-  } catch (e) {}
+  } catch {
+    headSha = undefined
+  }
   if (headSha && metadata.sha !== headSha) {
     throw new Error(
       `release.json SHA (${metadata.sha}) does not match current Git HEAD (${headSha})`,

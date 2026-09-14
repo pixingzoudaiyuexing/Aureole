@@ -7,7 +7,7 @@ try {
     console.error(status)
     process.exit(1)
   }
-} catch (e) {
+} catch {
   console.error('Failed to run git status')
   process.exit(1)
 }
