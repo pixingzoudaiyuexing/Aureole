@@ -457,10 +457,9 @@ hydrate 保留 marker。真正 authenticated session boundary 会递增仅内存
 无法确认的 non-idempotent operation，也不会把旧 Session consent 继承给新 Session。Referral Code Create 仍保持原
 memory-only guard，不属于 financial runtime registry。
 
-AUR-M9-003 的历史 Independent Financial Mutation Review 与 Primary Hardening Review 已通过，历史 reviewed SHA 为
-`e8e83622abf38960ed41fd222a978f02323592df`。AUR-M9-004 独立审查随后发现两类 financial mutation 共享的 SPA
-unmount / attempt-generation race，因此当前已应用 cross-cutting same-runtime concurrency hardening，targeted re-review pending；
-历史 SHA 不再代表当前最终封板 SHA。
+AUR-M9-003 已完成 Independent Financial Mutation Review、Primary Full-Reload Hardening、Same-Runtime Financial
+Concurrency Hardening 与 Cross-Session Financial Continuation Hardening，最终冻结于
+`e408f83311c3557706ac9fc09ac06fe754ea71b8`。
 
 AUR-M9-004 增加 strict `POST /api/v1/referrals/withdrawal-requests`，只发送 `{method,account}`；两个字段分别严格限制为
 1..255 与 1..1024 个字符并保持原始字符串，success 只接受 `{requested:true}`。Public Contract 没有 amount，因此 UI、
@@ -524,7 +523,9 @@ Session 切换。runtime handle 始终在所有允许的 shared cleanup 之后�
 
 最终 safety layers 分工为：form-local synchronous lock；QueryClient MutationCache exact pending；QueryClient-independent runtime
 attempt registry；sessionStorage cross-runtime uncertainty；authenticated session generation stale-continuation gate。Abort 不作为
-non-idempotent POST 的安全证明。
+non-idempotent POST 的安全证明。AUR-M9-004 已通过 Independent Withdrawal Financial Mutation Review、Required Fix、Same-Runtime
+Financial Concurrency Hardening 与 Cross-Session Financial Continuation Hardening，最终冻结于
+`e408f83311c3557706ac9fc09ac06fe754ea71b8`。Milestone 9 已完成并冻结；生产运行时证据仍属于后续 Launch Readiness。
 
 ## Theme and presentation
 

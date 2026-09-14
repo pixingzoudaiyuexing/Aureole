@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 9 - Referral / Commission / Withdrawal (`AUR-M9-004` Withdrawal Request)
+Milestone 10 - Launch Readiness (`AUTHORIZED / NOT STARTED`)
 
 ## Contract baseline
 
@@ -70,16 +70,13 @@ reconciliation, fail-closed Detail authority and guarded UNKNOWN resubmission. N
 message/status mutation or causal inference is used. Production solution/V2Board Ticket
 Read/Create/Reply/Close runtime is NOT TESTED.
 
-Milestone 9 is CURRENT. AUR-M9-001 Referral / Commission Read Model is COMPLETE and its
-Independent Referral Read Review passed; it is frozen at
-`445ffac542d89977f2db5b631516b6c3bbdc955f`. AUR-M9-002 Create Referral Code is COMPLETE,
-its Independent Referral Code Mutation Review passed, and it is frozen at
+Milestone 9 is COMPLETE / PASS / FROZEN. AUR-M9-001 Referral / Commission Read Model is COMPLETE / PASS / FROZEN at
+`445ffac542d89977f2db5b631516b6c3bbdc955f`. AUR-M9-002 Create Referral Code is COMPLETE / PASS / FROZEN at
 `ba106d1c7d7b69fbc9b5b52837c3abee939ef218`.
 
-AUR-M9-003 Commission Transfer has a PREVIOUS INDEPENDENT REVIEW PASS and PRIMARY HARDENING PASS at
-historical reviewed SHA `e8e83622abf38960ed41fd222a978f02323592df`. Cross-session financial
-continuation hardening is now applied with TARGETED RE-REVIEW PENDING, so the historical SHA
-is not the current final frozen SHA. It adds only strict
+AUR-M9-003 Commission Transfer is COMPLETE with Independent Financial Mutation Review PASS, Primary Full-Reload Hardening PASS,
+Same-Runtime Financial Concurrency Hardening PASS and Cross-Session Financial Continuation Hardening PASS. Final code freeze SHA:
+`e408f83311c3557706ac9fc09ac06fe754ea71b8`. It adds only strict
 `POST /api/v1/referrals/commissions/transfer`, fresh Overview/Wallet/Account Config authority,
 exact money parsing, financial confirmation, execution-time QueryClient rechecks, same-tick
 locking and Overview + Wallet reconciliation. Its content-free uncertainty state now uses both
@@ -87,14 +84,15 @@ QueryClient and a session-scoped reload-persistent marker, synchronously pre-arm
 POST. This closes handled-UNKNOWN and in-flight full-reload duplicate windows without persisting
 financial data. It never predicts balances or infers mutation outcome from recovered deltas.
 
-AUR-M9-004 Withdrawal Request is IMPLEMENTATION COMPLETE with INDEPENDENT REVIEW REQUIRED FIX APPLIED,
-CROSS-SESSION FINANCIAL CONTINUATION HARDENING APPLIED and TARGETED RE-REVIEW PENDING. It adds only strict
-`POST /api/v1/referrals/withdrawal-requests`, exact
+AUR-M9-004 Withdrawal Request is COMPLETE with Independent Withdrawal Financial Mutation Review PASS, Required Fixes PASS,
+Same-Runtime Financial Concurrency Hardening PASS and Cross-Session Financial Continuation Hardening PASS. Final code freeze SHA:
+`e408f83311c3557706ac9fc09ac06fe754ea71b8`. It adds only strict
 server-provided method selection, raw masked account handling, fresh Withdrawal Options authority,
 financial confirmation, execution-time QueryClient recheck, same-tick locking, synchronous persistent
 pre-arm and Options-only reconciliation. It never accepts or calculates a withdrawal amount and never
 infers request outcome from Options, commission, Wallet or Support Ticket state. Production
-solution/V2Board Referral Read, Create, Commission Transfer and Withdrawal Request runtime is NOT TESTED.
+solution/V2Board Referral Read, Create, Commission Transfer and Withdrawal Request runtime is NOT TESTED. These are Milestone 10
+Launch Readiness evidence gaps, not Milestone 9 code blockers.
 
 The required shared fix adds exact-key MutationCache pending gates to Commission Transfer and Withdrawal
 Request. `useIsMutating` provides the UI-level same-runtime fact across SPA route unmount/remount, while a
@@ -115,6 +113,10 @@ active and absent remains absent. This conservative same-tab state contains no a
 payload. If storage is unavailable while preparing the boundary, the runtime records the unsafe key and later
 recovers it only as active. Full-document replacement may remove the runtime registry, but the persistent active
 marker continues to require fresh authority and explicit acknowledgement.
+
+Final Gemini Cross-Session Financial Continuation Targeted Re-Review: PASS. Required Fixes: NONE. Primary accepted the final
+recommendation to freeze AUR-M9-003 and AUR-M9-004 and close Milestone 9. The documentation closure commit below is a checkpoint only;
+the final code freeze SHA for both tasks remains `e408f83311c3557706ac9fc09ac06fe754ea71b8`.
 
 ## Current commit
 
@@ -457,8 +459,8 @@ operational source of truth.
 - Wallet Balance Read, Wallet Deposit Create, Gift Card Redeem, all Support Ticket v1 work,
   Referral / Commission Read Model and Referral Code Create are complete and independently reviewed.
   Commission Transfer has previous review approval plus cross-session continuation hardening; Withdrawal Request
-  has its independent review required fixes applied plus the same cross-session hardening. Both await the final
-  targeted cross-session financial continuation re-review.
+  has its independent review required fixes applied plus the same cross-session hardening. Both are complete and
+  frozen at `e408f83311c3557706ac9fc09ac06fe754ea71b8`.
 - Production solution/V2Board Referral Overview, Commission History, Withdrawal Options,
   Referral Code Create, Commission Transfer and Withdrawal Request behavior is NOT TESTED;
   controlled mock browser and automated contract/privacy/recovery tests are the current evidence.
@@ -484,5 +486,5 @@ operational source of truth.
 
 ## Next milestone
 
-Exact-head CI verification and the final Gemini Cross-Session Financial Continuation Targeted Re-Review are the next gates.
-Milestone 10 and Launch Readiness have not started.
+Milestone 10 is AUTHORIZED / NOT STARTED. Its Launch Readiness work must separately collect the existing Production runtime evidence
+gaps; no production testing or Milestone 10 implementation is part of this documentation closure.
