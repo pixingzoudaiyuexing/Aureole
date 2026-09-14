@@ -200,3 +200,17 @@ Future actions require explicit staged authorization:
 4. **Gate 4:** PRODUCTION LOGIN + AUTHENTICATED READ L3 AUTHORIZED (Test account login, authenticated endpoints, page matrix)
 
 No gate is automatically implied by the previous gate.
+
+## 14. Selected Gate 2 Staging Architecture
+
+Gate 2 preparation is currently **COMPLETED** for the following staging architecture:
+
+- **Provider:** Cloudflare Pages
+- **Hostname:** `*.pages.dev`
+- **Proxy Adapter:** Pages Function same-origin `/api/v1/*`
+- **Upstream:** solution staging upstream
+- **Configuration:** `SOLUTION_GATEWAY_ORIGIN` deployment configuration
+
+_Gate 3 actual deployment verification remains NOT AUTHORIZED._
+_Gate 4 login remains NOT AUTHORIZED._
+_No L3 evidence has been obtained yet._

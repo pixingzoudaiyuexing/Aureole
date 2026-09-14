@@ -1,0 +1,95 @@
+export interface Env {
+  SOLUTION_GATEWAY_ORIGIN?: string
+}
+
+export type PagesFunctionContext<Env = any> = {
+  request: Request
+  env: Env
+}
+
+export type PagesFunction<Env = any> = (
+  context: PagesFunctionContext<Env>,
+) => Promise<Response> | Response
+
+const ALLOWED_METHODS = ['GET', 'POST', 'PATCH', 'OPTIONS']
+const ALLOWED_REQUEST_HEADERS = ['authorization', 'content-type', 'accept']
+const ALLOWED_RESPONSE_HEADERS = [
+  'content-type',
+  'cache-control',
+  'x-request-id',
+]
+
+export const onRequest: PagesFunction<Env> = async (context) => {
+  const { request, env } = context
+
+  if (!ALLOWED_METHODS.includes(request.method)) {
+    return new Response('Method Not Allowed', { status: 405 })
+  }
+
+  const gatewayOrigin = env.SOLUTION_GATEWAY_ORIGIN
+  if (!gatewayOrigin) {
+    return new Response('Gateway origin not configured', { status: 500 })
+  }
+
+  let gatewayUrl: URL
+  try {
+    gatewayUrl = new URL(gatewayOrigin)
+    if (
+      gatewayUrl.protocol !== 'https:' ||
+      gatewayUrl.pathname !== '/' ||
+      gatewayUrl.search !== '' ||
+      gatewayUrl.hash !== '' ||
+      gatewayUrl.username !== '' ||
+      gatewayUrl.password !== ''
+    ) {
+      throw new Error('Invalid gateway origin')
+    }
+  } catch {
+    return new Response('Invalid gateway origin configuration', { status: 500 })
+  }
+
+  const requestUrl = new URL(request.url)
+  const normalizedPathname = new URL(requestUrl.pathname, 'https://example.com')
+    .pathname
+
+  if (!normalizedPathname.startsWith('/api/v1/')) {
+    return new Response('Invalid path', { status: 400 })
+  }
+
+  const finalUrl = new URL(
+    normalizedPathname + requestUrl.search,
+    gatewayOrigin,
+  )
+
+  const headers = new Headers()
+  for (const [key, value] of request.headers.entries()) {
+    if (ALLOWED_REQUEST_HEADERS.includes(key.toLowerCase())) {
+      headers.set(key, value)
+    }
+  }
+
+  const fetchOptions: RequestInit = {
+    method: request.method,
+    headers,
+    redirect: 'manual',
+  }
+
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    fetchOptions.body = request.body
+  }
+
+  const response = await fetch(finalUrl.toString(), fetchOptions)
+
+  const responseHeaders = new Headers()
+  for (const [key, value] of response.headers.entries()) {
+    if (ALLOWED_RESPONSE_HEADERS.includes(key.toLowerCase())) {
+      responseHeaders.set(key, value)
+    }
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: responseHeaders,
+  })
+}
