@@ -141,10 +141,27 @@ rollback readiness and proposed M10 validation tasks.
 
 The audit confirmed that the highest current Aureole business-flow evidence is L2
 controlled browser verification. No deployed Aureole production Auth, read,
-mutation or financial flow was exercised. The principal blockers are the missing
-production deployment contract and runtime environment, absent deployed Auth/Session
-acceptance, and missing approved runtime verification for exposed payment and
-financial flows. AUR-M10-002 resolved the `VITE_API_BASE_URL` absence by defaulting to a same-origin production artifact.
+mutation or financial flow was exercised. **At the AUR-M10-001 audit checkpoint**, the deployment contract and runtime environment were missing.
+
+**Current Post-AUR-M10-002 Reality:**
+
+- vendor-neutral deployment/artifact contract now exists
+- same-origin `/api/v1` default is frozen
+- artifact verification exists
+- deterministic release identity exists
+- cache/rollback/security-header baseline contracts exist
+
+**Remaining Blocker: VERIFIED PRODUCTION DEPLOYMENT / RUNTIME EXECUTION**
+including:
+
+- real host/provider
+- HTTPS/TLS
+- actual `/api/v1` edge/reverse proxy
+- applied cache behavior
+- applied CSP/security headers
+- deployed release SHA
+- publish/rollback execution
+- production Auth/read/mutation/financial evidence
 
 AUR-M10-001 and AUR-M10-001R1 ran only SAFE-A local/documentation validation. They
 did not access production, deploy, mutate production state or perform a real
@@ -514,7 +531,8 @@ financial operation. No business source code or solution file was changed.
 
 Milestone 10 is IN PROGRESS.
 
-- AUR-M10-002 is IMPLEMENTATION COMPLETE / PRIMARY REVIEW FIXES APPLIED / TECHNICAL PRIMARY RE-REVIEW PASS / FINAL DOC SSOT CLOSURE PENDING.
+- AUR-M10-002 is COMPLETE / PRIMARY REVIEW PASS / FROZEN. (Code/config implementation checkpoint frozen at `bdaf39f4bbf462ab6729d86b83ea9afbf8421233`)
+- Independent targeted review: PENDING.
 - AUR-M10-003 is NOT STARTED / NOT AUTHORIZED.
 
 Actual production testing remains NOT AUTHORIZED.

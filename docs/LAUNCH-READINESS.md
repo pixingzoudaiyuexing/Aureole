@@ -6,7 +6,9 @@
 - Status: `COMPLETE / PRIMARY REVIEW PASS`
 - Milestone 10: `IN PROGRESS`
 - AUR-M10-001R1: `COMPLETE`
-- AUR-M10-002: `IMPLEMENTATION COMPLETE / PRIMARY REVIEW FIXES APPLIED / TECHNICAL RE-REVIEW PASS / FINAL DOCUMENTATION SSOT CLOSURE PENDING`
+- AUR-M10-002: `COMPLETE / PRIMARY REVIEW PASS / FROZEN` (Code checkpoint: `bdaf39f4bbf462ab6729d86b83ea9afbf8421233`)
+- AUR-M10-003: `NOT STARTED / NOT AUTHORIZED`
+- Independent targeted review: `PENDING`
 - Audit date: 2026-09-14
 - Aureole audit base: `a2366ea08bc579e1368d52aaf8b5b5ee72aac195`
 - Frozen M9 production code: `e408f83311c3557706ac9fc09ac06fe754ea71b8`
@@ -502,9 +504,13 @@ must remain `UNKNOWN` until the deployment owner supplies evidence.
 
 ### MEDIUM
 
-1. **At AUR-M10-001 audit time:** Tailwind scans repository documentation for utility candidates, so future documentation-only changes can alter the production CSS bundle unless source scope is constrained or artifact drift is gated.
+1. **At the AUR-M10-001 audit checkpoint**, Tailwind automatic candidate scanning included repository documentation and documentation prose could alter generated CSS.
 
-   **RESOLVED BY AUR-M10-002R1:** Tailwind automatic scanning disabled via `@import 'tailwindcss' source(none)`. Explicit scanning limited to `index.html` and `src`, and controlled docs-isolation proof succeeded.
+   **RESOLVED BY AUR-M10-002R1** because:
+   - automatic scanning is disabled with `source(none)`
+   - explicit production sources are root `index.html` and `src`
+   - controlled documentation-isolation proof passed
+   - documentation-only changes no longer participate in Tailwind candidate scanning.
 
 2. Historical L2 browser evidence is extensive but no committed/reproducible
    browser E2E suite exists; Safari/Firefox evidence is absent.
@@ -538,9 +544,8 @@ The audit findings justify this order rather than starting with production reads
 before a deployment contract exists:
 
 1. `AUR-M10-002 - Production Deployment Contract and Artifact Readiness`
-   - Current task: implementation + R1 complete.
-   - Technical Primary re-review PASS.
-   - R2 documentation closure pending.
+   - COMPLETE / PRIMARY REVIEW PASS / FROZEN.
+   - Code checkpoint frozen at `bdaf39f4bbf462ab6729d86b83ea9afbf8421233`.
 2. `AUR-M10-003 - Production Auth, Session and Read-Only Verification`
    - Next proposed task.
    - NOT STARTED / NOT AUTHORIZED.
