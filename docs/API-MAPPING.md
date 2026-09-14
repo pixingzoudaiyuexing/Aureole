@@ -298,7 +298,7 @@
 - `GET /api/v1/referrals/withdrawal-options` 使用
   `['referrals','withdrawal-options']`，保持 methods order。disabled 时只显示当前未开放；enabled 且空
   methods 时明确显示当前没有方式。Frontend 不翻译 method identifier，也不猜测 fee、minimum、limit、
-  processing time 或创建 Withdrawal form。
+  processing time。只有 fresh success、idle、enabled 且 methods 非空时才创建 Withdrawal Request form。
 - Referral 与 Commission money 是 non-negative safe integer minor units，复用 canonical Account Config 和
   `formatMinorMoney`，不硬编码 currency/symbol/fraction digits 或 `/100`。Config 不可用时 Referral data
   保持可见并显示明确 minor-unit fallback。`availableCommissionMinor` 不合并、累加或复制到 Wallet。
@@ -341,7 +341,39 @@
   logout/new session/Auth invalidation 通过 Session Core 清除。不使用 localStorage，M9-002 Create Code guard 仍不持久化。
 - Transfer/financial recovery 的 AUTH_REQUIRED/AUTH_FAILED 复用 sealed Session Core。金额、余额、币种快照、token、email
   与 raw upstream message 不进入 Query/Mutation key、local guard、storage、URL、Zustand、analytics 或 console。
-- AUR-M9-003 不调用 Withdrawal Request，也不直接访问 V2Board。
+- AUR-M9-003 已通过 Independent Financial Mutation Review 与 Primary Hardening Review，并冻结于
+  `e8e83622abf38960ed41fd222a978f02323592df`。
+- `POST /api/v1/referrals/withdrawal-requests` 只发送 strict `{method,account}`。method 1..255、account
+  1..1024，均保持 raw string；额外字段在 request boundary 被拒绝。成功只接受并 strip
+  `{requested:true}`，false、缺失、wrong type 或 raw V2Board `data:true` 均为 `MALFORMED_RESPONSE`。
+- Public Contract 没有 withdrawal amount。Aureole 不提供 amount/全部提现输入，不发送金额，不依据
+  `availableCommissionMinor` 计算申请金额、minimum、差额、手续费、剩余佣金或到账结果。
+- method 只能从当前 canonical Options 的 ordered `methods[]` exact 选择；不排序、去重、翻译、映射品牌或新增
+  identifier。account 默认遮蔽，保持大小写、首尾空格和全部字符原样，不 trim、normalize、parse、split 或格式化。
+- Mutation 使用 credential/method/account-free `['referrals','withdrawal-request']` 与 `retry:false`。第一次点击只打开
+  Financial Confirmation；Dialog snapshot 仅存在于 React memory，account 默认 masked，并明确 request accepted 不等于
+  payout completed。
+- Confirm 同步获取 action lock 后，从 QueryClient 重新要求 Options query `status=success`、`fetchStatus=idle`、data
+  存在、enabled、methods 非空且 snapshot method 仍 exact supported；同时重新验证 account 1..1024 与独立 uncertainty
+  state。任何检查失败均零 POST，并要求 fresh authority 下重新确认。
+- 每次真实 POST 前同步写入
+  `sessionStorage['aureole.safety.withdrawal-request-uncertainty']='active'`，再同步更新
+  `['referrals','withdrawal-request-uncertainty']`，随后无 await 调用 mutation。storage read/write failure fail closed。
+- confirmed `{requested:true}` 与五类 definitive rejection 都清除 Withdrawal marker 和敏感 account，只 exact refetch
+  Withdrawal Options；不 broad invalidate `['referrals']`，不刷新 Overview、Commission History、Wallet、Orders、
+  Subscription 或 Support Tickets。Options reconciliation failure 保留已确认结论但禁止下一笔 POST。
+- `WITHDRAWAL_DISABLED`、`WITHDRAWAL_METHOD_UNSUPPORTED`、`WITHDRAWAL_MINIMUM_NOT_MET`、
+  `WITHDRAWAL_REQUEST_FAILED` 与 `VALIDATION_ERROR` 是 definitive rejection；前端只显示稳定安全文案，不显示 raw
+  upstream message、minimum 数值或内部 Ticket 实现。
+- NETWORK_ERROR、UPSTREAM_TIMEOUT、UPSTREAM_ERROR、MALFORMED_RESPONSE、未知 Public error 与 non-ApiError 是
+  UNKNOWN。Options GET 无法证明上一笔申请 outcome；enabled/method 变化、Overview/Commission/Wallet/Order/Ticket
+  变化同样不具有因果意义。marker 保持 active，用户 fresh Options 后明确 acknowledgement 才能重新开始完整流程。
+- Withdrawal account 在 success、definitive rejection、UNKNOWN 与 Auth invalidation 后清空，并在 settle 后从 Mutation
+  cache 移除；不进入 Query/Mutation key、sessionStorage、localStorage、IndexedDB、URL、Zustand、analytics、console、
+  error metadata 或文档真实示例。
+- Withdrawal 与 Commission Transfer persistent marker 完全独立；普通 credential hydrate 保留，logout/new session/Auth
+  invalidation 由 sealed Session Core 统一清除。AUR-M9-004 不修改 solution、不直接访问 V2Board，也不查询 Support
+  Tickets 进行结果推断。
 
 ## Error and request rules
 

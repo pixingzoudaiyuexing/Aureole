@@ -13,6 +13,7 @@ export const referralsQueryKeys = {
 export const referralsMutationKeys = {
   createCode: ['referrals', 'create-code'] as const,
   commissionTransfer: ['referrals', 'commission-transfer'] as const,
+  withdrawalRequest: ['referrals', 'withdrawal-request'] as const,
 }
 
 export function referralOverviewOptions(accessToken: string) {
@@ -35,6 +36,7 @@ export function referralWithdrawalOptions(accessToken: string) {
   return queryOptions({
     queryKey: referralsQueryKeys.withdrawalOptions,
     queryFn: () => referralsApi.getWithdrawalOptions(accessToken),
+    refetchOnMount: 'always',
   })
 }
 
@@ -63,6 +65,15 @@ export function commissionTransferMutationOptions(accessToken: string) {
     mutationKey: referralsMutationKeys.commissionTransfer,
     mutationFn: (amountMinor: number) =>
       referralsApi.transferCommission(accessToken, { amountMinor }),
+    retry: false as const,
+  }
+}
+
+export function withdrawalRequestMutationOptions(accessToken: string) {
+  return {
+    mutationKey: referralsMutationKeys.withdrawalRequest,
+    mutationFn: (input: { method: string; account: string }) =>
+      referralsApi.requestWithdrawal(accessToken, input),
     retry: false as const,
   }
 }

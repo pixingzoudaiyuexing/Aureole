@@ -371,8 +371,8 @@ Core。Reply draft 和 UNKNOWN guard 仅为 React local memory，不持久化。
 
 ## Referral, commission read model and guarded mutations
 
-`features/referrals` 持有 Referral Overview、Commission History 与 Withdrawal Options 的 Public DTO
-parser、canonical Query 和 `/referrals` 只读页面边界。三个 authenticated GET 分别使用
+`features/referrals` 持有 Referral Overview、Commission History、Withdrawal Options 与受保护 mutation 的 Public DTO
+parser、canonical Query 和 `/referrals` 页面边界。三个 authenticated GET 分别使用
 `['referrals','overview']`、`['referrals','commissions',page,20]` 与
 `['referrals','withdrawal-options']`；Account Config 继续复用 canonical
 `['config','account']`。这些 server state 不进入 Zustand、storage、URL、analytics 或 console，Query key
@@ -392,8 +392,8 @@ Referral / Commission domain，不进入 Wallet query、Wallet balance 或任何
 Overview、Commission History、Withdrawal Options 与 Account Config 各自 loading/error/retry；普通错误仅
 影响对应 section，任何 AUTH_REQUIRED/AUTH_FAILED 继续复用 sealed Auth Session Core 清理 credential 与
 完整 Query cache。Referral code 只在用户明确点击时写入 clipboard；页面不生成 referral URL/QR，也不
-排序、去重或生成 code。Withdrawal Options 只展示 enabled 与 ordered method identifiers，不推断品牌、
-手续费、minimum、额度或到账时间。
+排序、去重或生成 code。Withdrawal Options 保持 enabled 与 ordered method identifiers，不推断品牌、
+手续费、minimum、额度或到账时间；Withdrawal Request 只消费该 fresh authority。
 
 AUR-M9-001 已完成并冻结于 `445ffac542d89977f2db5b631516b6c3bbdc955f`。
 AUR-M9-002 在同一 feature boundary 增加 bodyless `POST /api/v1/referrals/codes`；成功只接受
@@ -455,8 +455,39 @@ Persistent marker 不包含金额、余额、币种、token、email、timestamp 
 hydrate 保留 marker；logout、Auth invalidation 与 `establishSession` 除清 QueryClient 外还显式清理 session safety state，
 防止跨 authenticated session 泄漏。Referral Code Create 仍保持原 memory-only guard，不被本 hardening 修改。
 
-AUR-M9-003 不实现 Withdrawal Request，不修改 solution、直接访问 V2Board、预测余额、自动 retry 或进入 Launch
-Readiness。
+AUR-M9-003 的 Independent Financial Mutation Review 与 Primary Hardening Review 均已通过，并冻结于
+`e8e83622abf38960ed41fd222a978f02323592df`。
+
+AUR-M9-004 增加 strict `POST /api/v1/referrals/withdrawal-requests`，只发送 `{method,account}`；两个字段分别严格限制为
+1..255 与 1..1024 个字符并保持原始字符串，success 只接受 `{requested:true}`。Public Contract 没有 amount，因此 UI、
+request、confirmation 和 recovery 都不采集、计算、显示或推断提现金额、minimum、手续费、剩余佣金或预计到账结果。
+
+Request form 只在 canonical Withdrawal Options fresh success、idle、`enabled=true` 且 `methods.length>0` 时开放，Options 在
+页面 remount 时强制 fresh read。method 只能按 server order 从当前 identifiers 中选择，不排序、去重、翻译或映射品牌；
+account 默认 password-style 遮蔽，只存在于当前 React memory 和临时 request body，不进入 Query/Mutation key、storage、
+URL、Zustand、analytics、console 或 error metadata。Dialog snapshot 只保存在 React memory，默认遮蔽 account，关闭后恢复
+hidden；任何 POST settle 会从 TanStack Mutation cache 清除敏感 variables。
+
+第一次点击只打开 Financial Confirmation，不发送 POST；确认文案明确“提交申请”不等于到账。真正 Confirm 使用同步 lock，
+随后直接读取 QueryClient current Options state，重新检查 success/idle、enabled、method exact membership、account 长度和独立
+uncertainty guard。全部通过后先同步写入
+`sessionStorage['aureole.safety.withdrawal-request-uncertainty']='active'`，再同步更新
+`['referrals','withdrawal-request-uncertainty']`，然后无 `await` 调用 `mutateAsync`；持久写入失败时零 POST。
+
+可信 `{requested:true}` 只表示申请被服务端接受；definitive rejection 包括 `WITHDRAWAL_DISABLED`、
+`WITHDRAWAL_METHOD_UNSUPPORTED`、`WITHDRAWAL_MINIMUM_NOT_MET`、`WITHDRAWAL_REQUEST_FAILED` 与
+`VALIDATION_ERROR`。两类结果都清除独立 marker、清空敏感 account，并只 exact refetch Withdrawal Options。Options refetch
+失败不改变已确认 success/rejection，但下一笔申请 fail closed，只开放 GET-only recovery。
+
+NETWORK_ERROR、UPSTREAM_TIMEOUT、UPSTREAM_ERROR、MALFORMED_RESPONSE、未知 Public error 与 non-ApiError 都视为 UNKNOWN。
+account、method 与 confirmation snapshot 立即清空，persistent/local marker 保持 `active`。Withdrawal Options 只恢复当前开放
+状态与 methods authority，任何 enabled/method 变化、Referral Overview、Commission balance、Wallet、Orders 或 Support Ticket
+都不得用于推断上一笔申请结果。fresh Options 成功后仍需用户明确 acknowledgement 才能变为 `acknowledged`；下一次 POST
+仍需重新选择、输入、确认并再次 pre-arm `active`。
+
+Withdrawal marker 与 Commission Transfer marker 独立，均只允许 `active` / `acknowledged` / absent。普通同 session credential
+hydrate 保留二者；logout、new session、Auth invalidation 通过 sealed Session Core 统一清除。AUR-M9-004 不修改 solution、不
+直接访问 V2Board、不读取 Withdrawal status/list/detail 或 Support Ticket，也不进入 Launch Readiness。
 
 ## Theme and presentation
 

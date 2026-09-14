@@ -3,11 +3,13 @@ import {
   commissionTransferRequestSchema,
   commissionPageRequestSchema,
   referralsApi,
+  withdrawalRequestSchema,
 } from '@/features/referrals/referrals-api'
 import {
   commissionTransferMutationOptions,
   referralCodeCreateMutationOptions,
   referralsMutationKeys,
+  withdrawalRequestMutationOptions,
 } from '@/features/referrals/referrals-queries'
 import { apiClient } from '@/lib/api/client'
 import { ApiError } from '@/lib/api/errors'
@@ -44,6 +46,79 @@ function validCommissionPage() {
 }
 
 describe('Referrals API contract', () => {
+  it.each([
+    ['m', 'a'],
+    ['m'.repeat(255), 'a'.repeat(1024)],
+    ['  Raw Method  ', '  Mixed.Case+Account  '],
+  ])(
+    'submits exact valid Withdrawal strings at boundary %#',
+    async (method, account) => {
+      const request = vi
+        .spyOn(apiClient, 'authenticatedRequest')
+        .mockResolvedValue({ requested: true, additive: 'stripped' })
+
+      await expect(
+        referralsApi.requestWithdrawal(token, { method, account }),
+      ).resolves.toEqual({ requested: true })
+      expect(request).toHaveBeenCalledWith(
+        '/api/v1/referrals/withdrawal-requests',
+        {
+          method: 'POST',
+          body: { method, account },
+          accessToken: token,
+        },
+      )
+    },
+  )
+
+  it.each([
+    ['empty method', { method: '', account: 'a' }],
+    ['long method', { method: 'm'.repeat(256), account: 'a' }],
+    ['empty account', { method: 'm', account: '' }],
+    ['long account', { method: 'm', account: 'a'.repeat(1025) }],
+    ['wrong method type', { method: 1, account: 'a' }],
+    ['wrong account type', { method: 'm', account: 1 }],
+    ['extra field', { method: 'm', account: 'a', amount: 1 }],
+  ])(
+    'rejects invalid Withdrawal input before HTTP: %s',
+    async (_name, input) => {
+      const request = vi.spyOn(apiClient, 'authenticatedRequest')
+      expect(() => withdrawalRequestSchema.parse(input)).toThrow()
+      await expect(
+        referralsApi.requestWithdrawal(
+          token,
+          input as { method: string; account: string },
+        ),
+      ).rejects.toBeDefined()
+      expect(request).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each([
+    ['requested false', { requested: false }],
+    ['missing requested', {}],
+    ['wrong type', { requested: 'true' }],
+    ['raw V2Board result', { data: true }],
+  ])('rejects malformed Withdrawal success: %s', async (_name, payload) => {
+    vi.spyOn(apiClient, 'authenticatedRequest').mockResolvedValue(payload)
+    await expect(
+      referralsApi.requestWithdrawal(token, { method: 'm', account: 'a' }),
+    ).rejects.toMatchObject({
+      code: 'MALFORMED_RESPONSE',
+    } satisfies Partial<ApiError>)
+  })
+
+  it('uses a sensitive-data-free non-retrying Withdrawal mutation key', () => {
+    const options = withdrawalRequestMutationOptions(token)
+    expect(options.mutationKey).toEqual(['referrals', 'withdrawal-request'])
+    expect(options.mutationKey).toBe(referralsMutationKeys.withdrawalRequest)
+    expect(options.retry).toBe(false)
+    const serialized = JSON.stringify(options.mutationKey)
+    expect(serialized).not.toContain(token)
+    expect(serialized).not.toContain('method')
+    expect(serialized).not.toContain('account')
+  })
+
   it.each([1, 2_147_483_647])(
     'transfers commission through the exact strict Public POST for %i minor units',
     async (amountMinor) => {

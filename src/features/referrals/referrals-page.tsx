@@ -12,6 +12,7 @@ import { useAuthSessionStore } from '@/lib/auth/session-store'
 import type { CommissionPage, ReferralOverview } from './referrals-api'
 import { ReferralCreateControl } from './referral-create-control'
 import { CommissionTransferControl } from './commission-transfer-control'
+import { WithdrawalRequestControl } from './withdrawal-request-control'
 import {
   useReferralCommissions,
   useReferralOverview,
@@ -369,47 +370,10 @@ function ReferralsContent({ accessToken }: { accessToken: string }) {
         </div>
       </section>
 
-      <section
-        className="border-t border-border py-8"
-        aria-labelledby="withdrawal-status-title"
-      >
-        <h3 id="withdrawal-status-title" className="text-base font-semibold">
-          提现状态
-        </h3>
-        <div className="mt-5 min-h-16" aria-live="polite">
-          {withdrawal.isPending ? (
-            <p role="status" className="text-sm text-muted-foreground">
-              正在读取提现状态…
-            </p>
-          ) : withdrawal.isError ? (
-            <ReadError
-              message="暂时无法读取提现状态。"
-              error={withdrawal.error}
-              retry={() => void withdrawal.refetch()}
-            />
-          ) : !withdrawal.data.enabled ? (
-            <p className="text-sm text-muted-foreground">当前暂未开放提现。</p>
-          ) : withdrawal.data.methods.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              当前未提供提现方式。
-            </p>
-          ) : (
-            <div>
-              <p className="text-sm text-muted-foreground">支持的提现方式</p>
-              <ul className="mt-3 divide-y divide-border border-y border-border">
-                {withdrawal.data.methods.map((method, index) => (
-                  <li
-                    key={`${method}-${index}`}
-                    className="break-words py-3 text-sm [overflow-wrap:anywhere]"
-                  >
-                    {method}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      </section>
+      <WithdrawalRequestControl
+        accessToken={accessToken}
+        options={withdrawal}
+      />
     </div>
   )
 }

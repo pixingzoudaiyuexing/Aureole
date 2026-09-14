@@ -10,6 +10,7 @@ import type { AuthApi } from '@/features/auth/auth-api'
 import { referralCreateLocalGuardKeys } from '@/features/referrals/referral-create-guard'
 import { referralsApi } from '@/features/referrals/referrals-api'
 import { referralsQueryKeys } from '@/features/referrals/referrals-queries'
+import { withdrawalRequestLocalGuardKeys } from '@/features/referrals/withdrawal-request-guard'
 import { walletApi } from '@/features/wallet/wallet-api'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
@@ -116,7 +117,7 @@ describe('Referrals page', () => {
     expect(
       await screen.findByRole('heading', { level: 2, name: 'Referrals' }),
     ).toBeInTheDocument()
-    for (const heading of ['推荐概览', '佣金记录', '提现状态']) {
+    for (const heading of ['推荐概览', '佣金记录', '提现状态与申请']) {
       expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument()
     }
     expect(screen.getByText('正在读取推荐概览…')).toHaveAttribute(
@@ -328,7 +329,7 @@ describe('Referrals page', () => {
   it.each([
     ['overview', '暂时无法读取推荐概览和邀请码。'],
     ['commissions', '暂时无法读取佣金记录。'],
-    ['withdrawal', '暂时无法读取提现状态。'],
+    ['withdrawal', '暂时无法读取提现状态，不能提交提现申请。'],
   ] as const)(
     'isolates an ordinary %s error and retries only that domain',
     async (source, message) => {
@@ -425,6 +426,7 @@ describe('Referrals page', () => {
     expect(keys).toContainEqual(referralsQueryKeys.commissions(1))
     expect(keys).toContainEqual(referralsQueryKeys.withdrawalOptions)
     expect(keys).toContainEqual(referralCreateLocalGuardKeys.uncertainty)
+    expect(keys).toContainEqual(withdrawalRequestLocalGuardKeys.uncertainty)
     expect(
       queryClient.getQueryCache().find({
         queryKey: referralCreateLocalGuardKeys.uncertainty,

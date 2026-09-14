@@ -20,6 +20,8 @@ import { useAuthSessionStore } from '@/lib/auth/session-store'
 
 const commissionSafetyKey =
   sessionSafetyStorageKeys.commissionTransferUncertainty
+const withdrawalSafetyKey =
+  sessionSafetyStorageKeys.withdrawalRequestUncertainty
 
 const currentUser: CurrentUser = {
   email: 'member@example.com',
@@ -111,6 +113,7 @@ describe('Auth session lifecycle', () => {
 
   it('stores a successful login, bootstraps /me, and enters the app', async () => {
     window.sessionStorage.setItem(commissionSafetyKey, 'active')
+    window.sessionStorage.setItem(withdrawalSafetyKey, 'acknowledged')
     const login = vi.fn().mockResolvedValue(loginResponse)
     const getCurrentUser = vi.fn().mockResolvedValue(currentUser)
     const api = createAuthApi({ login, getCurrentUser })
@@ -141,6 +144,7 @@ describe('Auth session lifecycle', () => {
     )
     expect(window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
     expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
+    expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBeNull()
     expect(screen.getAllByText('member@example.com').length).toBeGreaterThan(0)
   })
 
@@ -244,6 +248,7 @@ describe('Auth session lifecycle', () => {
       'stored-session-token',
     )
     window.sessionStorage.setItem(commissionSafetyKey, 'active')
+    window.sessionStorage.setItem(withdrawalSafetyKey, 'acknowledged')
     const getCurrentUser = vi.fn().mockResolvedValue(currentUser)
     const { router } = renderRoute(
       '/dashboard',
@@ -254,6 +259,9 @@ describe('Auth session lifecycle', () => {
     expect(router.state.location.pathname).toBe('/dashboard')
     expect(getCurrentUser).toHaveBeenCalledWith('stored-session-token')
     expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
+    expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe(
+      'acknowledged',
+    )
   })
 
   it.each(['AUTH_REQUIRED', 'AUTH_FAILED'])(
@@ -264,6 +272,7 @@ describe('Auth session lifecycle', () => {
         'invalid-session-token',
       )
       window.sessionStorage.setItem(commissionSafetyKey, 'active')
+      window.sessionStorage.setItem(withdrawalSafetyKey, 'acknowledged')
       const api = createAuthApi({
         getCurrentUser: vi.fn().mockRejectedValue(
           new ApiError({
@@ -283,6 +292,7 @@ describe('Auth session lifecycle', () => {
       expect(router.state.location.pathname).toBe('/login')
       expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
       expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
+      expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBeNull()
       expect(queryClient.getQueryData(['private-account-data'])).toBeUndefined()
     },
   )
@@ -415,6 +425,7 @@ describe('Auth session lifecycle', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
     expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
     expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
+    expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBeNull()
     expect(queryClient.getQueryData(['private-account-data'])).toBeUndefined()
   })
 
@@ -448,6 +459,7 @@ describe('Auth session lifecycle', () => {
     async (settlement) => {
       window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'session-a-token')
       window.sessionStorage.setItem(commissionSafetyKey, 'active')
+      window.sessionStorage.setItem(withdrawalSafetyKey, 'acknowledged')
       const sessionA = createDeferred<CurrentUser>()
       const sessionBUser: CurrentUser = {
         ...currentUser,
@@ -507,6 +519,7 @@ describe('Auth session lifecycle', () => {
         'session-b-token',
       )
       expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
+      expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBeNull()
     },
   )
 })

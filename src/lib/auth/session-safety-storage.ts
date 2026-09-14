@@ -3,6 +3,7 @@ export type SessionSafetyMarker = 'active' | 'acknowledged'
 export const sessionSafetyStorageKeys = {
   commissionTransferUncertainty:
     'aureole.safety.commission-transfer-uncertainty',
+  withdrawalRequestUncertainty: 'aureole.safety.withdrawal-request-uncertainty',
 } as const
 
 export type SessionSafetyStorageKey =

@@ -33,7 +33,7 @@ Desktop 使用 persistent sidebar、header 和 main content。Mobile 使用 hamb
 
 - Rotate Access 是 Danger：明确影响现有 access URL，并要求确认。
 - Advance Period 是 Warning / Danger：明确不可逆影响并确认，不能自动 retry。
-- Withdrawal 是 Financial Confirmation，不使用 destructive 文案或红色删除语义；确认金额、方式、账户与后续人工处理。
+- Withdrawal 是 Financial Confirmation，不使用 destructive 文案或红色删除语义；确认提现方式、账户、申请性质与后续人工处理。Aureole 不采集或提交提现金额，实际提现规则由服务端决定。
 - Promotion Validation 只显示 preview，不由前端声明最终付款金额。
 - QR Payment 不使用“请勿关闭页面”；用户可离开并通过订单权威状态继续确认。
 - Gift Card code 和 Withdrawal account 默认遮蔽，禁止出现在日志、analytics 或 error metadata。

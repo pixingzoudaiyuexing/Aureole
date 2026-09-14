@@ -70,6 +70,17 @@ const commissionTransferredSchema = z
     transferred: z.literal(true),
   })
   .strip()
+export const withdrawalRequestSchema = z
+  .object({
+    method: z.string().min(1).max(255),
+    account: z.string().min(1).max(1024),
+  })
+  .strict()
+const withdrawalRequestedSchema = z
+  .object({
+    requested: z.literal(true),
+  })
+  .strip()
 
 export type ReferralOverview = z.infer<typeof referralOverviewSchema>
 export type CommissionPage = z.infer<typeof commissionPageSchema>
@@ -79,6 +90,8 @@ export type CommissionTransferInput = z.input<
   typeof commissionTransferRequestSchema
 >
 export type CommissionTransferred = z.infer<typeof commissionTransferredSchema>
+export type WithdrawalRequestInput = z.input<typeof withdrawalRequestSchema>
+export type WithdrawalRequested = z.infer<typeof withdrawalRequestedSchema>
 
 function parse<T>(schema: z.ZodType<T>, data: unknown) {
   const parsed = schema.safeParse(data)
@@ -140,5 +153,14 @@ export const referralsApi = {
       { method: 'GET', accessToken },
     )
     return parse(withdrawalOptionsSchema, data)
+  },
+
+  async requestWithdrawal(accessToken: string, input: WithdrawalRequestInput) {
+    const body = withdrawalRequestSchema.parse(input)
+    const data = await apiClient.authenticatedRequest<unknown>(
+      '/api/v1/referrals/withdrawal-requests',
+      { method: 'POST', body, accessToken },
+    )
+    return parse(withdrawalRequestedSchema, data)
   },
 }

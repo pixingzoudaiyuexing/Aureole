@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 9 - Referral / Commission / Withdrawal (`AUR-M9-003` Commission Transfer)
+Milestone 9 - Referral / Commission / Withdrawal (`AUR-M9-004` Withdrawal Request)
 
 ## Contract baseline
 
@@ -76,16 +76,22 @@ Independent Referral Read Review passed; it is frozen at
 its Independent Referral Code Mutation Review passed, and it is frozen at
 `ba106d1c7d7b69fbc9b5b52837c3abee939ef218`.
 
-AUR-M9-003 Commission Transfer is IMPLEMENTATION COMPLETE with PRIMARY REQUIRED HARDENING
-APPLIED and TARGETED FINANCIAL RE-REVIEW PENDING. It adds only strict
+AUR-M9-003 Commission Transfer is COMPLETE with INDEPENDENT FINANCIAL MUTATION REVIEW PASS and
+PRIMARY HARDENING PASS; it is frozen at `e8e83622abf38960ed41fd222a978f02323592df`. It adds only strict
 `POST /api/v1/referrals/commissions/transfer`, fresh Overview/Wallet/Account Config authority,
 exact money parsing, financial confirmation, execution-time QueryClient rechecks, same-tick
 locking and Overview + Wallet reconciliation. Its content-free uncertainty state now uses both
 QueryClient and a session-scoped reload-persistent marker, synchronously pre-armed before every
 POST. This closes handled-UNKNOWN and in-flight full-reload duplicate windows without persisting
 financial data. It never predicts balances or infers mutation outcome from recovered deltas.
-AUR-M9-004 Withdrawal Request is NOT STARTED. Production solution/V2Board Referral Read, Create
-and Commission Transfer runtime is NOT TESTED.
+
+AUR-M9-004 Withdrawal Request is IMPLEMENTATION COMPLETE with INDEPENDENT WITHDRAWAL FINANCIAL
+MUTATION REVIEW PENDING. It adds only strict `POST /api/v1/referrals/withdrawal-requests`, exact
+server-provided method selection, raw masked account handling, fresh Withdrawal Options authority,
+financial confirmation, execution-time QueryClient recheck, same-tick locking, synchronous persistent
+pre-arm and Options-only reconciliation. It never accepts or calculates a withdrawal amount and never
+infers request outcome from Options, commission, Wallet or Support Ticket state. Production
+solution/V2Board Referral Read, Create, Commission Transfer and Withdrawal Request runtime is NOT TESTED.
 
 ## Current commit
 
@@ -99,12 +105,12 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (43 files, 995 tests)
+- `npm test`: PASS (44 files, 1047 tests)
 - `npm run build`: PASS
 - `npm ls`: PASS
 - `git diff --check`: PASS
-- Build evidence: main JS 472.41 kB raw / 148.60 kB gzip; CSS 37.80 kB raw /
-  7.51 kB gzip; Referrals route 34.05 kB raw / 8.89 kB gzip; Support route
+- Build evidence: main JS 472.49 kB raw / 148.62 kB gzip; CSS 37.84 kB raw /
+  7.51 kB gzip; Referrals route 47.37 kB raw / 11.31 kB gzip; Support route
   31.19 kB raw / 8.29 kB gzip; Wallet route 22.81 kB raw / 6.84 kB gzip;
   Subscription route 19.89 kB raw / 5.68 kB gzip; Plans route 5.15 kB gzip;
   Orders route 13.17 kB gzip. Assets remain within budget; initial-route
@@ -376,16 +382,34 @@ operational source of truth.
   the old runtime could settle; the new runtime restored active uncertainty and the mock recorded
   exactly one POST. Browser console warning/error count was zero. This is controlled evidence, not
   production solution/V2Board runtime evidence.
+- AUR-M9-004 automated verification: PASS for strict raw method/account request boundaries,
+  `{requested:true}` parsing, every definitive and UNKNOWN class, execution-time Options rechecks,
+  same-tick double confirmation, Options-only reconciliation, no causal inference, sensitive account
+  clearing and Mutation cache removal. Brand-new QueryClient/runtime tests preserve sessionStorage
+  and cover handled UNKNOWN, unresolved in-flight POST reload, acknowledged reload, success/rejection
+  marker clearing, storage read/write/removal failure, logout/new session/Auth invalidation and
+  Withdrawal / Commission / Referral Code guard isolation. The 1024-character account boundary test was proven by
+  temporarily changing the parser limit to 1025: the targeted test failed, then passed after restore.
+- AUR-M9-004 controlled-browser verification: PASS against a local `/api/v1` mock at exact 1280 x 720
+  and 390 x 844 in Light/Dark/System. It covered default account masking, explicit confirmation reveal,
+  confirmed success, method-unsupported definitive rejection, handled UNKNOWN with real full reload,
+  acknowledgement with zero POST, acknowledged reload, an unresolved in-flight POST reloaded before
+  settlement, and real browser `sessionStorage` read/write SecurityError fail-closed recovery. Mock
+  evidence recorded one POST for each submitted flow and zero POST for acknowledgement, cancellation
+  and failed pre-arm. A 255-character method and 1024-character account remained contained in the
+  mobile Dialog; body/Dialog horizontal overflow was zero, Escape restored trigger focus, raw upstream
+  and internal Ticket wording were absent, and browser console warning/error count was zero. This is
+  controlled evidence, not production solution/V2Board runtime evidence.
 
 ## Known gaps
 
 - Wallet Balance Read, Wallet Deposit Create, Gift Card Redeem, all Support Ticket v1 work,
-  Referral / Commission Read Model and Referral Code Create are complete and independently
-  reviewed. Commission Transfer implementation and primary required full-reload hardening are
-  complete with targeted financial re-review pending; Withdrawal Request is not started.
+  Referral / Commission Read Model, Referral Code Create and Commission Transfer are complete and
+  independently reviewed. Withdrawal Request implementation is complete with independent financial
+  mutation review pending.
 - Production solution/V2Board Referral Overview, Commission History, Withdrawal Options,
-  Referral Code Create and Commission Transfer behavior is NOT TESTED; controlled mock browser
-  and automated contract/privacy/recovery tests are the current evidence.
+  Referral Code Create, Commission Transfer and Withdrawal Request behavior is NOT TESTED;
+  controlled mock browser and automated contract/privacy/recovery tests are the current evidence.
 - Production solution/V2Board Ticket List, Detail, Create, Reply and Close behavior is
   NOT TESTED; controlled mock browser and automated contract/privacy tests are the
   current evidence.
@@ -408,5 +432,5 @@ operational source of truth.
 
 ## Next milestone
 
-AUR-M9-003 exact-head CI verification and targeted Commission Transfer Financial Re-review are
-the next gates. AUR-M9-004 has not started.
+AUR-M9-004 exact-head CI verification and Independent Withdrawal Financial Mutation Review are the
+next gates. Milestone 10 and Launch Readiness have not started.
