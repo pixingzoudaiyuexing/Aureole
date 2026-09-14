@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+@source "../index.html";
+@source "../src";
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {

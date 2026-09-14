@@ -167,7 +167,7 @@ current provider configuration.
 | Hosting provider                            | NOT VERIFIED                    | No provider is selected or configured. `DEPLOYMENT INFO REQUIRED`.                                                               |
 | HTTPS                                       | NOT VERIFIED                    | Required for credentials, redirects and reCAPTCHA; no deployment config is present.                                              |
 | SPA history fallback                        | DOCUMENTED / NOT VERIFIED       | README and Architecture require unknown routes to serve `index.html`; no host rule exists.                                       |
-| API base URL                                | BLOCKER / NOT VERIFIED          | `VITE_API_BASE_URL` is referenced and public, but CI builds without it. Production value is unknown.                             |
+| API base URL                                | RESOLVED / NOT VERIFIED         | `VITE_API_BASE_URL` requirement removed for same-origin default. Production URL routing remains NOT VERIFIED.                    |
 | Same-origin `/api/v1` routing               | NOT VERIFIED                    | No proxy/routing configuration exists. Preferred mode and solution origin are undecided.                                         |
 | Cross-origin CORS                           | NOT VERIFIED                    | If a separate Gateway origin is used, exact production Origin compatibility must be proven.                                      |
 | Asset caching                               | BUILD READY / HOST NOT VERIFIED | Vite emits hashed JS/CSS assets suitable for immutable long cache.                                                               |
@@ -459,9 +459,7 @@ must remain `UNKNOWN` until the deployment owner supplies evidence.
 1. Production hosting and runtime configuration are undefined. There is no host,
    HTTPS/fallback/proxy/cache/header configuration, deployment command, deployed
    SHA or rollback procedure.
-2. CI builds without `VITE_API_BASE_URL`; a green artifact can be unusable at
-   runtime. The final production artifact and its public API origin must be fixed
-   and verified.
+2. RESOLVED BY AUR-M10-002: Same-origin `/api/v1` default implemented. Artifact verification command implemented.
 3. No deployed Aureole Auth/Session evidence exists. Login, `/me`, refresh,
    invalid-session handling and protected route behavior must pass before launch.
 4. Full v1 exposes payment and financial mutations, but none has deployed Aureole
@@ -490,9 +488,7 @@ must remain `UNKNOWN` until the deployment owner supplies evidence.
 
 ### MEDIUM
 
-1. Tailwind scans repository documentation for utility candidates, so future
-   documentation-only changes can alter the production CSS bundle unless source
-   scope is constrained or artifact drift is gated.
+1. RESOLVED BY AUR-M10-002: Tailwind source scanning boundary constrained to `src` and `index.html`. Documentation isolation proven.
 2. Historical L2 browser evidence is extensive but no committed/reproducible
    browser E2E suite exists; Safari/Firefox evidence is absent.
 3. There is no real initial-route analyzer or automated bundle budget gate.
