@@ -369,6 +369,35 @@ acknowledgement，且 Close 仍需标准 confirmation；Reply payload 变化会�
 失败只允许 GET Detail，所有 mutation/reconciliation/recovery 的 Auth error 继续进入 sealed Session
 Core。Reply draft 和 UNKNOWN guard 仅为 React local memory，不持久化。
 
+## Referral and commission read model
+
+`features/referrals` 持有 Referral Overview、Commission History 与 Withdrawal Options 的 Public DTO
+parser、canonical Query 和 `/referrals` 只读页面边界。三个 authenticated GET 分别使用
+`['referrals','overview']`、`['referrals','commissions',page,20]` 与
+`['referrals','withdrawal-options']`；Account Config 继续复用 canonical
+`['config','account']`。这些 server state 不进入 Zustand、storage、URL、analytics 或 console，Query key
+不包含 credential、referral code、email、withdrawal account 或 money value。
+
+Overview parser 只保留 ordered referral `codes` 与五项 Public `stats`。Code 必须是 1..32 ASCII
+alphanumeric，timestamp 必须是 ISO datetime；registered users、三项 commission minor-unit amount 均为
+non-negative safe integer，rate 是 0..100 integer。Commission History 固定请求 pageSize 20，保持 item
+顺序，只展示 order amount、commission amount 与 createdAt；page、pageSize 与 total 都按 Public Contract
+严格验证，页码仅由 React local state 持有。
+
+三项 commission amount 与 history amount 都复用 Account Config 和 `formatMinorMoney`，不硬编码币种、
+symbol、fraction digits 或 `/100`。Config loading、ordinary failure 或 unsupported currency 不隐藏 Referral
+data，而以明确的“最小货币单位”fallback 展示并提供 Config Retry。`availableCommissionMinor` 始终属于
+Referral / Commission domain，不进入 Wallet query、Wallet balance 或任何合计。
+
+Overview、Commission History、Withdrawal Options 与 Account Config 各自 loading/error/retry；普通错误仅
+影响对应 section，任何 AUTH_REQUIRED/AUTH_FAILED 继续复用 sealed Auth Session Core 清理 credential 与
+完整 Query cache。Referral code 只在用户明确点击时写入 clipboard；页面不生成 referral URL/QR，也不
+排序、去重或生成 code。Withdrawal Options 只展示 enabled 与 ordered method identifiers，不推断品牌、
+手续费、minimum、额度或到账时间。
+
+AUR-M9-001 不实现 Create Referral Code、Commission Transfer、Withdrawal Request 或任何其他 mutation，
+也不修改 solution、直接访问 V2Board、复制 Commission 到 Wallet 或进入 Launch Readiness。
+
 ## Theme and presentation
 
 Light、Dark、System 由 Theme Provider 管理；显式选择可保存为非敏感 local UI preference。CSS tokens 是颜色和 radius 的 SSOT，传统 `tailwind.config.js` 不是 token 核心。使用 system font 与 system monospace。

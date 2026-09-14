@@ -1,11 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { FeaturePlaceholder } from '@/components/shared/feature-placeholder'
+import { ReferralsPage } from '@/features/referrals/referrals-page'
 
 export const Route = createFileRoute('/_app/referrals')({
-  component: () => (
-    <FeaturePlaceholder
-      title="Referrals"
-      description="Referral codes, commission, and withdrawal requests will be added with their guarded workflows."
-    />
-  ),
+  component: ReferralsPage,
 })

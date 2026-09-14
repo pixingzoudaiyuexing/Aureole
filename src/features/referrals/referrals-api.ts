@@ -1,0 +1,104 @@
+import { z } from 'zod'
+import { apiClient } from '@/lib/api/client'
+import { ApiError } from '@/lib/api/errors'
+
+const safeNonnegativeIntegerSchema = z
+  .number()
+  .int()
+  .nonnegative()
+  .max(Number.MAX_SAFE_INTEGER)
+const timestampSchema = z.string().datetime({ offset: true })
+const referralCodeSchema = z
+  .object({
+    code: z.string().regex(/^[A-Za-z0-9]{1,32}$/),
+    createdAt: timestampSchema,
+  })
+  .strip()
+const referralOverviewSchema = z
+  .object({
+    codes: z.array(referralCodeSchema),
+    stats: z
+      .object({
+        registeredUsers: safeNonnegativeIntegerSchema,
+        earnedCommissionMinor: safeNonnegativeIntegerSchema,
+        pendingCommissionMinor: safeNonnegativeIntegerSchema,
+        commissionRatePercent: z.number().int().min(0).max(100),
+        availableCommissionMinor: safeNonnegativeIntegerSchema,
+      })
+      .strip(),
+  })
+  .strip()
+const commissionItemSchema = z
+  .object({
+    orderAmountMinor: safeNonnegativeIntegerSchema,
+    commissionAmountMinor: safeNonnegativeIntegerSchema,
+    createdAt: timestampSchema,
+  })
+  .strip()
+export const commissionPageRequestSchema = z
+  .object({
+    page: z.number().int().positive().max(2_147_483_647),
+    pageSize: z.number().int().min(10).max(100),
+  })
+  .strict()
+const commissionPageSchema = z
+  .object({
+    items: z.array(commissionItemSchema),
+    page: z.number().int().positive().max(2_147_483_647),
+    pageSize: z.number().int().min(10).max(100),
+    total: safeNonnegativeIntegerSchema,
+  })
+  .strip()
+const withdrawalOptionsSchema = z
+  .object({
+    enabled: z.boolean(),
+    methods: z.array(z.string().min(1).max(255)),
+  })
+  .strip()
+
+export type ReferralOverview = z.infer<typeof referralOverviewSchema>
+export type CommissionPage = z.infer<typeof commissionPageSchema>
+export type WithdrawalOptions = z.infer<typeof withdrawalOptionsSchema>
+
+function parse<T>(schema: z.ZodType<T>, data: unknown) {
+  const parsed = schema.safeParse(data)
+  if (!parsed.success) {
+    throw new ApiError({
+      status: 200,
+      code: 'MALFORMED_RESPONSE',
+      message: 'The public API returned an invalid response',
+    })
+  }
+  return parsed.data
+}
+
+export const referralsApi = {
+  async getOverview(accessToken: string) {
+    const data = await apiClient.authenticatedRequest<unknown>(
+      '/api/v1/referrals',
+      { method: 'GET', accessToken },
+    )
+    return parse(referralOverviewSchema, data)
+  },
+
+  async getCommissions(accessToken: string, page: number, pageSize: number) {
+    const request = commissionPageRequestSchema.parse({ page, pageSize })
+    const query = new URLSearchParams({
+      page: String(request.page),
+      pageSize: String(request.pageSize),
+    })
+    const data = await apiClient.authenticatedRequest<unknown>(
+      `/api/v1/referrals/commissions?${query.toString()}`,
+      { method: 'GET', accessToken },
+    )
+    return parse(commissionPageSchema, data)
+  },
+
+  async getWithdrawalOptions(accessToken: string) {
+    const data = await apiClient.authenticatedRequest<unknown>(
+      '/api/v1/referrals/withdrawal-options',
+      { method: 'GET', accessToken },
+    )
+    return parse(withdrawalOptionsSchema, data)
+  },
+}

@@ -10,8 +10,8 @@
 | 5         | COMPLETE | Commerce / Payment                                                       |
 | 6         | COMPLETE | Subscription Mutations                                                   |
 | 7         | COMPLETE | Wallet / Gift Card                                                       |
-| 8         | CURRENT  | Support                                                                  |
-| 9         | PLANNED  | Referral / Commission / Withdrawal                                       |
+| 8         | COMPLETE | Support                                                                  |
+| 9         | CURRENT  | Referral / Commission / Withdrawal                                       |
 | 10        | PLANNED  | Launch Readiness                                                         |
 
 ## Post-v1 Enhancements
@@ -58,7 +58,7 @@ Milestone 8 按以下边界推进：
 
 - AUR-M8-001 Support Ticket Read Model：COMPLETE，Independent Support Read Review PASS
 - AUR-M8-002 Create Ticket：COMPLETE，Independent Create Ticket Mutation Review PASS
-- AUR-M8-003 Reply + Close Ticket：IMPLEMENTATION COMPLETE，INDEPENDENT REVIEW PENDING
+- AUR-M8-003 Reply + Close Ticket：COMPLETE，Independent Support Mutation Review PASS
 
 AUR-M8-002 只增量实现 `POST /api/v1/tickets`，并已通过独立审查。Create 原样提交 strict Public
 fields、禁止自动 retry，使用同步锁与 authoritative List recovery；confirmed success 不推断 Ticket ID，
@@ -72,5 +72,19 @@ AUR-M8-003 只增量实现 Reply 与 Close，并集成现有 Ticket Detail。两
 Detail gate 与共享 synchronous lock 约束；confirmed success、definitive error 与 UNKNOWN 都通过 GET
 Detail/List 对账，不本地 append message 或改 status。UNKNOWN recovery 不依据相同消息或当前 status
 推断因果结果，再次执行需 acknowledgement，Close 另有独立 confirmation。Attachment、unread、
-search/filter 及 Referral / Commission / Withdrawal 均未实现。Production Ticket Read/Create/Reply/Close
-runtime 仍为 NOT TESTED；Milestone 8 保持 CURRENT，等待独立 Support Mutation Review。
+search/filter 均未实现。Production Ticket Read/Create/Reply/Close runtime 仍为 NOT TESTED，属于 Launch
+Readiness evidence gap。Milestone 8 已完成并冻结于
+`9736f3740f27d8b492d3affec4488c8cd59ebf0c`。
+
+Milestone 9 按以下边界推进：
+
+- AUR-M9-001 Referral / Commission Read Model：IMPLEMENTATION COMPLETE，INDEPENDENT REVIEW PENDING
+- AUR-M9-002 Create Referral Code：NOT STARTED
+- AUR-M9-003 Commission Transfer：NOT STARTED
+- AUR-M9-004 Withdrawal Request：NOT STARTED
+
+AUR-M9-001 只实现 `GET /api/v1/referrals`、分页 Commission History 与 Withdrawal Options。页面保持
+server order，金额复用 Account Config 与 canonical minor-unit formatter，Config 不可用时显示明确
+minor-unit fallback；三个业务读与 Config 独立失败、独立 Retry，Auth invalidation 复用 Session Core。
+`availableCommissionMinor` 不进入 Wallet。本 Task 没有 Create Code、Transfer、Withdrawal mutation 或
+Launch Readiness 工作。Production Referral / Commission / Withdrawal Options runtime 为 NOT TESTED。

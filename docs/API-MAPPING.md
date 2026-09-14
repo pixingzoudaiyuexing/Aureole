@@ -283,6 +283,30 @@
   storage、URL、Zustand、analytics、console、error metadata、Query/Mutation key。Detail 消息继续作为
   plain React text node 展示。
 
+## Referral and commission read mapping
+
+- `GET /api/v1/referrals` 是推荐概览与邀请码的唯一来源，使用 credential-free canonical
+  `['referrals','overview']`。Aureole 只接受 ordered `codes` 与 Public 五项 stats，strip additive/private
+  fields，不排序、去重、生成 code，也不构造 Contract 未定义的 referral URL 或 QR。
+- Code 严格消费 solution normalized 1..32 ASCII alphanumeric 与 ISO createdAt。用户可明确点击复制原始
+  code；页面不会自动写 clipboard，也不把 code、commission history 或其他账户私有数据写入 storage、
+  URL、Zustand、analytics、console 或 Query key。
+- `GET /api/v1/referrals/commissions?page={page}&pageSize=20` 使用
+  `['referrals','commissions',page,20]`。Aureole 保持 server item order，只展示 orderAmountMinor、
+  commissionAmountMinor 与 absolute createdAt；不推导 Order ID、购买用户、Product、Plan、Payment 或
+  commission status。Previous/Next 只依据 Public page/pageSize/total，page 是 React local state。
+- `GET /api/v1/referrals/withdrawal-options` 使用
+  `['referrals','withdrawal-options']`，保持 methods order。disabled 时只显示当前未开放；enabled 且空
+  methods 时明确显示当前没有方式。Frontend 不翻译 method identifier，也不猜测 fee、minimum、limit、
+  processing time 或创建 Withdrawal form。
+- Referral 与 Commission money 是 non-negative safe integer minor units，复用 canonical Account Config 和
+  `formatMinorMoney`，不硬编码 currency/symbol/fraction digits 或 `/100`。Config 不可用时 Referral data
+  保持可见并显示明确 minor-unit fallback。`availableCommissionMinor` 不合并、累加或复制到 Wallet。
+- Overview、History、Withdrawal Options 与 Config ordinary failure 各自隔离并可 Retry；任一 GET 的
+  AUTH_REQUIRED/AUTH_FAILED 都复用 sealed Session Core 清理 credential 与完整 Query cache。
+- AUR-M9-001 只调用以上三个 GET；不调用 Create Code、Commission Transfer、Withdrawal Request，不包含
+  `useMutation` 或 fake/disabled mutation control，也不直接访问 V2Board。
+
 ## Error and request rules
 
 - 业务分支依据稳定 `error.code`，禁止依据 message 文本包含关系。

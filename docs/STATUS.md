@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 8 - Support (`AUR-M8-003` Reply + Close Support Ticket)
+Milestone 9 - Referral / Commission / Withdrawal (`AUR-M9-001` Read Model)
 
 ## Contract baseline
 
@@ -60,14 +60,24 @@ Gift Card Redeem is COMPLETE and its Independent Gift Card/Account Mutation Revi
 passed. Production solution/V2Board Wallet, Deposit, Payment and Gift Card runtime is
 NOT TESTED and remains a Launch Readiness evidence gap.
 
-Milestone 8 is CURRENT. AUR-M8-001 Support Ticket Read Model is COMPLETE and its
+Milestone 8 is COMPLETE and FROZEN at
+`9736f3740f27d8b492d3affec4488c8cd59ebf0c`. AUR-M8-001 Support Ticket Read Model is COMPLETE and its
 Independent Support Read Review passed. AUR-M8-002 Create Support Ticket is COMPLETE
 and its Independent Create Ticket Mutation Review passed. AUR-M8-003 Reply + Close
-Ticket is IMPLEMENTATION COMPLETE with INDEPENDENT REVIEW PENDING. It adds only strict
+Ticket is COMPLETE and its Independent Support Mutation Review passed. It adds only strict
 raw-text Reply and bodyless Close, shared synchronous locking, authoritative Detail/List
 reconciliation, fail-closed Detail authority and guarded UNKNOWN resubmission. No local
 message/status mutation or causal inference is used. Production solution/V2Board Ticket
 Read/Create/Reply/Close runtime is NOT TESTED.
+
+Milestone 9 is CURRENT. AUR-M9-001 Referral / Commission Read Model is IMPLEMENTATION
+COMPLETE with INDEPENDENT REVIEW PENDING. It replaces `/referrals` with strict ordered
+Referral Overview, paginated Commission History and Withdrawal Options reads, canonical
+Account Config money formatting with explicit minor-unit fallback, isolated recovery and
+sealed Session Core Auth invalidation. `availableCommissionMinor` remains separate from
+Wallet. AUR-M9-002 Create Referral Code, AUR-M9-003 Commission Transfer and AUR-M9-004
+Withdrawal Request are NOT STARTED. Production solution/V2Board Referral runtime is NOT
+TESTED.
 
 ## Current commit
 
@@ -81,15 +91,16 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (38 files, 839 tests)
+- `npm test`: PASS (40 files, 900 tests)
 - `npm run build`: PASS
 - `npm ls`: PASS
 - `git diff --check`: PASS
-- Build evidence: main JS 471.72 kB raw / 148.31 kB gzip; CSS 36.91 kB raw /
-  7.42 kB gzip; Support route 31.36 kB raw / 8.40 kB gzip; Wallet route 23.81 kB
-  raw / 7.06 kB gzip; Subscription route 20.18 kB raw / 5.83 kB gzip; Plans
-  route 5.16 kB gzip; Orders route 13.17 kB gzip. Assets remain within budget;
-  initial-route composition has not been measured by a dedicated analyzer.
+- Build evidence: main JS 471.75 kB raw / 148.37 kB gzip; CSS 37.80 kB raw /
+  7.51 kB gzip; Referrals route 11.09 kB raw / 3.46 kB gzip; Support route
+  31.32 kB raw / 8.39 kB gzip; Wallet route 23.81 kB raw / 7.06 kB gzip;
+  Subscription route 19.89 kB raw / 5.67 kB gzip; Plans route 5.15 kB gzip;
+  Orders route 13.16 kB gzip. Assets remain within budget; initial-route
+  composition has not been measured by a dedicated analyzer.
 - Browser verification: PASS at 1280 x 720 and 390 x 844 for Login Light/Dark,
   keyboard validation, visible error, loading, controlled login, refresh
   bootstrap, authenticated App Shell, mobile Drawer and local logout. No
@@ -291,13 +302,29 @@ operational source of truth.
   reconciliation failure, manual GET-only recovery, remount safety, every required
   UNKNOWN category, strict DTOs and full Session cache clearing. Production
   solution/V2Board Ticket Reply/Close runtime is NOT TESTED.
+- AUR-M9-001 controlled-browser verification: PASS against a local `/api/v1` mock at
+  exact 1280 x 720 and 390 x 844 in Light/Dark/System for ordered multiple codes,
+  all five stats, safe-integer maximum money and registered-user values, long code and
+  255-character method, ordered Commission rows, enabled/disabled/empty Withdrawal,
+  all three domain empty states, Overview/History/Withdrawal/Config ordinary-error
+  isolation, safe minor-unit Config fallback, Overview Auth invalidation and absence of
+  mutation controls/raw upstream errors. No horizontal overflow, value overlap or browser
+  console warning/error was observed. Automated real-page tests additionally cover exact
+  initial reads, explicit clipboard copy, keyboard-capable Previous/Next pagination and
+  Overview/History/Withdrawal AUTH_REQUIRED/AUTH_FAILED cache clearing. Post-navigation
+  copy/pagination activation was NOT TESTED in the controlled browser because the browser
+  control layer stopped dispatching React click events after navigation; production
+  solution/V2Board Referral runtime is NOT TESTED.
 
 ## Known gaps
 
-- Wallet Balance Read, Wallet Deposit Create, Gift Card Redeem and Support Ticket
-  List/Detail reads and Create are complete and independently reviewed. Support Ticket
-  Reply/Close implementation is complete and pending independent review.
-  Referrals remains a placeholder without mock business data.
+- Wallet Balance Read, Wallet Deposit Create, Gift Card Redeem and all Support Ticket v1
+  work are complete and independently reviewed. Referral / Commission Read Model
+  implementation is complete and pending independent review; Referral Code Create,
+  Commission Transfer and Withdrawal Request are not started.
+- Production solution/V2Board Referral Overview, Commission History and Withdrawal Options
+  behavior is NOT TESTED; controlled mock browser and automated contract/privacy tests are
+  the current evidence.
 - Production solution/V2Board Ticket List, Detail, Create, Reply and Close behavior is
   NOT TESTED; controlled mock browser and automated contract/privacy tests are the
   current evidence.
@@ -320,5 +347,5 @@ operational source of truth.
 
 ## Next milestone
 
-AUR-M8-003 exact-head CI verification and Independent Support Reply/Close Mutation
-Review are the next required gates. Milestone 9 has not started.
+AUR-M9-001 exact-head CI verification and Independent Referral Read Review are the next
+required gates. AUR-M9-002, AUR-M9-003 and AUR-M9-004 have not started.
