@@ -66,7 +66,7 @@ The artifact does **not** contain backend secrets, V2Board credentials, or sourc
 
 ## 7. Artifact Verification
 
-The build automatically invokes the artifact verification command:
+The official release build (`npm run build:release`) automatically invokes the artifact verification command:
 
 ```bash
 npm run verify:artifact
@@ -82,7 +82,7 @@ This guarantees:
 
 ## 8. Release Identification
 
-Every successful build generates a static `dist/release.json`.
+Every successful release build (`npm run build:release`) generates a static `dist/release.json`.
 It contains exclusively the source Git SHA, making the release identity deterministic and independent of wall-clock build time.
 This non-secret, machine-readable identity enables static-host compatibility without exposing credentials or requiring a database.
 
@@ -164,8 +164,8 @@ The deployment owner is responsible for providing the following environment-spec
 
 Before going live, the deployment owner must verify:
 
-- [ ] Artifact builds successfully with `npm run build`.
-- [ ] `npm run verify:artifact` passes.
+- [ ] Artifact builds successfully with `npm run build:release`.
+- [ ] `dist/release.json` identity matches the exact expected source SHA.
 - [ ] SPA fallback correctly serves `index.html` for deep links.
 - [ ] Missing `.js`/`.css` assets return 404, not `index.html`.
 - [ ] `/api/v1/*` routes transparently to the solution Gateway.

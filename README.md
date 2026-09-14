@@ -31,7 +31,8 @@ npm run preview      # preview a production build
 npm run typecheck    # TypeScript project check
 npm run lint         # ESLint
 npm test             # Vitest once
-npm run build        # TypeScript + production build
+npm run build        # normal development/validation build
+npm run build:release # clean deployable exact-SHA release artifact build
 npm run format       # write Prettier formatting
 npm run format:check # verify formatting
 ```
