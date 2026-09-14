@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 10 - Launch Readiness (`AUTHORIZED / NOT STARTED`)
+Milestone 10 - Launch Readiness (`IN PROGRESS`)
 
 ## Contract baseline
 
@@ -123,6 +123,28 @@ the final code freeze SHA for both tasks remains `e408f83311c3557706ac9fc09ac06f
 This file records the latest checkpoint state. A commit cannot embed its own SHA
 without changing that SHA; Git HEAD and the implementation report are the
 operational source of truth.
+
+## AUR-M10-001 Launch Readiness audit
+
+Status: `AUDIT COMPLETE / PRIMARY REVIEW PENDING`.
+
+The Launch Readiness evidence SSOT is
+[`docs/LAUNCH-READINESS.md`](LAUNCH-READINESS.md). It inventories the complete v1
+feature matrix, L0-L5 evidence model, SAFE-A/SAFE-B/STATE-C/FINANCIAL-D safety
+classes, production evidence gaps, hosting/API/cache/security requirements,
+rollback readiness and proposed M10 validation tasks.
+
+The audit confirmed that the highest current Aureole business-flow evidence is L2
+controlled browser verification. No deployed Aureole production Auth, read,
+mutation or financial flow was exercised. The principal blockers are the missing
+production deployment contract and runtime environment, absent deployed Auth/Session
+acceptance, and missing approved runtime verification for exposed payment and
+financial flows. CI can currently build without `VITE_API_BASE_URL`, so a green
+build does not by itself prove a usable production artifact.
+
+AUR-M10-001 ran only SAFE-A local validation. It did not access production, deploy,
+mutate production state or perform a real financial operation. No business source
+code or solution file was changed.
 
 ## Validation summary
 

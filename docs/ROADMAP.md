@@ -1,18 +1,18 @@
 # Roadmap
 
-| Milestone | Status                   | Scope                                                                    |
-| --------- | ------------------------ | ------------------------------------------------------------------------ |
-| 0         | COMPLETE                 | Product framing and workflow baseline                                    |
-| 1         | COMPLETE                 | solution Public Contract and upstream architecture baseline              |
-| 2         | COMPLETE                 | Aureole repository, frontend foundation, app shell, quality and Git SSOT |
-| 3         | COMPLETE                 | Auth / Account                                                           |
-| 4         | COMPLETE                 | Read-only Core                                                           |
-| 5         | COMPLETE                 | Commerce / Payment                                                       |
-| 6         | COMPLETE                 | Subscription Mutations                                                   |
-| 7         | COMPLETE                 | Wallet / Gift Card                                                       |
-| 8         | COMPLETE                 | Support                                                                  |
-| 9         | COMPLETE                 | Referral / Commission / Withdrawal                                       |
-| 10        | AUTHORIZED / NOT STARTED | Launch Readiness                                                         |
+| Milestone | Status      | Scope                                                                    |
+| --------- | ----------- | ------------------------------------------------------------------------ |
+| 0         | COMPLETE    | Product framing and workflow baseline                                    |
+| 1         | COMPLETE    | solution Public Contract and upstream architecture baseline              |
+| 2         | COMPLETE    | Aureole repository, frontend foundation, app shell, quality and Git SSOT |
+| 3         | COMPLETE    | Auth / Account                                                           |
+| 4         | COMPLETE    | Read-only Core                                                           |
+| 5         | COMPLETE    | Commerce / Payment                                                       |
+| 6         | COMPLETE    | Subscription Mutations                                                   |
+| 7         | COMPLETE    | Wallet / Gift Card                                                       |
+| 8         | COMPLETE    | Support                                                                  |
+| 9         | COMPLETE    | Referral / Commission / Withdrawal                                       |
+| 10        | IN PROGRESS | Launch Readiness                                                         |
 
 ## Post-v1 Enhancements
 
@@ -123,4 +123,11 @@ generation mismatch 则禁止旧 Session continuation 清 marker、使用旧 tok
 
 Milestone 9：COMPLETE / PASS / FROZEN。其代码冻结 SHA 为
 `e408f83311c3557706ac9fc09ac06fe754ea71b8`；后续 documentation closure commit 不改变该 code freeze SHA。
-Milestone 10：AUTHORIZED / NOT STARTED，负责 Launch Readiness 与生产 runtime evidence，不在本 Milestone 9 文档闭环中执行。
+Milestone 10：IN PROGRESS。AUR-M10-001 Launch Readiness Evidence Inventory 已完成只读审计，状态为
+`AUDIT COMPLETE / PRIMARY REVIEW PENDING`。完整证据矩阵、安全分类、部署阻塞项和生产验证计划记录于
+[`LAUNCH-READINESS.md`](LAUNCH-READINESS.md)。本 Task 未访问生产环境、未部署、未执行生产 mutation 或真实资金操作。
+
+审计建议后续按实际依赖顺序拆分：AUR-M10-002 Production Deployment Contract and Artifact Readiness、
+AUR-M10-003 Production Auth/Session and Read-Only Verification、AUR-M10-004 Controlled Non-Financial Mutation
+Verification、AUR-M10-005 Payment/Wallet/Financial Runtime Verification、AUR-M10-006 Final Browser/Rollback/Launch
+Gate。上述后续 Task 均未在 AUR-M10-001 中启动，必须等待 Primary 审核并分别授权。
