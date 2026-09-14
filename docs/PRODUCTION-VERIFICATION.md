@@ -218,8 +218,9 @@ Future actions require explicit staged authorization:
 
 1. **Gate 1:** COMPLETE / PASS
 2. **Gate 2:** COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT SECURITY REVIEW PASS
-3. **Gate 3:** NOT STARTED / PRIMARY AUTHORIZATION PENDING
-4. **Gate 4:** NOT AUTHORIZED
+3. **Gate 3A:** PASS
+4. **Gate 3B:** REPOSITORY HARDENING IN PROGRESS
+5. **Gate 4:** NOT AUTHORIZED
 
 No gate is automatically implied by the previous gate.
 
@@ -249,3 +250,29 @@ _No L3 evidence has been obtained yet._
 - **Independent review verdict:** PASS — PAGES ADAPTER SECURITY REVIEW
 
 _(Note: `ddf9322cf3577475e73e455fb587fcbfee48e014` is the independent-review HEAD, not necessarily the final deployment candidate. The final deployment candidate will be frozen by the Primary after the completion of this task.)_
+
+## 16. Gate 3A Runtime Evidence
+
+- **Gate 3A Status:** PASS
+- **Deployed Candidate:** `3dc60910b0d58a11bfff1ac77389def6f9c98455`
+- **Project Name:** `aureole-cc-staging-3dc609`
+- **Staging URL:** `https://aureole-cc-staging-3dc609.pages.dev`
+
+**Gate 3A Runtime Findings (PASS):**
+
+- exact release identity
+- TLS
+- SPA routing
+- missing asset 404
+- Pages Function boundary
+- public onboarding
+- antiBot disabled
+
+**Gate 3B Required Configurations:**
+
+- immutable hashed-asset cache
+- Content-Security-Policy (CSP)
+- Strict-Transport-Security (HSTS)
+- Permissions-Policy
+
+_(Note: The new Gate 3B headers are repository hardening in progress and have not been deployed or runtime-verified yet.)_
