@@ -45,6 +45,17 @@ describe('Cloudflare Pages API Adapter', () => {
 
     expect(response.status).toBe(200)
     expect(globalFetch).toHaveBeenCalledTimes(1)
+
+    const fetchArgs = globalFetch.mock.calls[0]
+    if (!fetchArgs) throw new Error('Expected fetchArgs')
+    expect(fetchArgs[0]).toBe('https://gateway.example.com/api/v1/me')
+    expect(fetchArgs[1]?.method).toBe('GET')
+    expect(fetchArgs[1]?.redirect).toBe('manual')
+    expect(fetchArgs[1]?.headers?.get?.('authorization')).toBe(
+      'Bearer token123',
+    )
+    expect(fetchArgs[1]?.headers?.get?.('accept')).toBe('application/json')
+    expect(fetchArgs[1]?.body).toBeUndefined()
   })
 
   it('forwards valid POST with body', async () => {
@@ -58,6 +69,17 @@ describe('Cloudflare Pages API Adapter', () => {
 
     expect(response.status).toBe(200)
     expect(globalFetch).toHaveBeenCalledTimes(1)
+
+    const fetchArgs = globalFetch.mock.calls[0]
+    if (!fetchArgs) throw new Error('Expected fetchArgs')
+    expect(fetchArgs[0]).toBe('https://gateway.example.com/api/v1/referrals')
+    expect(fetchArgs[1]?.method).toBe('POST')
+    expect(fetchArgs[1]?.headers?.get?.('content-type')).toBe(
+      'application/json',
+    )
+    // We can't trivially assert fetchArgs[1].body directly on node Request stream without consuming,
+    // but we can check if it is truthy and not undefined since it was forwarded.
+    expect(fetchArgs[1]?.body).toBeDefined()
   })
 
   it('forwards valid PATCH', async () => {
@@ -68,6 +90,13 @@ describe('Cloudflare Pages API Adapter', () => {
     const response = await onRequest({ request, env: getEnv() })
     expect(response.status).toBe(200)
     expect(globalFetch).toHaveBeenCalledTimes(1)
+
+    const fetchArgs = globalFetch.mock.calls[0]
+    if (!fetchArgs) throw new Error('Expected fetchArgs')
+    expect(fetchArgs[0]).toBe(
+      'https://gateway.example.com/api/v1/me/preferences',
+    )
+    expect(fetchArgs[1]?.method).toBe('PATCH')
   })
 
   it('preserves query string', async () => {
@@ -80,84 +109,142 @@ describe('Cloudflare Pages API Adapter', () => {
 
     const response = await onRequest({ request, env: getEnv() })
     expect(response.status).toBe(200)
-  })
-
-  it('requires configured HTTPS origin', async () => {
-    const request = new Request('https://aureole.com/api/v1/me')
-
-    const response1 = await onRequest({
-      request,
-      env: { SOLUTION_GATEWAY_ORIGIN: 'http://gateway.com' },
-    })
-    expect(response1.status).toBe(500)
-    expect(globalFetch).not.toHaveBeenCalled()
-  })
-
-  it('rejects credentials in configured origin', async () => {
-    const request = new Request('https://aureole.com/api/v1/me')
-    const response = await onRequest({
-      request,
-      env: { SOLUTION_GATEWAY_ORIGIN: 'https://user:pass@gateway.com' },
-    })
-    expect(response.status).toBe(500)
-    expect(globalFetch).not.toHaveBeenCalled()
-  })
-
-  it('rejects configured origin path, query, and hash', async () => {
-    const request = new Request('https://aureole.com/api/v1/me')
-
-    const res1 = await onRequest({
-      request,
-      env: { SOLUTION_GATEWAY_ORIGIN: 'https://gateway.com/path' },
-    })
-    expect(res1.status).toBe(500)
-  })
-
-  it('rejects unsupported HTTP method', async () => {
-    const request = new Request('https://aureole.com/api/v1/me', {
-      method: 'DELETE',
-    })
-    const response = await onRequest({ request, env: getEnv() })
-
-    expect(response.status).toBe(405)
-    expect(globalFetch).not.toHaveBeenCalled()
-  })
-
-  it('does not forward unrelated Cookie header', async () => {
-    const request = new Request('https://aureole.com/api/v1/me', {
-      method: 'GET',
-      headers: { cookie: 'session=123', authorization: 'Bearer 123' },
-    })
-
-    await onRequest({ request, env: getEnv() })
 
     const fetchArgs = globalFetch.mock.calls[0]
     if (!fetchArgs) throw new Error('Expected fetchArgs')
-    expect(fetchArgs[1]?.headers?.has?.('cookie')).toBe(false)
-    expect(fetchArgs[1]?.headers?.has?.('authorization')).toBe(true)
+    expect(fetchArgs[0]).toBe(
+      'https://gateway.example.com/api/v1/orders?page=2&status=active',
+    )
   })
 
-  it('preserves configured safe response headers only', async () => {
-    globalFetch.mockResolvedValueOnce(
-      new Response('{}', {
-        status: 200,
-        headers: {
-          'content-type': 'application/json',
-          'cache-control': 'no-store',
-          'x-request-id': 'req-1',
-          'set-cookie': 'secret=123',
-          server: 'nginx',
+  describe('Gateway Configuration Validation', () => {
+    it('rejects missing configuration', async () => {
+      const request = new Request('https://aureole.com/api/v1/me')
+      const response = await onRequest({ request, env: {} })
+      expect(response.status).toBe(500)
+      expect(globalFetch).not.toHaveBeenCalled()
+    })
+
+    it('rejects invalid non-URL', async () => {
+      const request = new Request('https://aureole.com/api/v1/me')
+      const response = await onRequest({
+        request,
+        env: { SOLUTION_GATEWAY_ORIGIN: 'not-a-url' },
+      })
+      expect(response.status).toBe(500)
+      expect(globalFetch).not.toHaveBeenCalled()
+    })
+
+    it('rejects http:// Gateway', async () => {
+      const request = new Request('https://aureole.com/api/v1/me')
+      const response = await onRequest({
+        request,
+        env: { SOLUTION_GATEWAY_ORIGIN: 'http://gateway.example.com' },
+      })
+      expect(response.status).toBe(500)
+      expect(globalFetch).not.toHaveBeenCalled()
+    })
+
+    it('rejects credentials in configured origin', async () => {
+      const request = new Request('https://aureole.com/api/v1/me')
+      const response = await onRequest({
+        request,
+        env: {
+          SOLUTION_GATEWAY_ORIGIN: 'https://user:pass@gateway.example.com',
         },
-      }),
-    )
+      })
+      expect(response.status).toBe(500)
+      expect(globalFetch).not.toHaveBeenCalled()
+    })
 
-    const request = new Request('https://aureole.com/api/v1/me')
-    const response = await onRequest({ request, env: getEnv() })
+    it('rejects configured origin path, query, and hash', async () => {
+      const request = new Request('https://aureole.com/api/v1/me')
 
-    expect(response.headers.get('content-type')).toBe('application/json')
-    expect(response.headers.get('cache-control')).toBe('no-store')
-    expect(response.headers.get('x-request-id')).toBe('req-1')
-    expect(response.headers.has('set-cookie')).toBe(false)
+      const res1 = await onRequest({
+        request,
+        env: { SOLUTION_GATEWAY_ORIGIN: 'https://gateway.example.com/path' },
+      })
+      expect(res1.status).toBe(500)
+
+      const res2 = await onRequest({
+        request,
+        env: { SOLUTION_GATEWAY_ORIGIN: 'https://gateway.example.com?q=1' },
+      })
+      expect(res2.status).toBe(500)
+
+      const res3 = await onRequest({
+        request,
+        env: { SOLUTION_GATEWAY_ORIGIN: 'https://gateway.example.com#hash' },
+      })
+      expect(res3.status).toBe(500)
+
+      expect(globalFetch).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Method Policy Validation', () => {
+    const unsupportedMethods = ['OPTIONS', 'HEAD', 'PUT', 'DELETE']
+
+    for (const method of unsupportedMethods) {
+      it(`rejects unsupported HTTP method: ${method}`, async () => {
+        const request = new Request('https://aureole.com/api/v1/me', { method })
+        const response = await onRequest({ request, env: getEnv() })
+
+        expect(response.status).toBe(405)
+        expect(globalFetch).not.toHaveBeenCalled()
+      })
+    }
+  })
+
+  describe('Header Policy Validation', () => {
+    it('does not forward disallowed Request headers', async () => {
+      const request = new Request('https://aureole.com/api/v1/me', {
+        method: 'GET',
+        headers: {
+          authorization: 'Bearer token123',
+          cookie: 'session=123',
+          'proxy-authorization': 'Basic aaaa',
+          'x-forwarded-for': '1.2.3.4',
+          'cf-connecting-ip': '1.2.3.4',
+        },
+      })
+
+      await onRequest({ request, env: getEnv() })
+
+      const fetchArgs = globalFetch.mock.calls[0]
+      if (!fetchArgs) throw new Error('Expected fetchArgs')
+      expect(fetchArgs[1]?.headers?.has?.('cookie')).toBe(false)
+      expect(fetchArgs[1]?.headers?.has?.('proxy-authorization')).toBe(false)
+      expect(fetchArgs[1]?.headers?.has?.('x-forwarded-for')).toBe(false)
+      expect(fetchArgs[1]?.headers?.has?.('cf-connecting-ip')).toBe(false)
+
+      // Kept authorization
+      expect(fetchArgs[1]?.headers?.has?.('authorization')).toBe(true)
+    })
+
+    it('preserves configured safe response headers only', async () => {
+      globalFetch.mockResolvedValueOnce(
+        new Response('{}', {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+            'cache-control': 'no-store',
+            'x-request-id': 'req-1',
+            'set-cookie': 'secret=123',
+            server: 'nginx',
+          },
+        }),
+      )
+
+      const request = new Request('https://aureole.com/api/v1/me')
+      const response = await onRequest({ request, env: getEnv() })
+
+      expect(response.headers.get('content-type')).toBe('application/json')
+      expect(response.headers.get('cache-control')).toBe('no-store')
+      expect(response.headers.get('x-request-id')).toBe('req-1')
+      expect(response.headers.has('set-cookie')).toBe(false)
+      expect(response.headers.has('server')).toBe(false)
+    })
   })
 
   describe('Open Proxy and Path Escapes', () => {
@@ -167,6 +254,7 @@ describe('Cloudflare Pages API Adapter', () => {
       'https://aureole.com/api/v1/%2e%2e/x',
       'https://aureole.com/api/v1/%2E%2E/x',
       'https://aureole.com/api/v1/%2e%2e/%2e%2e/x',
+      'https://aureole.com/api/v1',
     ]
 
     for (const url of escapingUrls) {
@@ -225,9 +313,12 @@ describe('Cloudflare Pages API Adapter', () => {
 
     const fetchArgs = globalFetch.mock.calls[0]
     if (!fetchArgs) throw new Error('Expected fetchArgs')
+    expect(fetchArgs[0]).toBe('https://gateway.example.com/api/v1/me')
     expect(fetchArgs[1]?.redirect).toBe('manual')
 
     expect(response.status).toBe(302)
+    // Ensure no manual following behavior occurred
+    expect(globalFetch).toHaveBeenCalledTimes(1)
   })
 
   it('does not log credentials or bodies', async () => {

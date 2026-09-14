@@ -194,16 +194,16 @@ The plan verifies the expected implementation behavior without recording the tok
 
 Future actions require explicit staged authorization:
 
-1. **Gate 1:** PLAN ACCEPTED (Pending Primary Acceptance)
-2. **Gate 2:** DEPLOYMENT PREPARATION AUTHORIZED
-3. **Gate 3:** STATIC / UNAUTHENTICATED DEPLOYMENT VERIFICATION AUTHORIZED (DNS, TLS, `release.json`, static assets, SPA fallback, missing asset 404, security headers, cache, public onboarding capabilities, routing plumbing)
-4. **Gate 4:** PRODUCTION LOGIN + AUTHENTICATED READ L3 AUTHORIZED (Test account login, authenticated endpoints, page matrix)
+1. **Gate 1:** PLAN ACCEPTED
+2. **Gate 2:** IMPLEMENTED / PRIMARY CODE REVIEW PASS / TEST-EVIDENCE CLEANUP IN PROGRESS
+3. **Gate 3:** NOT AUTHORIZED
+4. **Gate 4:** NOT AUTHORIZED
 
 No gate is automatically implied by the previous gate.
 
 ## 14. Selected Gate 2 Staging Architecture
 
-Gate 2 preparation is currently **COMPLETED** with Required Fixes for the following staging architecture:
+Gate 2 preparation is currently **IMPLEMENTED / PRIMARY CODE REVIEW PASS / TEST-EVIDENCE CLEANUP IN PROGRESS** for the following staging architecture:
 
 - **Provider:** Cloudflare Pages
 - **Hostname:** `*.pages.dev`
@@ -211,8 +211,9 @@ Gate 2 preparation is currently **COMPLETED** with Required Fixes for the follow
 - **Upstream:** solution staging upstream
 - **Configuration:** `SOLUTION_GATEWAY_ORIGIN` deployment configuration
 - **API Namespace:** API Function strictly confined to `/api/v1` and `/api/v1/*`.
-- **SPA Routing:** Explicit SPA route rewrite strategy implemented (no wildcard HTML rewrites).
-- **404 Behavior:** Top-level `404.html` deployed; real missing static assets accurately return HTTP 404.
+- **SPA Routing:** Explicit SPA rewrites prepared (no wildcard HTML rewrites).
+- **404 Behavior:** Top-level `404.html` prepared in deployment artifact; expected missing-static-asset behavior is HTTP 404.
+- **Runtime Disclaimer:** Actual Cloudflare runtime behavior remains NOT VERIFIED until Gate 3.
 
 _Gate 3 actual deployment verification remains NOT AUTHORIZED._
 _Gate 4 login remains NOT AUTHORIZED._
