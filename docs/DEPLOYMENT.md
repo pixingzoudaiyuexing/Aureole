@@ -48,6 +48,9 @@ npm run build
 
 This command performs typechecking, builds the static artifact, generates release metadata, and runs artifact verification.
 
+**Build Git-Context Requirement:**
+The official `npm run build` from source requires a Git checkout with valid `HEAD` metadata because `release.json` is strictly bound to the exact source commit. However, the resulting prebuilt `dist/` artifact does NOT require Git at runtime/deployment.
+
 ## 6. Artifact Contents
 
 The production artifact is located in the `dist/` directory. It contains:

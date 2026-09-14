@@ -122,8 +122,9 @@ generation mismatch 则禁止旧 Session continuation 清 marker、使用旧 tok
 后 full reload 导致 registry 消失，persistent active 仍要求 fresh authority 和新 acknowledgement。Milestone 10 IN PROGRESS；
 AUR-M10-001 COMPLETE / PRIMARY REVIEW PASS。
 AUR-M10-001R1 COMPLETE。
-AUR-M10-002 IMPLEMENTATION COMPLETE / PRIMARY REVIEW FIXES APPLIED / PRIMARY RE-REVIEW PENDING。
+AUR-M10-002 IMPLEMENTATION COMPLETE / PRIMARY REVIEW FIXES APPLIED / TECHNICAL PRIMARY RE-REVIEW PASS / FINAL DOC SSOT CLOSURE PENDING。
 AUR-M10-003 NOT STARTED / NOT AUTHORIZED。
+Milestone 10 IN PROGRESS。
 
 Milestone 9：COMPLETE / PASS / FROZEN。其代码冻结 SHA 为
 `e408f83311c3557706ac9fc09ac06fe754ea71b8`；后续 documentation closure commit 不改变该 code freeze SHA。

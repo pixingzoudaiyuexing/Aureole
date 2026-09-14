@@ -3,8 +3,10 @@
 ## Status and scope
 
 - Task: `AUR-M10-001`
-- Status: `IMPLEMENTATION COMPLETE / PRIMARY REVIEW FIXES APPLIED / PRIMARY RE-REVIEW PENDING`
+- Status: `COMPLETE / PRIMARY REVIEW PASS`
 - Milestone 10: `IN PROGRESS`
+- AUR-M10-001R1: `COMPLETE`
+- AUR-M10-002: `IMPLEMENTATION COMPLETE / PRIMARY REVIEW FIXES APPLIED / TECHNICAL RE-REVIEW PASS / FINAL DOCUMENTATION SSOT CLOSURE PENDING`
 - Audit date: 2026-09-14
 - Aureole audit base: `a2366ea08bc579e1368d52aaf8b5b5ee72aac195`
 - Frozen M9 production code: `e408f83311c3557706ac9fc09ac06fe754ea71b8`
@@ -34,11 +36,29 @@ separate upstream runtime acceptance for selected Gateway/V2Board behavior, but
 that evidence does not prove the Aureole deployment, browser integration, CORS,
 production environment or real provider path.
 
-The principal launch blockers are deployment readiness and production integration
-evidence. No hosting provider, production build environment, API routing mode,
-cache policy, security headers, deployment procedure or rollback procedure is
-defined in this repository. CI can build without `VITE_API_BASE_URL`; that artifact
-passes compilation but fails its first API request with `API_BASE_URL_MISSING`.
+The principal launch blockers remain actual production deployment and integration evidence.
+
+### Current Application/Artifact Contract (AUR-M10-002):
+
+- same-origin `/api/v1` is the frozen DEFAULT.
+- cross-origin is an explicit EXCEPTION.
+- `VITE_API_BASE_URL` is optional in normal same-origin mode.
+- vendor-neutral static artifact contract exists.
+- routing precedence, cache policy, and rollback contracts are defined.
+- security-header/CSP baseline contract is established.
+- artifact verification and deterministic source SHA release identity exist.
+- Tailwind docs scanning isolation is rigorously proven.
+
+### Unresolved Production State (NOT VERIFIED):
+
+- actual production frontend hostname(s)
+- actual hosting/CDN provider selection
+- TLS termination
+- actual `/api/v1` edge/reverse-proxy route
+- applied production cache and security headers/CSP
+- actual deployed release SHA
+- production publish and rollback execution/drill
+- production Auth/read/mutation/financial runtime integration
 
 A complete v1 launch must also close the production Auth/Session gate and make an
 explicit validation decision for exposed payment and financial mutations. Real
@@ -355,7 +375,8 @@ Gaps:
   is defined.
 - No client error-reporting integration or documented privacy-safe console policy
   exists beyond absence of application logging.
-- No deployed SHA/version indicator is exposed in the app or deployment metadata.
+- ARTIFACT SOURCE IDENTITY: IMPLEMENTED via `dist/release.json`.
+- ACTUAL PRODUCTION DEPLOYED SHA: NOT VERIFIED.
 - No production request-ID correlation procedure is documented.
 
 Classification: monitoring and SHA correlation are `MEDIUM` recommended before or
@@ -369,21 +390,16 @@ Known source checkpoints exist:
 - M9 documentation closure and M10 audit base:
   `a2366ea08bc579e1368d52aaf8b5b5ee72aac195`
 
-Repository deployment rollback readiness is `NOT VERIFIED`:
+At AUR-M10-001 audit time, rollback readiness was entirely unverified.
 
-- Actual production provider and deployed SHA are unknown.
-- No artifact registry, deployment command, environment snapshot or rollback
-  command is documented.
-- No proof exists that solution Contract baseline and deployed solution SHA match.
-- No CDN purge/cache rollback procedure is documented.
+**Current Rollback State:**
 
-An SPA rollback must restore `index.html` and its matching hashed assets as one
-release, preserve old hashed assets during cache propagation and ensure the
-rollback build contains the correct `VITE_API_BASE_URL`. Rolling back HTML alone
-can break chunk references; rolling back assets alone can leave new HTML pointing
-to missing files.
+- vendor-neutral rollback contract: DEFINED in `DEPLOYMENT.md`.
+- provider-specific rollback command: UNKNOWN.
+- production rollback drill: NOT VERIFIED.
+- artifact registry/provider release history: UNKNOWN unless proven.
 
-Status: `DEPLOYMENT INFO REQUIRED`. This is part of the deployment BLOCKER.
+Status: `CONTRACT READY / EXECUTION NOT VERIFIED`. This remains part of the deployment execution BLOCKER.
 
 ## Production read-only verification plan
 
@@ -456,9 +472,7 @@ must remain `UNKNOWN` until the deployment owner supplies evidence.
 
 ### BLOCKER
 
-1. Production hosting and runtime configuration are undefined. There is no host,
-   HTTPS/fallback/proxy/cache/header configuration, deployment command, deployed
-   SHA or rollback procedure.
+1. Production hosting and runtime configuration are unverified. While the application contract is ready, there is no verified host, HTTPS/fallback/proxy/applied cache/header execution, deployment command, or rollback drill execution.
 2. RESOLVED BY AUR-M10-002: Same-origin `/api/v1` default implemented. Artifact verification command implemented.
 3. No deployed Aureole Auth/Session evidence exists. Login, `/me`, refresh,
    invalid-session handling and protected route behavior must pass before launch.
@@ -476,7 +490,7 @@ must remain `UNKNOWN` until the deployment owner supplies evidence.
    Advance Period have no production runtime evidence and limited/no rollback.
 4. Notice HTML has strong local sanitizer evidence but no representative production
    content verification.
-5. Security headers and CSP are not defined at the deployment layer.
+5. Security header/CSP CONTRACT exists, but actual production-applied headers remain NOT VERIFIED.
 
 ### RESOLVED BY AUR-M10-001R1
 
@@ -488,11 +502,14 @@ must remain `UNKNOWN` until the deployment owner supplies evidence.
 
 ### MEDIUM
 
-1. RESOLVED BY AUR-M10-002R1: Tailwind source(none) scanning boundary constrained explicitly to `src` and `index.html`. Documentation isolation rigorously proven.
+1. **At AUR-M10-001 audit time:** Tailwind scans repository documentation for utility candidates, so future documentation-only changes can alter the production CSS bundle unless source scope is constrained or artifact drift is gated.
+
+   **RESOLVED BY AUR-M10-002R1:** Tailwind automatic scanning disabled via `@import 'tailwindcss' source(none)`. Explicit scanning limited to `index.html` and `src`, and controlled docs-isolation proof succeeded.
+
 2. Historical L2 browser evidence is extensive but no committed/reproducible
    browser E2E suite exists; Safari/Firefox evidence is absent.
 3. There is no real initial-route analyzer or automated bundle budget gate.
-4. Production uptime, synthetic checks, deployed SHA visibility and request-ID
+4. Production uptime, synthetic checks, production deployed SHA visibility and request-ID
    correlation procedure are absent.
 5. Real reCAPTCHA remains unverified; it is non-blocking only while production
    onboarding does not enable that capability.
@@ -521,12 +538,12 @@ The audit findings justify this order rather than starting with production reads
 before a deployment contract exists:
 
 1. `AUR-M10-002 - Production Deployment Contract and Artifact Readiness`
-   - select hosting/routing mode;
-   - define `VITE_API_BASE_URL`, HTTPS, SPA fallback, cache/security headers;
-   - define build/publish/rollback and deployed-SHA evidence;
-   - perform only non-mutating deployment validation or dry-run as separately
-     authorized.
+   - Current task: implementation + R1 complete.
+   - Technical Primary re-review PASS.
+   - R2 documentation closure pending.
 2. `AUR-M10-003 - Production Auth, Session and Read-Only Verification`
+   - Next proposed task.
+   - NOT STARTED / NOT AUTHORIZED.
    - execute the SAFE-B matrix plus explicitly authorized login/session checks;
    - verify request IDs, CORS/same-origin behavior and sensitive reads.
 3. `AUR-M10-004 - Controlled Non-Financial Mutation Verification`
