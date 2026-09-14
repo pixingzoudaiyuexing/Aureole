@@ -2,12 +2,11 @@
 
 ## 1. Scope
 
-This document plans the precise eventual verification of Production Auth, Session, and Read-Only core functionalities for Aureole.
-It establishes the prerequisites, evidence matrix, stop conditions, and explicit authorization gates required for Phase M10-003 execution.
+This document defines the exact minimum evidence required for Production Auth, Session, and Read-Only core verification (AUR-M10-003) for Aureole. It uses the strict Public Contract SSOT (`0a37894173d1db0bbc57576c640652878f8f623d`) and the active TanStack Router definitions.
 
 ## 2. Safety Boundary
 
-**Current Status:** PLANNING ONLY.
+**Current Status:** PLANNING CORRECTIONS APPLIED. PENDING REVIEW.
 
 - PRODUCTION DEPLOYMENT IS **NOT AUTHORIZED**.
 - PRODUCTION ACCESS / LOGIN IS **NOT AUTHORIZED**.
@@ -15,30 +14,31 @@ It establishes the prerequisites, evidence matrix, stop conditions, and explicit
 - PRODUCTION MUTATIONS ARE **NOT AUTHORIZED**.
 - FINANCIAL OPERATIONS ARE **NOT AUTHORIZED**.
 
-Actual login constitutes a state-changing boundary and is prohibited during this planning phase.
+## 3. Release SHA and Deployment Semantics
 
-## 3. Environment Prerequisites (Phase A)
+Before deployment, the Primary will freeze one exact source commit as the **deployment candidate SHA**.
 
-Before browser verification can begin, the following environment requirements must be satisfied:
+- **Code/Config Freeze Checkpoint:** `8890ba0e8325828e27d2234a3f8b242561fbe801` (from AUR-M10-002).
+- **Deployment candidate SHA:** NOT YET SELECTED.
+- **`release.json` SHA:** Must equal the exact Git HEAD from which `npm run build:release` generates the artifacts.
 
-- Production or production-equivalent Aureole frontend hostname must be provisioned.
-- DNS readiness and resolution confirmed.
-- HTTPS/TLS termination strictly verified.
-- Static hosting / CDN / provider assigned.
-- Exact deployed release SHA matches the expected build (`8890ba0e8325828e27d2234a3f8b242561fbe801` baseline).
-- Presence and correctness of `release.json`.
-- `/api/v1/*` routing properly proxied to the solution Gateway.
-- SPA fallback (unknown routes return `index.html`).
-- Static asset 404 behavior (must return 404, not fallback to index.html).
-- Cache rules explicitly set (HTML no-cache, assets immutable).
-- CSP / Security headers properly injected.
-- Defined rollback target and mechanism.
-- Deployment owner acknowledged.
+## 4. Existing-vs-New Deployment Decision Model
 
-## 4. Required Owner Inputs
+No active production deployment of Aureole exists yet.
+The execution of M10-003 depends entirely on the completion of **AUR-M10-002 Production Deployment Contract and Artifact Readiness**.
+M10-003 cannot begin until an authenticated deployment is fully established and authorized by the Primary.
 
-The following information must be provided by the Primary/User before execution can be authorized.
-Do NOT commit credentials into the repository.
+## 5. M10-003 Minimum Acceptance Evidence
+
+The minimum required evidence to pass M10-003 is:
+
+- **Infrastructure readiness:** deployment candidate exact SHA, `release.json` exact match, HTTPS, static routing, `/api/v1` routing, cache, security headers, rollback defined.
+- **Auth/session evidence:** authorized test account login, `/me` resolution, session restoration, logout, credential clearing.
+- **Read-only product evidence:** page-driven authenticated GET flows across core v1 pages. (Artificial detail GETs are not required when no safe ID exists. POST/PATCH/DELETE must not be exercised.)
+
+## 6. Required Owner Inputs
+
+The following information must be provided by the Primary/User before respective gates can be authorized:
 
 | Input Item                              | Requirement                |
 | --------------------------------------- | -------------------------- |
@@ -55,135 +55,111 @@ Do NOT commit credentials into the repository.
 | Anti-bot/reCAPTCHA mode                 | OPTIONAL                   |
 | Any production restrictions             | DISCOVERABLE SAFELY        |
 
-## 5. Test Account Requirements (Phase B)
+## 7. Test Account Recommendation
 
-The safest dedicated test-account characteristics include:
+We recommend **two dedicated verification accounts** to properly test both empty states and active states. This is RECOMMENDED / OPTIONAL FOR BROADER COVERAGE, not mandatory.
 
-- Must be a dedicated verification account.
-- Must have **NO** valuable balance.
-- Must have **NO** important active orders.
-- Must have **NO** important support state.
-- Must have **NO** valuable commission.
-- Must have **NO** pending withdrawals.
-- Must have **NO** sensitive production role (ordinary user permissions only).
+- **Account A:** No active plan.
+- **Account B:** Active low-value/test plan.
 
-**Recommendation to Primary:**
-Two test accounts are required:
+**Strict characteristics for both:**
 
-1. Account A: No active plan (to verify fallback states and upgrade prompts).
-2. Account B: Active low-value/test plan (to verify dashboard, traffic resources, and active subscription states).
+- NO valuable balance.
+- NO valuable commission.
+- NO pending withdrawal.
+- NO important orders/tickets.
+- Ordinary user permissions only.
 
-## 6. Auth / Session Verification Plan (Phase C)
+## 8. Corrected solution GET Matrix
 
-The eventual checks must follow this progression:
+Based strictly on the Public Contract SSOT. Execution is page-driven; detail endpoints (`{id}`) are conditional detail reads and are not artificially called if suitable IDs do not exist.
 
-1. **Login page load:** Check for proper rendering, correct static asset loading, and TLS.
-2. **Anti-bot capability / challenge mode:** Observe presence and un-obstructed rendering if enabled.
-3. **Login:** Submit credentials.
-4. **Bearer acquisition:** Ensure token is acquired, persisted securely (not in local storage if not permitted), and omitted from telemetry.
-5. **Authenticated bootstrap:** Ensure Auth Context is populated and UI transitions.
-6. **`/api/v1/me`:** Successful resolution and hydration of Account Profile.
-7. **Refresh/session restoration behavior:** Hard reload the SPA and verify smooth restoration of the authenticated state.
-8. **Auth Invalidation:** Trigger a 401 locally or mock a 401 response and confirm automatic logout.
-9. **Logout / token clearing:** Click logout, ensure network requests stop sending the Bearer, and all caches (QueryClient, storage) are fully cleared.
+**PUBLIC:**
 
-## 7. Read-Only API Matrix
+- `GET /api/v1/config/onboarding` (Required for M10-003 L3)
 
-The following exact `/api/v1/*` routes will be executed and observed (GET only):
+**AUTHENTICATED:**
 
-- `GET /api/v1/me`
-- `GET /api/v1/subscriptions/overview`
-- `GET /api/v1/subscriptions/resources`
-- `GET /api/v1/products/plans`
-- `GET /api/v1/orders`
-- `GET /api/v1/tickets`
-- `GET /api/v1/referrals/overview`
-- `GET /api/v1/wallet`
-- `GET /api/v1/notices`
-- `GET /api/v1/site/config`
+- `GET /api/v1/config/account` (Required for M10-003 L3)
+- `GET /api/v1/me` (Required for M10-003 L3)
+- `GET /api/v1/me/preferences` (Required for M10-003 L3)
+- `GET /api/v1/me/stats` (Required for M10-003 L3)
+- `GET /api/v1/wallet` (Required for M10-003 L3)
+- `GET /api/v1/products` (Required for M10-003 L3)
+- `GET /api/v1/products/{id}` (Conditional detail read)
+- `GET /api/v1/orders` (Required for M10-003 L3)
+- `GET /api/v1/orders/{id}` (Conditional detail read)
+- `GET /api/v1/orders/{id}/status` (Conditional detail read)
+- `GET /api/v1/billing/methods` (Required for M10-003 L3)
+- `GET /api/v1/subscription` (Required for M10-003 L3)
+- `GET /api/v1/subscription/overview` (Required for M10-003 L3)
+- `GET /api/v1/resources` (Required for M10-003 L3)
+- `GET /api/v1/tickets` (Required for M10-003 L3)
+- `GET /api/v1/tickets/{id}` (Conditional detail read)
+- `GET /api/v1/notices` (Required for M10-003 L3)
+- `GET /api/v1/notices/{id}` (Conditional detail read)
+- `GET /api/v1/traffic/logs` (Required for M10-003 L3)
+- `GET /api/v1/referrals` (Required for M10-003 L3)
+- `GET /api/v1/referrals/commissions` (Required for M10-003 L3)
+- `GET /api/v1/referrals/withdrawal-options` (Required for M10-003 L3)
 
-## 8. Aureole Page Matrix
+**SPECIAL SENSITIVE CREDENTIAL ROUTE:**
 
-The following exact frontend routes will be visited to observe data hydration:
+- `GET /api/v1/access/subscription`
+  _Decision:_ **EXCLUDE** from M10-003 browser L3 verification unless a later task has a specific justified requirement. Do not expose subscription credentials in evidence.
 
-- `/` (Home)
-- `/login`
-- `/dashboard`
-- `/plans`
-- `/orders`
-- `/wallet`
-- `/support`
-- `/referrals`
-- `/profile`
+## 9. Corrected Aureole Page-to-API Matrix
 
-## 9. Anti-Bot / reCAPTCHA Plan
+Based strictly on the current TanStack Router implementation and actual source code bindings.
 
-- Verify if V2Board/solution upstream requires reCAPTCHA for the `/api/v1/auth/login` endpoint.
-- Observe CSP compliance for external scripts (e.g., `www.recaptcha.net` or `www.google.com/recaptcha`).
-- Confirm challenge renders successfully within the login flow layout on both Desktop and Mobile viewports without breaking UI containment.
+| Frontend Route     | Actual GET Endpoint(s)                                                                           | Required/Conditional |
+| ------------------ | ------------------------------------------------------------------------------------------------ | -------------------- |
+| `/login`           | `/api/v1/config/onboarding`                                                                      | Required             |
+| `/register`        | `/api/v1/config/onboarding`                                                                      | Required             |
+| `/forgot-password` | `/api/v1/config/onboarding`                                                                      | Required             |
+| `/dashboard`       | `/api/v1/me`<br>`/api/v1/subscription/overview`<br>`/api/v1/notices`                             | Required             |
+| `/notices`         | `/api/v1/notices`                                                                                | Required             |
+| `/orders`          | `/api/v1/orders`<br>`/api/v1/orders/{id}` (conditional)                                          | Required             |
+| `/plans`           | `/api/v1/products`<br>`/api/v1/config/account`                                                   | Required             |
+| `/referrals`       | `/api/v1/referrals`<br>`/api/v1/referrals/commissions`<br>`/api/v1/referrals/withdrawal-options` | Required             |
+| `/resources`       | `/api/v1/resources`<br>`/api/v1/traffic/logs`                                                    | Required             |
+| `/settings`        | `/api/v1/me/preferences`<br>`/api/v1/me/stats`<br>`/api/v1/config/account`                       | Required             |
+| `/subscription`    | `/api/v1/subscription`<br>`/api/v1/subscription/overview`                                        | Required             |
+| `/support`         | `/api/v1/tickets`<br>`/api/v1/tickets/{id}` (conditional)                                        | Required             |
+| `/wallet`          | `/api/v1/wallet`                                                                                 | Required             |
 
-## 10. Evidence / Redaction Plan (Phase D)
+_Note:_ The `/` (index) route is a root redirector component (`AuthBootstrapScreen`, `AuthRecoveryScreen`, or `Navigate`) to `/dashboard` or `/login`. It is not a standalone page.
 
-**Authorized Evidence Collection:**
+## 10. Anti-Bot / reCAPTCHA Capability
 
-- Browser type and version
-- Exact page URL visited
-- TLS certificate issuer / validity
-- HTTP status codes (no sensitive bodies)
-- Method and Path (e.g., `GET /api/v1/me`)
-- Operation duration
-- `requestId` (if available in headers)
-- UI rendering result (Pass/Fail)
-- Console errors / warnings
-- CSP / security-header observations
-- Cache rule observations
+- Uses: `GET /api/v1/config/onboarding` as the SSOT for capabilities.
+- Current codebase mapping supports only `provider: recaptcha` and `mode: v2-checkbox`.
+- Unknown provider/mode fails closed.
+- The deployment CSP must be derived from the actual enabled integration (no assumptions on `www.recaptcha.net` unless strictly required by official integration rules).
+- No challenge is solved during this planning phase.
 
-**Strict Redaction Policy (NEVER RECORD):**
+## 11. Auth Negative-Test Evidence
 
-- Bearer tokens
-- Subscription access URLs
-- Gift Card codes
-- Withdrawal account details
-- Payment secrets
-- Raw sensitive payloads or full request/response bodies
-- User passwords
+Local/mock 401 tests establish **L1/L2 regression evidence**, but must **NOT** be presented as production L3 verification.
+For eventual production negative-auth behavior, a safe test must not mutate server state.
 
-## 11. Browser Scope
+- **Concept:** A controlled client-local invalid credential/session test where an authenticated GET fails, resulting in the client invalidating the local session.
+- Do NOT revoke or change production account credentials merely for this test.
+- This is **DEFERRED** unless explicitly required for M10-003 minimum acceptance.
 
-Minimum justified browser set required for production Auth/read evidence:
+## 12. Token Storage Expectations
 
-1. **Chrome (Desktop):** Primary verification.
-2. **Mobile Viewport (Chrome Mobile Emulation or Safari iOS):** Primary responsive verification for Auth flows.
+- In-memory auth state is used.
+- Where session-scoped browser storage is implemented, it must not leak.
+- **Verification Rule:** Explicitly verify there is NO `localStorage` credential persistence, NO token in logs, NO token in URLs, and NO token in analytics. Browser storage must not be overclaimed as inherently "secure."
 
-Safari/Firefox full coverage is deferred to M10-006 unless an Auth-specific anomaly justifies earlier execution.
+## 13. Authorization Gates
 
-## 12. Stop Conditions
+Future actions require explicit staged authorization:
 
-Execution MUST abort immediately if any of the following occur:
+1. **Gate 1:** PLAN ACCEPTED (Currently pending)
+2. **Gate 2:** DEPLOYMENT PREPARATION AUTHORIZED
+3. **Gate 3:** STATIC / UNAUTHENTICATED DEPLOYMENT VERIFICATION AUTHORIZED (DNS, TLS, `release.json`, static assets, SPA fallback, missing asset 404, security headers, cache, `/api/v1/config/onboarding`, routing plumbing)
+4. **Gate 4:** PRODUCTION LOGIN + AUTHENTICATED READ L3 AUTHORIZED (Test account login, authenticated endpoints, page matrix)
 
-- Wrong release SHA is detected in `release.json` or HTML footprint.
-- Unexpected production host is observed.
-- TLS error or certificate mismatch.
-- API routes returning SPA HTML (indicates broken Gateway routing).
-- Raw V2Board exposure in headers or payloads.
-- Unexpected cross-origin target for API calls.
-- CORS wildcard (`*`) detected on authenticated routes.
-- CSP materially broken or causing site functionality failure.
-- Unexpected mutation request (POST/PATCH/DELETE) fires without user action.
-- Auth token appearing in console logs, error boundaries, or analytics.
-- Sensitive credential exposure.
-- Provided production test account has valuable funds, commission, or state.
-- Unexpected account mutation occurs during read verification.
-
-## 13. Deployment Prerequisite Decision
-
-**Can M10-003 begin against an already-existing deployed environment?**
-No known production environment exists matching the verified Aureole baseline architecture yet.
-**Minimal prerequisite:** The deployment environment MUST be fully provisioned, populated with the frozen SHA, and the exact `Frontend hostname` and routing configurations MUST be returned to the Primary before M10-003 execution can commence.
-Actual execution cannot begin until the infrastructure is proven deployed.
-
-## 14. Authorization Gates
-
-1. **Planning Gate:** [x] Produce this plan and await Primary approval.
-2. **Infrastructure Gate:** [ ] Primary provides environment inputs and confirms deployment readiness.
-3. **Execution Gate:** [ ] Primary explicitly authorizes actual browser execution of M10-003.
+A deployment authorization (Gate 3) does **NOT** automatically authorize login (Gate 4).
