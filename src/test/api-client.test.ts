@@ -9,7 +9,7 @@ describe('API client', () => {
     const originalWindow = globalThis.window
     globalThis.window = {
       location: { origin: 'https://same-origin.example.com' },
-    } as any
+    } as unknown as Window & typeof globalThis
 
     try {
       const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
