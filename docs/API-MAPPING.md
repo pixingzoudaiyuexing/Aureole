@@ -323,15 +323,22 @@
   `{transferred:true}` 并 strip additions。`transferred:false`、缺失、wrong type 或 raw V2Board `data:true` 都是
   `MALFORMED_RESPONSE`。Mutation 使用 `['referrals','commission-transfer']` 与 `retry:false`。
 - Transfer 输入复用 Account Config、`parseMoneyInputToMinor` 与 `formatMinorMoney`。Overview、Wallet、Config 必须 fresh
-  success 且 idle；POST 前在同步锁后从 QueryClient 重新检查三项 current authority、currency snapshot、uncertainty
-  marker 与 `amountMinor <= availableCommissionMinor`，不只信任 React render state。
+  success 且 idle，session safety storage 必须可读；POST 前在同步锁后从 QueryClient 重新检查三项 current authority、
+  currency snapshot、uncertainty marker 与 `amountMinor <= availableCommissionMinor`，不只信任 React render state。
+- 每次真实 Transfer POST 前先同步写入
+  `sessionStorage['aureole.safety.commission-transfer-uncertainty']='active'`，再同步更新 QueryClient marker，随后无 await
+  调用 mutation。持久写入失败时不发送 POST。pending、runtime replacement 与 response 前 full reload 都由预先持久化的
+  `active` 保护。
 - confirmed success 与 definitive rejection 都 exact refetch Overview + Wallet；不 broad invalidate `['referrals']`，不刷新
   Commission History、Withdrawal Options、Orders 或 Subscription，也不本地加减余额。成功对账部分失败保留 confirmed
   success 但 fail closed，只开放 GET-only 双读恢复。
-- NETWORK_ERROR、UPSTREAM_TIMEOUT、UPSTREAM_ERROR、MALFORMED_RESPONSE 与 non-ApiError 是 UNKNOWN。独立
-  `['referrals','commission-transfer-uncertainty']` local marker 在 recovery 前立即置为 `active`，且只保存 enum-like state。
-  recovered delta 匹配或不变都不证明 outcome；双读恢复后仍需明确 acknowledgement、重新输入和 financial confirmation。
-  Marker 以 `gcTime:Infinity` 跨 SPA remount，并由 Session Core clear，不进入任何 browser storage。
+- NETWORK_ERROR、UPSTREAM_TIMEOUT、UPSTREAM_ERROR、MALFORMED_RESPONSE 与 non-ApiError 是 UNKNOWN。QueryClient local
+  marker 与 session-scoped persistent marker 都保持 `active`；recovered delta 匹配或不变都不证明 outcome。双读恢复后
+  仍需明确 acknowledgement、重新输入和 financial confirmation；ack/uncheck 同步持久化 `acknowledged` / `active`，
+  下一次 POST 前再次 pre-arm。
+- Persistent marker 只允许 `active` / `acknowledged` / absent，不包含 amount、balance、currency、credential、identity、
+  timestamp 或 error。首次 render 同步 hydrate；普通 auth reload 保留它，confirmed success 与 definitive rejection 清除，
+  logout/new session/Auth invalidation 通过 Session Core 清除。不使用 localStorage，M9-002 Create Code guard 仍不持久化。
 - Transfer/financial recovery 的 AUTH_REQUIRED/AUTH_FAILED 复用 sealed Session Core。金额、余额、币种快照、token、email
   与 raw upstream message 不进入 Query/Mutation key、local guard、storage、URL、Zustand、analytics 或 console。
 - AUR-M9-003 不调用 Withdrawal Request，也不直接访问 V2Board。

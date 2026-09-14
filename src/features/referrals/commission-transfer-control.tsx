@@ -89,6 +89,9 @@ export function CommissionTransferControl({
   const [feedback, setFeedback] = useState<TransferFeedback | null>(null)
   const [keepAcknowledgementVisible, setKeepAcknowledgementVisible] =
     useState(false)
+  const [safetyStorageError, setSafetyStorageError] = useState<string | null>(
+    null,
+  )
   const [sessionError, setSessionError] = useState<unknown>(null)
 
   const invalidSessionError = [
@@ -110,7 +113,9 @@ export function CommissionTransferControl({
   const configAuthorityReady =
     config.isSuccess && !config.isFetching && configSupported
   const financialReadsReady = overviewAuthorityReady && walletAuthorityReady
-  const transferAuthorityReady = financialReadsReady && configAuthorityReady
+  const financialAuthorityReady = financialReadsReady && configAuthorityReady
+  const safetyStateReady = uncertainty.hydrated && uncertainty.storageAvailable
+  const transferAuthorityReady = financialAuthorityReady && safetyStateReady
   const recoveryFailed = feedback?.reconciled === false
   const unknownGuardActive = uncertainty.status === 'active'
   const unknownAcknowledged = uncertainty.status === 'acknowledged'
@@ -128,6 +133,7 @@ export function CommissionTransferControl({
     mutation.isPending ||
     recovering ||
     recoveryFailed ||
+    Boolean(safetyStorageError) ||
     unknownGuardActive
 
   const formattedAvailableCommission =
@@ -245,6 +251,8 @@ export function CommissionTransferControl({
     const authority = getCommissionTransferAuthority(queryClient)
     if (
       !authority ||
+      !uncertainty.hydrated ||
+      !uncertainty.storageAvailable ||
       getCommissionTransferUncertaintyStatus(queryClient) === 'active'
     ) {
       rejectStaleConfirmation(
@@ -271,7 +279,17 @@ export function CommissionTransferControl({
       return
     }
 
-    uncertainty.clear()
+    if (!uncertainty.preArm()) {
+      setSafetyStorageError(
+        '当前无法建立资金操作安全状态，请稍后重试或检查浏览器存储设置。',
+      )
+      setConfirmationOpen(false)
+      setConfirmedTransfer(null)
+      transferLock.release()
+      return
+    }
+
+    setSafetyStorageError(null)
     setKeepAcknowledgementVisible(false)
     sessionInvalidatedRef.current = false
     setActionPending(true)
@@ -280,6 +298,7 @@ export function CommissionTransferControl({
     const request = mutation.mutateAsync(confirmedTransfer.amountMinor)
     try {
       await request
+      uncertainty.clear()
       setConfirmationOpen(false)
       setConfirmedTransfer(null)
       setAmountText('')
@@ -298,7 +317,7 @@ export function CommissionTransferControl({
       setConfirmationOpen(false)
       setConfirmedTransfer(null)
       if (isAmbiguousCommissionTransferError(error)) {
-        uncertainty.activate()
+        uncertainty.retainActive()
         setKeepAcknowledgementVisible(true)
         setAmountText('')
         setAmountError(null)
@@ -308,6 +327,7 @@ export function CommissionTransferControl({
           setFeedback({ kind: 'unknown', reconciled })
         }
       } else {
+        uncertainty.clear()
         const kind: TransferFeedbackKind =
           error instanceof ApiError &&
           error.code === 'INSUFFICIENT_COMMISSION_BALANCE'
@@ -344,6 +364,10 @@ export function CommissionTransferControl({
     }
   }
 
+  const retrySafetyStorage = () => {
+    if (uncertainty.retryHydration()) setSafetyStorageError(null)
+  }
+
   return (
     <section
       className="border-t border-border py-8"
@@ -357,6 +381,28 @@ export function CommissionTransferControl({
       </p>
 
       <div className="mt-5 max-w-2xl space-y-5">
+        {!uncertainty.hydrated ? (
+          <p className="text-sm text-muted-foreground" role="status">
+            正在检查资金操作安全状态…
+          </p>
+        ) : !uncertainty.storageAvailable || safetyStorageError ? (
+          <div className="space-y-3" role="alert">
+            <p className="text-sm text-destructive">
+              {safetyStorageError ??
+                '当前无法读取资金操作安全状态，佣金划转已停用。'}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={retrySafetyStorage}
+            >
+              <RefreshCw className="size-4" aria-hidden="true" />
+              重新检查浏览器安全存储
+            </Button>
+          </div>
+        ) : null}
+
         <FinancialAuthorityState
           overview={overview}
           wallet={wallet}
@@ -406,8 +452,16 @@ export function CommissionTransferControl({
               disabled={actionPending || recovering}
               onChange={(event) => {
                 setKeepAcknowledgementVisible(true)
-                if (event.target.checked) uncertainty.acknowledge()
-                else uncertainty.activate()
+                const persisted = event.target.checked
+                  ? uncertainty.acknowledge()
+                  : uncertainty.activate()
+                if (!persisted) {
+                  setSafetyStorageError(
+                    '当前无法更新资金操作安全状态，请稍后重试或检查浏览器存储设置。',
+                  )
+                } else {
+                  setSafetyStorageError(null)
+                }
               }}
             />
             <span>我已核对当前可用佣金和账户余额，仍需再次提交佣金划转。</span>

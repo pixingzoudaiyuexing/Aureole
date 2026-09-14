@@ -15,7 +15,11 @@ import { AuthProvider } from '@/features/auth/auth-provider'
 import { authQueryKeys } from '@/features/auth/auth-query-keys'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
+import { sessionSafetyStorageKeys } from '@/lib/auth/session-safety-storage'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
+
+const commissionSafetyKey =
+  sessionSafetyStorageKeys.commissionTransferUncertainty
 
 const currentUser: CurrentUser = {
   email: 'member@example.com',
@@ -106,6 +110,7 @@ describe('Auth session lifecycle', () => {
   })
 
   it('stores a successful login, bootstraps /me, and enters the app', async () => {
+    window.sessionStorage.setItem(commissionSafetyKey, 'active')
     const login = vi.fn().mockResolvedValue(loginResponse)
     const getCurrentUser = vi.fn().mockResolvedValue(currentUser)
     const api = createAuthApi({ login, getCurrentUser })
@@ -135,6 +140,7 @@ describe('Auth session lifecycle', () => {
       'opaque-session-token',
     )
     expect(window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
     expect(screen.getAllByText('member@example.com').length).toBeGreaterThan(0)
   })
 
@@ -237,6 +243,7 @@ describe('Auth session lifecycle', () => {
       AUTH_SESSION_STORAGE_KEY,
       'stored-session-token',
     )
+    window.sessionStorage.setItem(commissionSafetyKey, 'active')
     const getCurrentUser = vi.fn().mockResolvedValue(currentUser)
     const { router } = renderRoute(
       '/dashboard',
@@ -246,6 +253,7 @@ describe('Auth session lifecycle', () => {
     await screen.findAllByRole('heading', { name: 'Overview' })
     expect(router.state.location.pathname).toBe('/dashboard')
     expect(getCurrentUser).toHaveBeenCalledWith('stored-session-token')
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
   })
 
   it.each(['AUTH_REQUIRED', 'AUTH_FAILED'])(
@@ -255,6 +263,7 @@ describe('Auth session lifecycle', () => {
         AUTH_SESSION_STORAGE_KEY,
         'invalid-session-token',
       )
+      window.sessionStorage.setItem(commissionSafetyKey, 'active')
       const api = createAuthApi({
         getCurrentUser: vi.fn().mockRejectedValue(
           new ApiError({
@@ -273,6 +282,7 @@ describe('Auth session lifecycle', () => {
       ).toBeInTheDocument()
       expect(router.state.location.pathname).toBe('/login')
       expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
+      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
       expect(queryClient.getQueryData(['private-account-data'])).toBeUndefined()
     },
   )
@@ -393,6 +403,7 @@ describe('Auth session lifecycle', () => {
       AUTH_SESSION_STORAGE_KEY,
       'stored-session-token',
     )
+    window.sessionStorage.setItem(commissionSafetyKey, 'active')
     const queryClient = createQueryClient()
     queryClient.setQueryData(['private-account-data'], { secret: 'cached' })
     const { router } = renderRoute('/dashboard', createAuthApi(), queryClient)
@@ -403,6 +414,7 @@ describe('Auth session lifecycle', () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
     expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
     expect(queryClient.getQueryData(['private-account-data'])).toBeUndefined()
   })
 
@@ -435,6 +447,7 @@ describe('Auth session lifecycle', () => {
     'keeps session B when stale session A later %ss',
     async (settlement) => {
       window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'session-a-token')
+      window.sessionStorage.setItem(commissionSafetyKey, 'active')
       const sessionA = createDeferred<CurrentUser>()
       const sessionBUser: CurrentUser = {
         ...currentUser,
@@ -493,6 +506,7 @@ describe('Auth session lifecycle', () => {
       expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
         'session-b-token',
       )
+      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
     },
   )
 })

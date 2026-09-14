@@ -22,7 +22,11 @@ import { walletApi } from '@/features/wallet/wallet-api'
 import { walletQueryKeys } from '@/features/wallet/wallet-queries'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
+import { sessionSafetyStorageKeys } from '@/lib/auth/session-safety-storage'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
+
+const commissionSafetyKey =
+  sessionSafetyStorageKeys.commissionTransferUncertainty
 
 const overview = {
   codes: [{ code: 'CODE1', createdAt: '2026-09-14T01:00:00.000Z' }],
@@ -82,6 +86,27 @@ function renderReferrals(queryClient: QueryClient = createQueryClient()) {
     accessToken: 'transfer-token',
     hydrated: true,
   })
+  const authApi: AuthApi = {
+    login: vi.fn(),
+    getCurrentUser: vi.fn().mockResolvedValue({
+      email: 'member@example.com',
+      expiresAt: null,
+      status: 'active',
+    }),
+  }
+  const router = createAppRouter({ initialEntries: ['/referrals'] })
+  const rendered = render(
+    <AppProviders
+      router={router}
+      authApi={authApi}
+      queryClient={queryClient}
+    />,
+  )
+  return { queryClient, router, unmount: rendered.unmount }
+}
+
+function renderFullRuntime(queryClient: QueryClient = createQueryClient()) {
+  useAuthSessionStore.setState({ accessToken: null, hydrated: false })
   const authApi: AuthApi = {
     login: vi.fn(),
     getCurrentUser: vi.fn().mockResolvedValue({
@@ -249,6 +274,7 @@ describe('Commission Transfer authority and confirmation', () => {
     fireEvent.click(confirm)
     fireEvent.click(confirm)
     await waitFor(() => expect(mocks.transferCommission).toHaveBeenCalledOnce())
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
     expect(mocks.transferCommission).toHaveBeenCalledWith('transfer-token', {
       amountMinor: 1_000,
     })
@@ -257,6 +283,7 @@ describe('Commission Transfer authority and confirmation', () => {
     ).toBeVisible()
     act(() => transfer.resolve({ transferred: true }))
     expect(await screen.findByText('佣金划转已确认。')).toBeInTheDocument()
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
     expect(mocks.transferCommission).toHaveBeenCalledOnce()
   })
 
@@ -359,6 +386,7 @@ describe('Commission Transfer outcomes and reconciliation', () => {
       const section = await transferSection()
       expect(section.getByRole('button', { name: '佣金划转' })).toBeDisabled()
       expect(mocks.transferCommission).toHaveBeenCalledOnce()
+      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
 
       mocks.getOverview.mockResolvedValue(overview)
       mocks.getWallet.mockResolvedValue(wallet)
@@ -371,6 +399,7 @@ describe('Commission Transfer outcomes and reconciliation', () => {
         expect(section.getByRole('button', { name: '佣金划转' })).toBeEnabled(),
       )
       expect(mocks.transferCommission).toHaveBeenCalledOnce()
+      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
     },
   )
 
@@ -404,6 +433,7 @@ describe('Commission Transfer outcomes and reconciliation', () => {
       expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
         'transfer-token',
       )
+      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
     },
   )
 })
@@ -443,6 +473,7 @@ describe('Commission Transfer UNKNOWN safety', () => {
       expect(screen.queryByText('佣金划转未能完成')).toBeNull()
       expect(form.input).toHaveValue('')
       expect(mocks.transferCommission).toHaveBeenCalledOnce()
+      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
       expect(
         (await transferSection()).getByRole('button', { name: '佣金划转' }),
       ).toBeDisabled()
@@ -468,11 +499,17 @@ describe('Commission Transfer UNKNOWN safety', () => {
     expect(
       queryClient.getQueryData(commissionTransferLocalGuardKeys.uncertainty),
     ).toBe('active')
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
     expect(
       JSON.stringify(
         queryClient.getQueryData(commissionTransferLocalGuardKeys.uncertainty),
       ),
     ).not.toMatch(/1000|transfer-token|CNY|member@example.com/)
+    expect(
+      JSON.stringify(window.sessionStorage.getItem(commissionSafetyKey)),
+    ).not.toMatch(
+      /1000|transfer-token|CNY|member@example.com|commission|balance|timestamp|private/,
+    )
     expect(form.input).toHaveValue('')
 
     act(() => overviewRecovery.resolve(overview))
@@ -541,6 +578,7 @@ describe('Commission Transfer UNKNOWN safety', () => {
     expect(
       queryClient.getQueryData(commissionTransferLocalGuardKeys.uncertainty),
     ).toBe('active')
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
 
     first.unmount()
     renderReferrals(queryClient)
@@ -580,6 +618,19 @@ describe('Commission Transfer UNKNOWN safety', () => {
     expect(
       queryClient.getQueryData(commissionTransferLocalGuardKeys.uncertainty),
     ).toBe('acknowledged')
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe(
+      'acknowledged',
+    )
+
+    await form.user.click(acknowledgement)
+    expect(
+      queryClient.getQueryData(commissionTransferLocalGuardKeys.uncertainty),
+    ).toBe('active')
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
+    await form.user.click(acknowledgement)
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe(
+      'acknowledged',
+    )
 
     first.unmount()
     renderReferrals(queryClient)
@@ -589,6 +640,208 @@ describe('Commission Transfer UNKNOWN safety', () => {
     expect(input).toHaveValue('')
     expect(section.queryByRole('checkbox')).toBeNull()
     expect(mocks.transferCommission).toHaveBeenCalledOnce()
+  })
+
+  it('hydrates handled UNKNOWN into a brand-new QueryClient runtime', async () => {
+    const mocks = installMocks()
+    mocks.transferCommission.mockRejectedValue(apiError('NETWORK_ERROR', 0))
+    const first = renderReferrals()
+    const form = await openConfirmation()
+    await confirmTransfer(form)
+    await screen.findByRole('checkbox', {
+      name: '我已核对当前可用佣金和账户余额，仍需再次提交佣金划转。',
+    })
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
+
+    first.unmount()
+    const nextQueryClient = createQueryClient()
+    renderFullRuntime(nextQueryClient)
+    const section = await transferSection()
+    const input = await section.findByRole('textbox', { name: '划转金额' })
+    expect(input).toHaveValue('')
+    expect(input).toBeDisabled()
+    expect(
+      await section.findByRole('checkbox', {
+        name: '我已核对当前可用佣金和账户余额，仍需再次提交佣金划转。',
+      }),
+    ).toBeInTheDocument()
+    expect(
+      nextQueryClient.getQueryData(
+        commissionTransferLocalGuardKeys.uncertainty,
+      ),
+    ).toBe('active')
+    expect(mocks.transferCommission).toHaveBeenCalledOnce()
+  })
+
+  it('pre-arms persistent uncertainty before an in-flight POST and survives full runtime replacement', async () => {
+    const mocks = installMocks()
+    const pendingTransfer = deferred<{ transferred: true }>()
+    mocks.transferCommission.mockImplementation(() => {
+      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
+      return pendingTransfer.promise
+    })
+    const first = renderReferrals()
+    const form = await openConfirmation()
+    await confirmTransfer(form)
+
+    await waitFor(() => expect(mocks.transferCommission).toHaveBeenCalledOnce())
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
+    first.unmount()
+
+    const nextQueryClient = createQueryClient()
+    renderFullRuntime(nextQueryClient)
+    const section = await transferSection()
+    const input = await section.findByRole('textbox', { name: '划转金额' })
+    expect(input).toHaveValue('')
+    expect(input).toBeDisabled()
+    expect(
+      await section.findByRole('checkbox', {
+        name: '我已核对当前可用佣金和账户余额，仍需再次提交佣金划转。',
+      }),
+    ).toBeInTheDocument()
+    expect(mocks.transferCommission).toHaveBeenCalledOnce()
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
+  })
+
+  it('hydrates acknowledged state into a new runtime and pre-arms the next POST again', async () => {
+    const mocks = installMocks()
+    mocks.transferCommission.mockRejectedValueOnce(apiError('NETWORK_ERROR', 0))
+    const first = renderReferrals()
+    const form = await openConfirmation()
+    await confirmTransfer(form)
+    const acknowledgement = await screen.findByRole('checkbox', {
+      name: '我已核对当前可用佣金和账户余额，仍需再次提交佣金划转。',
+    })
+    await form.user.click(acknowledgement)
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe(
+      'acknowledged',
+    )
+    first.unmount()
+
+    const pendingTransfer = deferred<{ transferred: true }>()
+    mocks.transferCommission.mockImplementationOnce(() => {
+      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
+      return pendingTransfer.promise
+    })
+    renderFullRuntime(createQueryClient())
+    const section = await transferSection()
+    const input = await section.findByRole('textbox', { name: '划转金额' })
+    await waitFor(() => expect(input).toBeEnabled())
+    expect(input).toHaveValue('')
+    expect(section.queryByRole('checkbox')).toBeNull()
+    await form.user.type(input, '10')
+    await form.user.click(section.getByRole('button', { name: '佣金划转' }))
+    expect(mocks.transferCommission).toHaveBeenCalledOnce()
+    await form.user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: '确认划转',
+      }),
+    )
+    await waitFor(() =>
+      expect(mocks.transferCommission).toHaveBeenCalledTimes(2),
+    )
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
+  })
+
+  it.each([
+    ['success', null],
+    ['insufficient', apiError('INSUFFICIENT_COMMISSION_BALANCE', 409)],
+  ] as const)(
+    'does not hydrate a stale marker after confirmed %s',
+    async (_outcome, error) => {
+      const mocks = installMocks()
+      if (error) mocks.transferCommission.mockRejectedValue(error)
+      const first = renderReferrals()
+      const form = await openConfirmation()
+      await confirmTransfer(form)
+      await waitFor(() =>
+        expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull(),
+      )
+      first.unmount()
+
+      const nextQueryClient = createQueryClient()
+      renderFullRuntime(nextQueryClient)
+      const section = await transferSection()
+      const input = await section.findByRole('textbox', { name: '划转金额' })
+      await waitFor(() => expect(input).toBeEnabled())
+      expect(input).toHaveValue('')
+      expect(section.queryByRole('checkbox')).toBeNull()
+      expect(
+        nextQueryClient.getQueryData(
+          commissionTransferLocalGuardKeys.uncertainty,
+        ),
+      ).toBeNull()
+    },
+  )
+
+  it('fails closed with zero POST when the safety marker cannot be persisted, then recovers', async () => {
+    const mocks = installMocks()
+    renderReferrals()
+    const form = await openConfirmation()
+    const originalSetItem = Storage.prototype.setItem
+    const storageSpy = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(function (this: Storage, key, value) {
+        if (this === window.sessionStorage && key === commissionSafetyKey) {
+          throw new DOMException('private storage detail', 'SecurityError')
+        }
+        return originalSetItem.call(this, key, value)
+      })
+
+    await confirmTransfer(form)
+    expect(mocks.transferCommission).not.toHaveBeenCalled()
+    expect(
+      await screen.findByText(
+        '当前无法建立资金操作安全状态，请稍后重试或检查浏览器存储设置。',
+      ),
+    ).toBeInTheDocument()
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
+
+    storageSpy.mockRestore()
+    await form.user.click(
+      (await transferSection()).getByRole('button', {
+        name: '重新检查浏览器安全存储',
+      }),
+    )
+    await form.user.click(
+      (await transferSection()).getByRole('button', { name: '佣金划转' }),
+    )
+    await form.user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: '确认划转',
+      }),
+    )
+    expect(await screen.findByText('佣金划转已确认。')).toBeInTheDocument()
+    expect(mocks.transferCommission).toHaveBeenCalledOnce()
+  })
+
+  it('fails closed when persistent safety state cannot be read during initialization', async () => {
+    const mocks = installMocks()
+    const originalGetItem = Storage.prototype.getItem
+    const storageSpy = vi
+      .spyOn(Storage.prototype, 'getItem')
+      .mockImplementation(function (this: Storage, key) {
+        if (this === window.sessionStorage && key === commissionSafetyKey) {
+          throw new DOMException('private storage detail', 'SecurityError')
+        }
+        return originalGetItem.call(this, key)
+      })
+    renderReferrals()
+    const section = await transferSection()
+    expect(section.getByRole('button', { name: '佣金划转' })).toBeDisabled()
+    expect(section.getByRole('textbox', { name: '划转金额' })).toBeDisabled()
+    expect(
+      section.getByText('当前无法读取资金操作安全状态，佣金划转已停用。'),
+    ).toBeInTheDocument()
+    expect(mocks.transferCommission).not.toHaveBeenCalled()
+
+    storageSpy.mockRestore()
+    await userEvent
+      .setup()
+      .click(section.getByRole('button', { name: '重新检查浏览器安全存储' }))
+    await waitFor(() =>
+      expect(section.getByRole('button', { name: '佣金划转' })).toBeEnabled(),
+    )
   })
 
   it('keeps a failed UNKNOWN recovery guarded after remount until both reads recover', async () => {
@@ -652,6 +905,7 @@ describe('Commission Transfer UNKNOWN safety', () => {
         queryClient.getQueryData(referralsQueryKeys.overview),
       ).toBeUndefined()
       expect(queryClient.getQueryData(walletQueryKeys.wallet)).toBeUndefined()
+      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
     },
   )
 
@@ -669,6 +923,7 @@ describe('Commission Transfer UNKNOWN safety', () => {
       ).toBeInTheDocument()
       expect(router.state.location.pathname).toBe('/login')
       expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
+      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
       expect(
         queryClient.getQueryData(referralsQueryKeys.overview),
       ).toBeUndefined()

@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, type ReactNode } from 'react'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
+import { clearSessionSafetyState } from '@/lib/auth/session-safety-storage'
 import { authApi as defaultAuthApi, type AuthApi } from './auth-api'
 import {
   AuthContext,
@@ -37,6 +38,7 @@ export function AuthProvider({
   })
 
   const clearSession = useCallback(() => {
+    clearSessionSafetyState()
     queryClient.clear()
     clearAccessToken()
   }, [clearAccessToken, queryClient])
@@ -58,6 +60,7 @@ export function AuthProvider({
 
   const establishSession = useCallback(
     async (accessToken: string) => {
+      clearSessionSafetyState()
       queryClient.clear()
       setAccessToken(accessToken)
 

@@ -82,7 +82,8 @@ Milestone 9 按以下边界推进：
   `445ffac542d89977f2db5b631516b6c3bbdc955f`
 - AUR-M9-002 Create Referral Code：COMPLETE，INDEPENDENT REFERRAL CODE MUTATION REVIEW PASS，冻结于
   `ba106d1c7d7b69fbc9b5b52837c3abee939ef218`
-- AUR-M9-003 Commission Transfer：IMPLEMENTATION COMPLETE，INDEPENDENT FINANCIAL MUTATION REVIEW PENDING
+- AUR-M9-003 Commission Transfer：IMPLEMENTATION COMPLETE，PRIMARY REQUIRED HARDENING APPLIED，TARGETED
+  FINANCIAL RE-REVIEW PENDING
 - AUR-M9-004 Withdrawal Request：NOT STARTED
 
 AUR-M9-002 只增量实现 bodyless `POST /api/v1/referrals/codes`。Create 使用 fresh Overview authority、
@@ -95,5 +96,7 @@ AUR-M9-003 只增量实现 strict `POST /api/v1/referrals/commissions/transfer`�
 Account Config 三项 fresh authority、major-to-minor 精确解析、financial confirmation、同步锁和 execution-time
 QueryClient recheck。confirmed success 与 definitive failure 只双读 Overview/Wallet；UNKNOWN 使用独立 session-memory
 uncertainty marker，双读只恢复当前资金事实，不根据余额 delta 推断 outcome，再次提交需要 acknowledgement、重新输入和
-重新确认。Withdrawal Request 与 Launch Readiness 未开始。Production Referral / Commission / Withdrawal / Create /
-Transfer runtime 为 NOT TESTED。
+重新确认。Primary required hardening 进一步加入只保存 `active` / `acknowledged` 的 session-scoped safety marker，并在
+每次 POST 前同步 pre-arm，关闭 handled UNKNOWN 与 in-flight response 前 full reload 的重复划转窗口；logout、新 Session
+和 Auth invalidation 清 marker，普通同 session reload 保留。Withdrawal Request 与 Launch Readiness 未开始。Production
+Referral / Commission / Withdrawal / Create / Transfer runtime 为 NOT TESTED。

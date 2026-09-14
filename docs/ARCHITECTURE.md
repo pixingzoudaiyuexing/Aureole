@@ -426,23 +426,34 @@ AUR-M9-003 增加 `POST /api/v1/referrals/commissions/transfer`。Request 使用
 `parseMoneyInputToMinor` / `formatMinorMoney` 与 canonical Account Config，不硬编码两位小数、币种或 symbol，也不提供
 “全部划转”。
 
-Transfer 只有在 canonical Overview、Wallet 与 Account Config 都 fresh success、idle 且币种可安全处理时开放；Wallet
-在 Transfer 页面 remount 时强制 fresh read。标准 financial confirmation 保存 amount 与 currency semantics 的 React
-memory snapshot，展示当时的可用佣金和账户余额但不预测划转后余额。同步 lock 后、POST 前会直接读取 QueryClient
-current state，再次验证三项 authority、独立 uncertainty marker、币种快照和当前可用佣金；authority check 与
-`mutateAsync` 调用之间没有 await。
+Transfer 只有在 canonical Overview、Wallet 与 Account Config 都 fresh success、idle、币种可安全处理且 session safety
+storage 可读时开放；Wallet 在 Transfer 页面 remount 时强制 fresh read。标准 financial confirmation 保存 amount 与
+currency semantics 的 React memory snapshot，展示当时的可用佣金和账户余额但不预测划转后余额。同步 lock 后、POST 前
+会直接读取 QueryClient current state，再次验证三项 authority、独立 uncertainty marker、币种快照和当前可用佣金。
+验证通过后必须先同步把 content-free safety marker 持久化为 `active`，再同步更新 QueryClient marker，随后无 `await`
+调用 `mutateAsync`。持久写入失败时零 POST 并 fail closed。
 
 confirmed success、`INSUFFICIENT_COMMISSION_BALANCE`、`COMMISSION_TRANSFER_FAILED` 与 `VALIDATION_ERROR` 都只通过 exact
 `GET /api/v1/referrals` 和 canonical `GET /api/v1/wallet` 对账，不刷新 Commission History、Withdrawal Options、Orders
 或 Subscription，也不使用 `setQueryData` 修改 server financial state。成功后的任一 GET 失败不推翻 confirmed success，
 但会 fail closed 并只开放双 GET manual recovery。
 
-NETWORK_ERROR、UPSTREAM_TIMEOUT、UPSTREAM_ERROR、MALFORMED_RESPONSE 与 non-ApiError 都是 UNKNOWN。分类后立即把独立
-`['referrals','commission-transfer-uncertainty']` memory-only marker 设为 `active`，再清空 amount/snapshot 并执行 Overview
-与 Wallet recovery。无论 recovered balance delta 刚好匹配还是完全不变，都不推断本次 outcome。只有双读恢复且用户明确
-acknowledgement 后 marker 才变为 `acknowledged`；取消勾选恢复 `active`，下一次仍需重新输入并确认。marker 只保存
-`active` / `acknowledged` / null，以 `gcTime:Infinity` 跨 SPA remount，不包含金额、余额、币种、token、email 或错误信息；
-Session Core `queryClient.clear()` 清除它。Full-document reload 仍不同于 SPA remount，本任务不新增持久化。
+Commission Transfer uncertainty 同时使用 QueryClient local guard
+`['referrals','commission-transfer-uncertainty']` 和 session-scoped
+`aureole.safety.commission-transfer-uncertainty`。后者只允许 `active` / `acknowledged` / key absent，使同一 tab 的
+full-document reload 能恢复 safety state；首次 render 同步读取 marker，在读取失败时 fail closed，不出现 marker 尚未
+hydrate 而短暂开放的首帧。
+
+NETWORK_ERROR、UPSTREAM_TIMEOUT、UPSTREAM_ERROR、MALFORMED_RESPONSE 与 non-ApiError 都是 UNKNOWN。因为 POST 前已
+pre-arm，pending 期间、handled UNKNOWN 和旧 runtime 在 response 前被 reload 的情况都保持 persistent `active`。catch
+只清空 amount/snapshot 并执行 Overview 与 Wallet recovery；无论 recovered balance delta 刚好匹配还是完全不变，都不
+推断本次 outcome。只有双读恢复且用户明确 acknowledgement 后，两层 marker 才同步变为 `acknowledged`；取消勾选同步
+恢复 `active`。下一次 POST 前再次 pre-arm `active`。可信 `{transferred:true}` 或 definitive rejection 才清除两层 marker，
+然后对账。
+
+Persistent marker 不包含金额、余额、币种、token、email、timestamp 或错误信息，也不使用 localStorage。普通 credential
+hydrate 保留 marker；logout、Auth invalidation 与 `establishSession` 除清 QueryClient 外还显式清理 session safety state，
+防止跨 authenticated session 泄漏。Referral Code Create 仍保持原 memory-only guard，不被本 hardening 修改。
 
 AUR-M9-003 不实现 Withdrawal Request，不修改 solution、直接访问 V2Board、预测余额、自动 retry 或进入 Launch
 Readiness。

@@ -76,13 +76,16 @@ Independent Referral Read Review passed; it is frozen at
 its Independent Referral Code Mutation Review passed, and it is frozen at
 `ba106d1c7d7b69fbc9b5b52837c3abee939ef218`.
 
-AUR-M9-003 Commission Transfer is IMPLEMENTATION COMPLETE with INDEPENDENT FINANCIAL
-MUTATION REVIEW PENDING. It adds only strict `POST /api/v1/referrals/commissions/transfer`,
-fresh Overview/Wallet/Account Config authority, exact money parsing, financial confirmation,
-execution-time QueryClient rechecks, same-tick locking, Overview + Wallet reconciliation and a
-content-free session-memory UNKNOWN guard. It never predicts balances or infers mutation
-outcome from recovered deltas. AUR-M9-004 Withdrawal Request is NOT STARTED. Production
-solution/V2Board Referral Read, Create and Commission Transfer runtime is NOT TESTED.
+AUR-M9-003 Commission Transfer is IMPLEMENTATION COMPLETE with PRIMARY REQUIRED HARDENING
+APPLIED and TARGETED FINANCIAL RE-REVIEW PENDING. It adds only strict
+`POST /api/v1/referrals/commissions/transfer`, fresh Overview/Wallet/Account Config authority,
+exact money parsing, financial confirmation, execution-time QueryClient rechecks, same-tick
+locking and Overview + Wallet reconciliation. Its content-free uncertainty state now uses both
+QueryClient and a session-scoped reload-persistent marker, synchronously pre-armed before every
+POST. This closes handled-UNKNOWN and in-flight full-reload duplicate windows without persisting
+financial data. It never predicts balances or infers mutation outcome from recovered deltas.
+AUR-M9-004 Withdrawal Request is NOT STARTED. Production solution/V2Board Referral Read, Create
+and Commission Transfer runtime is NOT TESTED.
 
 ## Current commit
 
@@ -96,15 +99,15 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (42 files, 983 tests)
+- `npm test`: PASS (43 files, 995 tests)
 - `npm run build`: PASS
 - `npm ls`: PASS
 - `git diff --check`: PASS
-- Build evidence: main JS 471.84 kB raw / 148.41 kB gzip; CSS 37.80 kB raw /
-  7.51 kB gzip; Referrals route 32.75 kB raw / 8.50 kB gzip; Support route
-  31.19 kB raw / 8.29 kB gzip; Wallet route 22.80 kB raw / 6.84 kB gzip;
+- Build evidence: main JS 472.41 kB raw / 148.60 kB gzip; CSS 37.80 kB raw /
+  7.51 kB gzip; Referrals route 34.05 kB raw / 8.89 kB gzip; Support route
+  31.19 kB raw / 8.29 kB gzip; Wallet route 22.81 kB raw / 6.84 kB gzip;
   Subscription route 19.89 kB raw / 5.68 kB gzip; Plans route 5.15 kB gzip;
-  Orders route 13.16 kB gzip. Assets remain within budget; initial-route
+  Orders route 13.17 kB gzip. Assets remain within budget; initial-route
   composition has not been measured by a dedicated analyzer.
 - Browser verification: PASS at 1280 x 720 and 390 x 844 for Login Light/Dark,
   keyboard validation, visible error, loading, controlled login, refresh
@@ -358,13 +361,28 @@ operational source of truth.
   definitive errors, success reconciliation partial failures, recovery-failure remount,
   acknowledged remount, recovery Auth invalidation and Session Core clear. Production
   solution/V2Board Commission Transfer runtime is NOT TESTED.
+- AUR-M9-003 primary full-reload hardening automated verification uses brand-new QueryClient and
+  runtime-facing Auth state while preserving the same sessionStorage. It proves handled UNKNOWN,
+  an unresolved in-flight POST before old-runtime catch, and acknowledged state all hydrate with
+  the required semantics; persistent pre-arm exists before mutation invocation and remains while
+  pending. Confirmed success and definitive rejection clear the marker; all UNKNOWN classes retain
+  it. Storage write/read failure is fail closed with zero POST, and logout, new login and Auth
+  invalidation clear persistent safety state. Controlled real-browser F5 evidence is tracked
+  separately from these deterministic tests.
+- AUR-M9-003 primary full-reload hardening controlled-browser verification: PASS against a local
+  `/api/v1` mock. Handled UNKNOWN survived a real browser reload with Transfer disabled, empty
+  amount and acknowledgement required. Acknowledged state survived reload and restored only the
+  normal empty confirmation flow. A Transfer whose response remained pending was reloaded before
+  the old runtime could settle; the new runtime restored active uncertainty and the mock recorded
+  exactly one POST. Browser console warning/error count was zero. This is controlled evidence, not
+  production solution/V2Board runtime evidence.
 
 ## Known gaps
 
 - Wallet Balance Read, Wallet Deposit Create, Gift Card Redeem, all Support Ticket v1 work,
   Referral / Commission Read Model and Referral Code Create are complete and independently
-  reviewed. Commission Transfer implementation is complete with independent financial mutation
-  review pending; Withdrawal Request is not started.
+  reviewed. Commission Transfer implementation and primary required full-reload hardening are
+  complete with targeted financial re-review pending; Withdrawal Request is not started.
 - Production solution/V2Board Referral Overview, Commission History, Withdrawal Options,
   Referral Code Create and Commission Transfer behavior is NOT TESTED; controlled mock browser
   and automated contract/privacy/recovery tests are the current evidence.
@@ -390,5 +408,5 @@ operational source of truth.
 
 ## Next milestone
 
-AUR-M9-003 exact-head CI verification and Independent Commission Transfer Financial Mutation
-Review are the next gates. AUR-M9-004 has not started.
+AUR-M9-003 exact-head CI verification and targeted Commission Transfer Financial Re-review are
+the next gates. AUR-M9-004 has not started.

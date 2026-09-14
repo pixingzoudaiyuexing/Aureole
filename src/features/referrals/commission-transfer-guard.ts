@@ -3,11 +3,18 @@ import {
   useQueryClient,
   type QueryClient,
 } from '@tanstack/react-query'
+import { useState } from 'react'
 import type { AccountConfig } from '@/features/account/account-api'
 import { accountQueryKeys } from '@/features/account/account-queries'
 import { formatMinorMoney } from '@/features/catalog/money-format'
 import type { Wallet } from '@/features/wallet/wallet-api'
 import { walletQueryKeys } from '@/features/wallet/wallet-queries'
+import {
+  clearSessionSafetyMarker,
+  readSessionSafetyMarker,
+  sessionSafetyStorageKeys,
+  writeSessionSafetyMarker,
+} from '@/lib/auth/session-safety-storage'
 import type { ReferralOverview } from './referrals-api'
 import { referralsQueryKeys } from './referrals-queries'
 
@@ -24,12 +31,16 @@ export interface CommissionTransferAuthority {
   wallet: Wallet
 }
 
-function uncertaintyGuardOptions() {
+const persistentKey = sessionSafetyStorageKeys.commissionTransferUncertainty
+
+function uncertaintyGuardOptions(
+  initialData: CommissionTransferUncertaintyStatus,
+) {
   return {
     queryKey: commissionTransferLocalGuardKeys.uncertainty,
     queryFn: async (): Promise<CommissionTransferUncertaintyStatus> => null,
     enabled: false,
-    initialData: null as CommissionTransferUncertaintyStatus,
+    initialData,
     staleTime: Infinity,
     gcTime: Infinity,
   }
@@ -37,25 +48,51 @@ function uncertaintyGuardOptions() {
 
 export function useCommissionTransferUncertaintyGuard() {
   const queryClient = useQueryClient()
-  const query = useQuery(uncertaintyGuardOptions())
+  const [persistentRead, setPersistentRead] = useState(() =>
+    readSessionSafetyMarker(persistentKey),
+  )
+  const query = useQuery(uncertaintyGuardOptions(persistentRead.value))
+
+  const persistStatus = (
+    status: Exclude<CommissionTransferUncertaintyStatus, null>,
+  ) => {
+    if (!writeSessionSafetyMarker(persistentKey, status)) return false
+    queryClient.setQueryData(
+      commissionTransferLocalGuardKeys.uncertainty,
+      status,
+    )
+    return true
+  }
 
   return {
     status: query.data,
-    activate: () =>
+    hydrated: true,
+    storageAvailable: persistentRead.ok,
+    preArm: () => persistStatus('active'),
+    retainActive: () =>
       queryClient.setQueryData(
         commissionTransferLocalGuardKeys.uncertainty,
         'active' satisfies CommissionTransferUncertaintyStatus,
       ),
-    acknowledge: () =>
-      queryClient.setQueryData(
-        commissionTransferLocalGuardKeys.uncertainty,
-        'acknowledged' satisfies CommissionTransferUncertaintyStatus,
-      ),
-    clear: () =>
+    activate: () => persistStatus('active'),
+    acknowledge: () => persistStatus('acknowledged'),
+    clear: () => {
+      const cleared = clearSessionSafetyMarker(persistentKey)
       queryClient.setQueryData(
         commissionTransferLocalGuardKeys.uncertainty,
         null satisfies CommissionTransferUncertaintyStatus,
-      ),
+      )
+      return cleared
+    },
+    retryHydration: () => {
+      const next = readSessionSafetyMarker(persistentKey)
+      setPersistentRead(next)
+      queryClient.setQueryData(
+        commissionTransferLocalGuardKeys.uncertainty,
+        next.value,
+      )
+      return next.ok
+    },
   }
 }
 
