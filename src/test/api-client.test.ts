@@ -100,6 +100,32 @@ describe('API client', () => {
     expect(init?.redirect).toBe('error')
   })
 
+  it.each([
+    '/api/v1/../x',
+    '/api/v1/../../user/info',
+    '/api/v1/%2e%2e/x',
+    '/api/v1/%2E%2E/x',
+    'https://evil.example.com/api/v1/me',
+    '//evil.example.com/api/v1/me',
+  ])('rejects escaped or invalid paths: %s', async (escapePath) => {
+    const fetchImpl = vi.fn<typeof fetch>()
+    const client = createApiClient({ baseUrl, fetchImpl })
+    await expect(client.request(escapePath)).rejects.toMatchObject({
+      code: 'INVALID_API_PATH',
+      status: 0,
+    })
+    expect(fetchImpl).not.toHaveBeenCalled()
+
+    // Also prove authenticated requests don't leak the token before path escape checks
+    await expect(
+      client.authenticatedRequest(escapePath, { accessToken: 'secret' }),
+    ).rejects.toMatchObject({
+      code: 'INVALID_API_PATH',
+      status: 0,
+    })
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
   it('rejects manually supplied authorization headers', async () => {
     const fetchImpl = vi.fn<typeof fetch>()
     const client = createApiClient({ baseUrl, fetchImpl })

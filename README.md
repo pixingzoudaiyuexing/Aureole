@@ -15,7 +15,13 @@ cp .env.example .env.local
 npm run dev
 ```
 
-`VITE_API_BASE_URL` 是公开的 solution API Origin，不是 Secret。Foundation 页面不会发出真实业务请求。
+**关于 API Base URL：**
+
+- 默认情况下（Same-origin 模式）不需要设置 `VITE_API_BASE_URL`，应用会自动使用与前端相同的 Origin 发送 `/api/v1/*` 请求。
+- 仅在需要显式跨域调试或特定独立部署时，才在 `.env.local` 中取消注释并设置 `VITE_API_BASE_URL`。
+- 该变量是公开的浏览器配置，非 Secret。
+- 它绝不能直接指向 V2Board 后端。
+- 生产环境的跨域 Origin 必须是合法的 HTTPS 地址，并遵守 Origin-only 限制。
 
 ## Commands
 

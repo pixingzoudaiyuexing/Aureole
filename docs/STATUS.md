@@ -531,7 +531,7 @@ financial operation. No business source code or solution file was changed.
 
 Milestone 10 is IN PROGRESS.
 
-- AUR-M10-002 is COMPLETE / PRIMARY REVIEW PASS / FROZEN. (Code/config implementation checkpoint frozen at `bdaf39f4bbf462ab6729d86b83ea9afbf8421233`)
+- AUR-M10-002 is INDEPENDENT REVIEW REQUIRED FIXES APPLIED / INDEPENDENT RE-REVIEW PENDING. (Historical pre-independent-review code/config checkpoint: `bdaf39f4bbf462ab6729d86b83ea9afbf8421233`)
 - Independent targeted review: PENDING.
 - AUR-M10-003 is NOT STARTED / NOT AUTHORIZED.
 

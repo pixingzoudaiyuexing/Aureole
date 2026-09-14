@@ -28,6 +28,8 @@ This is an **exception mode**. For cross-origin production:
 
 - The override origin MUST be HTTPS.
 - The solution `FRONTEND_ORIGINS` configuration must contain the exact HTTPS frontend origin.
+- CSP `connect-src` must permit ONLY the exact approved HTTPS solution API origin required for fetch connectivity. Do not weaken `script-src`, `img-src`, or `frame-src` merely because `connect-src` needs another origin.
+- For normal same-origin production, `connect-src` should remain constrained to the allowed origin requirements without broadly using `*`.
 - Wildcard `*` origins are forbidden.
 - Bearer authentication semantics remain unchanged.
 - Aureole still only calls solution `/api/v1` and must never call V2Board directly.
@@ -40,16 +42,13 @@ The same-origin default adapts dynamically to whatever domain serves the artifac
 
 ## 5. Build Configuration
 
-The official vendor-neutral production build command is:
+Two build modes are preserved:
 
-```bash
-npm run build
-```
-
-This command performs typechecking, builds the static artifact, generates release metadata, and runs artifact verification.
+1. **`npm run build`**: Normal development/validation production build. It supports intended uncommitted implementation changes and does not generate `release.json` or perform `verify:artifact`.
+2. **`npm run build:release`**: Official deployable release build. It requires a clean source repository, produces `release.json`, performs artifact verification, and binds the artifact to the exact committed HEAD.
 
 **Build Git-Context Requirement:**
-The official `npm run build` from source requires a Git checkout with valid `HEAD` metadata because `release.json` is strictly bound to the exact source commit. However, the resulting prebuilt `dist/` artifact does NOT require Git at runtime/deployment.
+The `build:release` command requires a clean Git checkout with valid `HEAD` metadata because `release.json` is strictly bound to the exact source commit. The resulting prebuilt `dist/` artifact does NOT require Git at runtime/deployment.
 
 ## 6. Artifact Contents
 
@@ -60,6 +59,8 @@ The production artifact is located in the `dist/` directory. It contains:
 - `dist/assets/*-[hash].css` (application styling)
 - `dist/release.json` (machine-readable release identity)
 - Static public assets
+
+Note: `release.json` identifies the SOURCE COMMIT. It does not cryptographically prove every possible deployment environment variable.
 
 The artifact does **not** contain backend secrets, V2Board credentials, or source maps (unless explicitly enabled).
 
@@ -98,10 +99,11 @@ Deployments must enforce the following routing priority:
 
 - **Hashed Assets**: `dist/assets/*-[hash].js` and `dist/assets/*-[hash].css` are immutable and should be configured with a long-lived cache (e.g. 1 year).
 - **`index.html`**: Must NOT be indefinitely cached. Use revalidation (e.g., `Cache-Control: no-cache`) or a short cache duration to ensure browsers receive new chunk names.
+- **`release.json`**: Must NOT receive immutable long-lived caching. Use revalidation or short cache semantics so verification commands can accurately determine the currently deployed release.
 
 ## 11. Atomic Publish Contract
 
-A deployment must publish `index.html` and its referenced hashed assets as a single, coherent release.
+A deployment must publish `index.html`, matching `release.json`, matching hashed assets, and static public assets as a single, coherent release. Do not publish a new release identity independently from the release it identifies.
 Old hashed assets should remain available after a new deployment to support previously cached HTML, open browser tabs, CDN propagation, and rollbacks.
 
 ## 12. Rollback Contract
@@ -109,8 +111,11 @@ Old hashed assets should remain available after a new deployment to support prev
 A valid rollback restores:
 
 - A previous `index.html`
-- Matching hashed assets
+- Matching previous hashed assets
+- Matching previous `release.json`
 - Matching public API routing configuration
+
+Production deployed-SHA verification should obtain a fresh/revalidated `release.json`. Do not allow application A to serve release metadata for B.
 
 Rollback is **not** simply replacing `index.html` or deleting all new assets immediately.
 The deployment owner is responsible for mapping the source SHA to their provider's rollback mechanism.

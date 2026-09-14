@@ -6,7 +6,7 @@
 - Status: `COMPLETE / PRIMARY REVIEW PASS`
 - Milestone 10: `IN PROGRESS`
 - AUR-M10-001R1: `COMPLETE`
-- AUR-M10-002: `COMPLETE / PRIMARY REVIEW PASS / FROZEN` (Code checkpoint: `bdaf39f4bbf462ab6729d86b83ea9afbf8421233`)
+- AUR-M10-002: `INDEPENDENT REVIEW REQUIRED FIXES APPLIED / INDEPENDENT RE-REVIEW PENDING` (Pre-independent-review code checkpoint: `bdaf39f4bbf462ab6729d86b83ea9afbf8421233`)
 - AUR-M10-003: `NOT STARTED / NOT AUTHORIZED`
 - Independent targeted review: `PENDING`
 - Audit date: 2026-09-14
@@ -542,8 +542,7 @@ The audit findings justify this order rather than starting with production reads
 before a deployment contract exists:
 
 1. `AUR-M10-002 - Production Deployment Contract and Artifact Readiness`
-   - COMPLETE / PRIMARY REVIEW PASS / FROZEN.
-   - Code checkpoint frozen at `bdaf39f4bbf462ab6729d86b83ea9afbf8421233`.
+   - INDEPENDENT REVIEW REQUIRED FIXES APPLIED / INDEPENDENT RE-REVIEW PENDING.
 2. `AUR-M10-003 - Production Auth, Session and Read-Only Verification`
    - Next proposed task.
    - NOT STARTED / NOT AUTHORIZED.

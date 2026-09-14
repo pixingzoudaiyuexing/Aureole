@@ -76,6 +76,7 @@ export function createApiClient({
     options: ApiRequestOptions,
     accessToken?: string,
   ) {
+    // Optionally retain raw check
     assertPublicApiPath(path)
 
     if (!resolvedBaseUrl) {
@@ -83,6 +84,34 @@ export function createApiClient({
         status: 0,
         code: 'API_BASE_URL_MISSING',
         message: 'The public API origin is not configured',
+      })
+    }
+
+    // Resolve WHATWG URL
+    let finalUrl: URL
+    try {
+      finalUrl = new URL(path, resolvedBaseUrl)
+    } catch {
+      throw new ApiError({
+        status: 0,
+        code: 'INVALID_API_PATH',
+        message: 'The requested API path is malformed',
+      })
+    }
+
+    if (finalUrl.origin !== resolvedBaseUrl) {
+      throw new ApiError({
+        status: 0,
+        code: 'INVALID_API_PATH',
+        message: 'API requests must not escape the origin',
+      })
+    }
+
+    if (!finalUrl.pathname.startsWith('/api/v1/')) {
+      throw new ApiError({
+        status: 0,
+        code: 'INVALID_API_PATH',
+        message: 'API requests must use the solution /api/v1 contract',
       })
     }
 
@@ -115,7 +144,7 @@ export function createApiClient({
 
     let response: Response
     try {
-      response = await fetchImpl(new URL(path, resolvedBaseUrl), {
+      response = await fetchImpl(finalUrl, {
         ...requestInit,
         headers,
         body,
