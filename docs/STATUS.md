@@ -73,11 +73,13 @@ Read/Create/Reply/Close runtime is NOT TESTED.
 Milestone 9 is CURRENT. AUR-M9-001 Referral / Commission Read Model is COMPLETE and its
 Independent Referral Read Review passed; it is frozen at
 `445ffac542d89977f2db5b631516b6c3bbdc955f`. AUR-M9-002 Create Referral Code is
-IMPLEMENTATION COMPLETE with INDEPENDENT REVIEW PENDING. It adds only the bodyless Public
-Create route, fresh Overview authority gating, standard confirmation, same-tick locking,
-Overview-only reconciliation and fail-closed UNKNOWN handling without identifying a new
-code. AUR-M9-003 Commission Transfer and AUR-M9-004 Withdrawal Request are NOT STARTED.
-Production solution/V2Board Referral Read and Create runtime is NOT TESTED.
+IMPLEMENTATION COMPLETE with INDEPENDENT REVIEW REQUIRED FIXES APPLIED and TARGETED
+RE-REVIEW PENDING. The fixes keep UNKNOWN uncertainty in a content-free, memory-only
+QueryClient local guard across feature remount until explicit acknowledgement or Session
+Core clear, and recheck current Overview query status/fetchStatus/data immediately before
+POST instead of relying only on a React prop. AUR-M9-003 Commission Transfer and AUR-M9-004
+Withdrawal Request are NOT STARTED. Production solution/V2Board Referral Read and Create
+runtime is NOT TESTED.
 
 ## Current commit
 
@@ -91,14 +93,14 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (41 files, 929 tests)
+- `npm test`: PASS (41 files, 933 tests)
 - `npm run build`: PASS
 - `npm ls`: PASS
 - `git diff --check`: PASS
 - Build evidence: main JS 471.80 kB raw / 148.39 kB gzip; CSS 37.80 kB raw /
-  7.51 kB gzip; Referrals route 17.91 kB raw / 5.49 kB gzip; Support route
-  31.19 kB raw / 8.29 kB gzip; Wallet route 23.81 kB raw / 7.07 kB gzip;
-  Subscription route 19.89 kB raw / 5.68 kB gzip; Plans route 5.16 kB gzip;
+  7.51 kB gzip; Referrals route 19.19 kB raw / 5.79 kB gzip; Support route
+  31.19 kB raw / 8.29 kB gzip; Wallet route 23.81 kB raw / 7.06 kB gzip;
+  Subscription route 19.89 kB raw / 5.68 kB gzip; Plans route 5.15 kB gzip;
   Orders route 13.16 kB gzip. Assets remain within budget; initial-route
   composition has not been measured by a dedicated analyzer.
 - Browser verification: PASS at 1280 x 720 and 390 x 844 for Login Light/Dark,
@@ -328,12 +330,22 @@ operational source of truth.
   bodyless DTO parsing, every UNKNOWN category, authority loss while Dialog is open, cached
   Overview refetch, every required recovery/Auth boundary and full Query cache clearing.
   Production solution/V2Board Referral Code Create runtime is NOT TESTED.
+- AUR-M9-002 required-fix controlled-browser verification: PASS against the local mock for
+  UNKNOWN recovery success followed by real SPA navigation from Referrals to Dashboard and
+  back. The fresh remount Overview GET did not clear uncertainty: Create stayed disabled,
+  the acknowledgement remained visible and no success/code-identity claim appeared. Explicit
+  acknowledgement sent zero POST and enabled only the standard confirmation flow; cancelling
+  acknowledgement again disabled Create. The same behavior remained usable without horizontal
+  overflow at 390 x 844, and no browser console warning/error was observed. Automated tests
+  additionally prove UNKNOWN marker activation before recovery completes, recovery-failure
+  remount, acknowledged remount, Session Core clear, `gcTime: Infinity` and same-tick refetch
+  plus immediate Confirm execution authority.
 
 ## Known gaps
 
 - Wallet Balance Read, Wallet Deposit Create, Gift Card Redeem, all Support Ticket v1 work
   and the Referral / Commission Read Model are complete and independently reviewed. Referral
-  Code Create implementation is complete and pending independent review; Commission Transfer
+  Code Create required fixes are applied with targeted re-review pending; Commission Transfer
   and Withdrawal Request are not started.
 - Production solution/V2Board Referral Overview, Commission History, Withdrawal Options and
   Referral Code Create behavior is NOT TESTED; controlled mock browser and automated
@@ -360,5 +372,5 @@ operational source of truth.
 
 ## Next milestone
 
-AUR-M9-002 exact-head CI verification and Independent Referral Code Mutation Review are the
-next required gates. AUR-M9-003 and AUR-M9-004 have not started.
+AUR-M9-002 exact-head CI verification and targeted required-fix re-review are the next gates.
+AUR-M9-003 and AUR-M9-004 have not started.

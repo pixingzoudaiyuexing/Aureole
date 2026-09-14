@@ -307,12 +307,18 @@
 - `POST /api/v1/referrals/codes` 是唯一 Create Code 写边界。请求没有 body 或人为 JSON Content-Type；成功只
   接受并 strip `{created:true}`，`created:false`、缺失、错误类型或 raw V2Board `data:true` 均为
   `MALFORMED_RESPONSE`。Mutation 使用 `['referrals','create-code']`、`retry:false` 与同步锁。
-- Create 由 fresh `['referrals','overview']` authority、标准 confirmation 和最终 execution recheck 三层约束。
-  success、`REFERRAL_CODE_LIMIT_REACHED`、UNKNOWN 均只 GET Overview 对账，不刷新 Commission、Withdrawal 或
+- Create 由 fresh `['referrals','overview']` authority、标准 confirmation 和最终 QueryClient execution recheck
+  三层约束。执行层在同步锁后立即要求 Overview query `status=success`、`fetchStatus=idle` 且 data 存在；不只
+  信任可能尚未 commit 的 React prop，也不只检查 cached data。
+- success、`REFERRAL_CODE_LIMIT_REACHED`、UNKNOWN 均只 GET Overview 对账，不刷新 Commission、Withdrawal 或
   Wallet，也不本地修改 code list。成功只说明服务端确认创建；UNKNOWN 即使 Overview 出现新 code 也不推断
   因果。对账失败 fail closed；UNKNOWN 对账成功后需要先核对 acknowledgement，再重新打开 confirmation。
-- Create/recovery 的 AUTH_REQUIRED/AUTH_FAILED 复用 sealed Session Core。Code list、mutation state 与
-  acknowledgement 不进入 storage、URL、Zustand、analytics、console 或 Query/Mutation key。
+- `['referrals','create-code-uncertainty']` 是 session-memory local mutation-safety guard，不是 Public/server Query。
+  它只保存 `active` / `acknowledged` / null，使用 `gcTime:Infinity` 跨 Referral unmount/remount；fresh GET 不会
+  清除 `active`。明确 acknowledgement 可解除，取消勾选恢复 `active`，Session Core `queryClient.clear()` 会
+  清除 marker。
+- Create/recovery 的 AUTH_REQUIRED/AUTH_FAILED 复用 sealed Session Core。Code list、token、email、amount、
+  timestamp 与 upstream message 不进入 local guard；marker 不进入 storage、URL、Zustand、analytics 或 console。
 - AUR-M9-002 不调用 Commission Transfer、Withdrawal Request，也不直接访问 V2Board。
 
 ## Error and request rules

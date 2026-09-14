@@ -7,6 +7,7 @@ import { createQueryClient } from '@/app/providers/query-client'
 import { createAppRouter } from '@/app/router/router'
 import { accountApi } from '@/features/account/account-api'
 import type { AuthApi } from '@/features/auth/auth-api'
+import { referralCreateLocalGuardKeys } from '@/features/referrals/referral-create-guard'
 import { referralsApi } from '@/features/referrals/referrals-api'
 import { referralsQueryKeys } from '@/features/referrals/referrals-queries'
 import { ApiError } from '@/lib/api/errors'
@@ -401,6 +402,12 @@ describe('Referrals page', () => {
     expect(keys).toContainEqual(referralsQueryKeys.overview)
     expect(keys).toContainEqual(referralsQueryKeys.commissions(1))
     expect(keys).toContainEqual(referralsQueryKeys.withdrawalOptions)
+    expect(keys).toContainEqual(referralCreateLocalGuardKeys.uncertainty)
+    expect(
+      queryClient.getQueryCache().find({
+        queryKey: referralCreateLocalGuardKeys.uncertainty,
+      })?.gcTime,
+    ).toBe(Infinity)
     const serialized = JSON.stringify(keys)
     for (const privateValue of [
       'referral-token',

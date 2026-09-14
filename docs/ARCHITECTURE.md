@@ -402,12 +402,20 @@ AUR-M9-002 在同一 feature boundary 增加 bodyless `POST /api/v1/referrals/co
 才发送一次 POST。
 
 Create 只在 canonical Overview `isSuccess && !isFetching` 时开放，Overview query 在页面 remount 时强制
-fresh read。confirmed success、`REFERRAL_CODE_LIMIT_REACHED` 与 UNKNOWN 都只重新读取
+fresh read；真正调用 mutation 前还会同步读取 QueryClient state，要求 Overview query 当前同时满足
+`status=success`、`fetchStatus=idle` 且 data 存在，避免 React prop 尚未 commit 时穿透 POST。confirmed
+success、`REFERRAL_CODE_LIMIT_REACHED` 与 UNKNOWN 都只重新读取
 `GET /api/v1/referrals`；不 invalidate Commission、Withdrawal 或 Wallet。成功 DTO 不含 code identity，
 因此页面不 append、生成、自动复制、高亮或通过 list diff/timestamp 推断某个 code 属于本次操作。成功对账
-失败保持 confirmed success 但 fail closed；UNKNOWN 对账成功后仍需 acknowledgement 和新的标准 confirmation，
-对账失败及 remount 则依靠 fresh Overview authority gate 继续 fail closed。所有 mutation/recovery Auth error
-复用 sealed Session Core，局部 feedback/acknowledgement 不持久化。
+失败保持 confirmed success 但 fail closed。
+
+UNKNOWN classification 会立即在独立的 `['referrals','create-code-uncertainty']` local guard key 写入 enum-like
+`active` marker。它不是 solution DTO 或 server state，不包含 code、token、email、amount、timestamp、error
+message 或 list；`gcTime:Infinity` 使其在同一 authenticated SPA session 内跨 feature unmount/remount 保留，
+但不进入 storage、URL、Zustand、analytics 或 console。fresh Overview 只能恢复当前 list authority，不能清除
+mutation uncertainty；用户明确 acknowledgement 后 marker 变为 `acknowledged`，取消勾选会恢复 `active`，
+下一次真正 POST 前清除已确认 marker。Auth logout/establishSession 的 `queryClient.clear()` 自然清除整个 local
+guard，防止跨 session 泄漏。所有 mutation/recovery Auth error 继续复用 sealed Session Core。
 
 AUR-M9-002 不实现 Commission Transfer、Withdrawal Request 或其他 mutation，也不修改 solution、直接访问
 V2Board、复制 Commission 到 Wallet 或进入 Launch Readiness。

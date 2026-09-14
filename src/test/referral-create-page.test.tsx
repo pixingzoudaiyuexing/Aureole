@@ -14,6 +14,7 @@ import { createQueryClient } from '@/app/providers/query-client'
 import { createAppRouter } from '@/app/router/router'
 import { accountApi } from '@/features/account/account-api'
 import type { AuthApi } from '@/features/auth/auth-api'
+import { referralCreateLocalGuardKeys } from '@/features/referrals/referral-create-guard'
 import { referralsApi } from '@/features/referrals/referrals-api'
 import { referralsQueryKeys } from '@/features/referrals/referrals-queries'
 import { ApiError } from '@/lib/api/errors'
@@ -110,6 +111,9 @@ function expectLoggedOut(
   expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
   expect(queryClient.getQueryData(['private-state'])).toBeUndefined()
   expect(queryClient.getQueryData(referralsQueryKeys.overview)).toBeUndefined()
+  expect(
+    queryClient.getQueryData(referralCreateLocalGuardKeys.uncertainty),
+  ).toBeUndefined()
 }
 
 describe('Create Referral Code', () => {
@@ -225,28 +229,34 @@ describe('Create Referral Code', () => {
     expect(mocks.createCode).toHaveBeenCalledOnce()
   })
 
-  it('blocks confirm when Overview authority is lost while the Dialog is open', async () => {
+  it('blocks an immediate same-tick confirm from stale React authority while Overview refetch starts', async () => {
     const mocks = installMocks()
     const { queryClient } = renderReferrals()
     const form = await openConfirmation()
     const background = deferred<typeof overview>()
+    const create = deferred<{ created: true }>()
     mocks.getOverview.mockReturnValueOnce(background.promise)
+    mocks.createCode.mockReturnValue(create.promise)
+    const confirm = within(form.dialog).getByRole('button', {
+      name: '确认创建',
+    })
 
     act(() => {
       void queryClient.refetchQueries({
         queryKey: referralsQueryKeys.overview,
         exact: true,
       })
+      confirm.click()
     })
-    const confirm = within(form.dialog).getByRole('button', {
-      name: '确认创建',
-    })
-    await waitFor(() => expect(confirm).toBeDisabled())
-    fireEvent.click(confirm)
+    await act(async () => Promise.resolve())
     expect(mocks.createCode).not.toHaveBeenCalled()
 
     act(() => background.resolve(overview))
     await waitFor(() => expect(confirm).toBeEnabled())
+    fireEvent.click(confirm)
+    await waitFor(() => expect(mocks.createCode).toHaveBeenCalledOnce())
+    act(() => create.resolve({ created: true }))
+    expect(await screen.findByText('邀请码已创建。')).toBeInTheDocument()
   })
 
   it('keeps success confirmed, refetches only Overview, and does not infer a code', async () => {
@@ -263,7 +273,7 @@ describe('Create Referral Code', () => {
         { code: 'NEW999', createdAt: '2026-09-14T01:00:01.000Z' },
       ],
     })
-    renderReferrals()
+    const { queryClient } = renderReferrals()
     const form = await openConfirmation()
     await confirmCreate(form)
 
@@ -274,6 +284,9 @@ describe('Create Referral Code', () => {
     expect(mocks.getCommissions).toHaveBeenCalledOnce()
     expect(mocks.getWithdrawalOptions).toHaveBeenCalledOnce()
     expect(writeText).not.toHaveBeenCalled()
+    expect(
+      queryClient.getQueryData(referralCreateLocalGuardKeys.uncertainty),
+    ).not.toBe('active')
     expect(screen.queryByText(/新创建/)).toBeNull()
     expect(screen.queryByText(/刚刚创建/)).toBeNull()
   })
@@ -312,7 +325,7 @@ describe('Create Referral Code', () => {
     mocks.createCode.mockRejectedValue(
       apiError('REFERRAL_CODE_LIMIT_REACHED', 409),
     )
-    renderReferrals()
+    const { queryClient } = renderReferrals()
     const form = await openConfirmation()
     await confirmCreate(form)
 
@@ -322,6 +335,9 @@ describe('Create Referral Code', () => {
     expect(screen.queryByText('private upstream message')).toBeNull()
     expect(mocks.createCode).toHaveBeenCalledOnce()
     expect(mocks.getOverview).toHaveBeenCalledTimes(2)
+    expect(
+      queryClient.getQueryData(referralCreateLocalGuardKeys.uncertainty),
+    ).not.toBe('active')
     expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
       'referral-token',
     )
@@ -390,6 +406,33 @@ describe('Create Referral Code', () => {
     },
   )
 
+  it('activates the session uncertainty marker before UNKNOWN recovery completes', async () => {
+    const mocks = installMocks()
+    const recovery = deferred<typeof overview>()
+    mocks.createCode.mockRejectedValue(apiError('NETWORK_ERROR', 0))
+    mocks.getOverview
+      .mockResolvedValueOnce(overview)
+      .mockReturnValueOnce(recovery.promise)
+    const { queryClient } = renderReferrals()
+    const form = await openConfirmation()
+    await confirmCreate(form)
+
+    await waitFor(() => expect(mocks.createCode).toHaveBeenCalledOnce())
+    expect(
+      queryClient.getQueryData(referralCreateLocalGuardKeys.uncertainty),
+    ).toBe('active')
+    expect(
+      JSON.stringify(
+        queryClient.getQueryData(referralCreateLocalGuardKeys.uncertainty),
+      ),
+    ).not.toMatch(/referral-token|OLD1|member@example.com/)
+
+    act(() => recovery.resolve(overview))
+    await screen.findByRole('checkbox', {
+      name: '我已检查当前邀请码列表，仍需再次创建一个邀请码。',
+    })
+  })
+
   it('requires acknowledgement and a new confirmation before a second POST', async () => {
     const mocks = installMocks()
     mocks.createCode
@@ -400,7 +443,7 @@ describe('Create Referral Code', () => {
     await confirmCreate(form)
     await screen.findByText('邀请码创建结果暂时无法确认。')
 
-    const acknowledgement = screen.getByRole('checkbox', {
+    const acknowledgement = await screen.findByRole('checkbox', {
       name: '我已检查当前邀请码列表，仍需再次创建一个邀请码。',
     })
     await form.user.click(acknowledgement)
@@ -416,6 +459,123 @@ describe('Create Referral Code', () => {
     )
     expect(await screen.findByText('邀请码已创建。')).toBeInTheDocument()
     expect(mocks.createCode).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps successful UNKNOWN recovery guarded across remount until acknowledgement', async () => {
+    const mocks = installMocks()
+    mocks.createCode
+      .mockRejectedValueOnce(apiError('NETWORK_ERROR', 0))
+      .mockResolvedValueOnce({ created: true })
+    const queryClient = createQueryClient()
+    const first = renderReferrals(queryClient)
+    const form = await openConfirmation()
+    await confirmCreate(form)
+    await screen.findByText('邀请码创建结果暂时无法确认。')
+    expect(mocks.createCode).toHaveBeenCalledOnce()
+
+    first.unmount()
+    renderReferrals(queryClient)
+    await screen.findByText('OLD1')
+    const trigger = screen.getByRole('button', { name: '创建邀请码' })
+    expect(trigger).toBeDisabled()
+    const acknowledgement = await screen.findByRole('checkbox', {
+      name: '我已检查当前邀请码列表，仍需再次创建一个邀请码。',
+    })
+    await userEvent.setup().click(acknowledgement)
+    expect(mocks.createCode).toHaveBeenCalledOnce()
+    expect(trigger).toBeEnabled()
+
+    await userEvent.setup().click(trigger)
+    expect(mocks.createCode).toHaveBeenCalledOnce()
+    await userEvent.setup().click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: '确认创建',
+      }),
+    )
+    expect(await screen.findByText('邀请码已创建。')).toBeInTheDocument()
+    expect(mocks.createCode).toHaveBeenCalledTimes(2)
+  })
+
+  it('restores the guard when acknowledgement is unchecked and clears it for the next remount', async () => {
+    const mocks = installMocks()
+    mocks.createCode.mockRejectedValueOnce(apiError('NETWORK_ERROR', 0))
+    const queryClient = createQueryClient()
+    const first = renderReferrals(queryClient)
+    const form = await openConfirmation()
+    await confirmCreate(form)
+    const acknowledgement = await screen.findByRole('checkbox', {
+      name: '我已检查当前邀请码列表，仍需再次创建一个邀请码。',
+    })
+    const trigger = screen.getByRole('button', { name: '创建邀请码' })
+
+    await form.user.click(acknowledgement)
+    expect(acknowledgement).toBeChecked()
+    expect(trigger).toBeEnabled()
+    expect(
+      queryClient.getQueryData(referralCreateLocalGuardKeys.uncertainty),
+    ).toBe('acknowledged')
+
+    await form.user.click(acknowledgement)
+    expect(acknowledgement).not.toBeChecked()
+    expect(trigger).toBeDisabled()
+    expect(
+      queryClient.getQueryData(referralCreateLocalGuardKeys.uncertainty),
+    ).toBe('active')
+
+    await form.user.click(acknowledgement)
+    expect(trigger).toBeEnabled()
+    first.unmount()
+    renderReferrals(queryClient)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '创建邀请码' })).toBeEnabled(),
+    )
+    expect(
+      screen.queryByRole('checkbox', {
+        name: '我已检查当前邀请码列表，仍需再次创建一个邀请码。',
+      }),
+    ).toBeNull()
+
+    const remountedTrigger = screen.getByRole('button', {
+      name: '创建邀请码',
+    })
+    await userEvent.setup().click(remountedTrigger)
+    expect(mocks.createCode).toHaveBeenCalledOnce()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('clears active uncertainty on logout before a new authenticated session', async () => {
+    const mocks = installMocks()
+    mocks.createCode.mockRejectedValue(apiError('NETWORK_ERROR', 0))
+    const queryClient = createQueryClient()
+    const first = renderReferrals(queryClient)
+    const form = await openConfirmation()
+    await confirmCreate(form)
+    await screen.findByRole('checkbox', {
+      name: '我已检查当前邀请码列表，仍需再次创建一个邀请码。',
+    })
+    expect(
+      queryClient.getQueryData(referralCreateLocalGuardKeys.uncertainty),
+    ).toBe('active')
+
+    await form.user.click(screen.getByRole('button', { name: '退出登录' }))
+    expect(
+      await screen.findByRole('heading', { name: '登录 Aureole' }),
+    ).toBeInTheDocument()
+    expect(
+      queryClient.getQueryData(referralCreateLocalGuardKeys.uncertainty),
+    ).toBeUndefined()
+
+    first.unmount()
+    mocks.createCode.mockResolvedValue({ created: true })
+    renderReferrals(queryClient)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '创建邀请码' })).toBeEnabled(),
+    )
+    expect(
+      screen.queryByRole('checkbox', {
+        name: '我已检查当前邀请码列表，仍需再次创建一个邀请码。',
+      }),
+    ).toBeNull()
   })
 
   it('remains fail closed after UNKNOWN recovery failure and remount', async () => {
@@ -447,7 +607,14 @@ describe('Create Referral Code', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(mocks.createCode).toHaveBeenCalledOnce()
     act(() => remountRead.resolve(overview))
-    await waitFor(() => expect(trigger).toBeEnabled())
+    await waitFor(() =>
+      expect(
+        screen.getByRole('checkbox', {
+          name: '我已检查当前邀请码列表，仍需再次创建一个邀请码。',
+        }),
+      ).toBeInTheDocument(),
+    )
+    expect(trigger).toBeDisabled()
   })
 
   it.each(['AUTH_REQUIRED', 'AUTH_FAILED'])(

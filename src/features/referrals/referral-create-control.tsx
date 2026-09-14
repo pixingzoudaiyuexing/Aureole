@@ -18,6 +18,11 @@ import {
   isAmbiguousReferralCodeCreateError,
 } from './referral-create-errors'
 import {
+  getReferralCreateUncertaintyStatus,
+  isReferralOverviewAuthorityReady,
+  useReferralCreateUncertaintyGuard,
+} from './referral-create-guard'
+import {
   referralCodeCreateMutationOptions,
   referralOverviewOptions,
   referralsQueryKeys,
@@ -46,9 +51,11 @@ export function ReferralCreateControl({
     error: unknown
     message: string
   } | null>(null)
-  const [unknownAcknowledged, setUnknownAcknowledged] = useState(false)
+  const [keepAcknowledgementVisible, setKeepAcknowledgementVisible] =
+    useState(false)
   const [sessionError, setSessionError] = useState<unknown>(null)
   const mutation = useMutation(referralCodeCreateMutationOptions(accessToken))
+  const uncertainty = useReferralCreateUncertaintyGuard()
 
   const invalidSessionError = isInvalidSessionError(mutation.error)
     ? mutation.error
@@ -60,15 +67,20 @@ export function ReferralCreateControl({
   if (invalidSessionError) return null
 
   const recoveryFailed = feedback?.reconciled === false
-  const unknownGuardActive =
-    feedback?.kind === 'unknown' && feedback.reconciled === true
+  const unknownGuardActive = uncertainty.status === 'active'
+  const unknownAcknowledged = uncertainty.status === 'acknowledged'
+  const showUnknownAcknowledgement =
+    overviewAuthorityReady &&
+    (keepAcknowledgementVisible ||
+      feedback?.kind === 'unknown' ||
+      unknownGuardActive)
   const createDisabled =
     !overviewAuthorityReady ||
     actionPending ||
     mutation.isPending ||
     recovering ||
     recoveryFailed ||
-    (unknownGuardActive && !unknownAcknowledged)
+    unknownGuardActive
 
   const refreshOverview = async () => {
     await queryClient.invalidateQueries({
@@ -92,22 +104,28 @@ export function ReferralCreateControl({
   }
 
   const createCode = async () => {
-    if (
-      !overviewAuthorityReady ||
-      recoveryFailed ||
-      (unknownGuardActive && !unknownAcknowledged)
-    ) {
+    if (!overviewAuthorityReady || recoveryFailed || unknownGuardActive) {
       return
     }
     if (!createLock.tryAcquire()) return
 
+    if (
+      !isReferralOverviewAuthorityReady(queryClient) ||
+      getReferralCreateUncertaintyStatus(queryClient) === 'active'
+    ) {
+      createLock.release()
+      return
+    }
+
+    uncertainty.clear()
+    setKeepAcknowledgementVisible(false)
     sessionInvalidatedRef.current = false
     setActionPending(true)
     setDialogError(null)
+    setFeedback(null)
     mutation.reset()
     try {
       await mutation.mutateAsync()
-      setUnknownAcknowledged(false)
       setDialogOpen(false)
       setFeedback({ kind: 'success', reconciled: null })
       const reconciled = await refreshOverview()
@@ -125,7 +143,6 @@ export function ReferralCreateControl({
         error instanceof ApiError &&
         error.code === 'REFERRAL_CODE_LIMIT_REACHED'
       ) {
-        setUnknownAcknowledged(false)
         setDialogOpen(false)
         setFeedback({ kind: 'limit', reconciled: null })
         const reconciled = await refreshOverview()
@@ -133,7 +150,8 @@ export function ReferralCreateControl({
           setFeedback({ kind: 'limit', reconciled })
         }
       } else if (isAmbiguousReferralCodeCreateError(error)) {
-        setUnknownAcknowledged(false)
+        uncertainty.activate()
+        setKeepAcknowledgementVisible(true)
         setDialogOpen(false)
         setFeedback({ kind: 'unknown', reconciled: null })
         const reconciled = await refreshOverview()
@@ -185,7 +203,13 @@ export function ReferralCreateControl({
         </p>
       ) : null}
 
-      {feedback ? <CreateFeedbackMessage feedback={feedback} /> : null}
+      {feedback ? (
+        <CreateFeedbackMessage feedback={feedback} />
+      ) : unknownGuardActive ? (
+        <PersistedUnknownFeedback
+          overviewAuthorityReady={overviewAuthorityReady}
+        />
+      ) : null}
 
       {recoveryFailed ? (
         <Button
@@ -203,14 +227,18 @@ export function ReferralCreateControl({
         </Button>
       ) : null}
 
-      {unknownGuardActive ? (
+      {showUnknownAcknowledgement ? (
         <label className="flex max-w-2xl items-start gap-3 text-sm leading-6">
           <input
             type="checkbox"
             className="mt-1 size-4 shrink-0 accent-primary"
             checked={unknownAcknowledged}
-            disabled={actionPending || recovering}
-            onChange={(event) => setUnknownAcknowledged(event.target.checked)}
+            disabled={!overviewAuthorityReady || actionPending || recovering}
+            onChange={(event) => {
+              setKeepAcknowledgementVisible(true)
+              if (event.target.checked) uncertainty.acknowledge()
+              else uncertainty.activate()
+            }}
           />
           <span>我已检查当前邀请码列表，仍需再次创建一个邀请码。</span>
         </label>
@@ -274,7 +302,9 @@ export function ReferralCreateControl({
               </Button>
               <Button
                 type="button"
-                disabled={!overviewAuthorityReady || actionPending}
+                disabled={
+                  !overviewAuthorityReady || actionPending || unknownGuardActive
+                }
                 onClick={() => void createCode()}
               >
                 {actionPending ? (
@@ -289,6 +319,26 @@ export function ReferralCreateControl({
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+function PersistedUnknownFeedback({
+  overviewAuthorityReady,
+}: {
+  overviewAuthorityReady: boolean
+}) {
+  return (
+    <div
+      className="max-w-2xl border-l-2 border-foreground/40 bg-muted px-4 py-3"
+      role="alert"
+    >
+      <p className="text-sm font-semibold">邀请码创建结果暂时无法确认。</p>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+        {overviewAuthorityReady
+          ? '已重新读取当前邀请码列表。请先核对列表，避免重复创建。'
+          : '请先重新读取当前邀请码列表，暂时不要再次创建。'}
+      </p>
     </div>
   )
 }
