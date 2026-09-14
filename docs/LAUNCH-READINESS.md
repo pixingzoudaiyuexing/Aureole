@@ -6,9 +6,9 @@
 - Status: `COMPLETE / PRIMARY REVIEW PASS`
 - Milestone 10: `IN PROGRESS`
 - AUR-M10-001R1: `COMPLETE`
-- AUR-M10-002: `INDEPENDENT REVIEW REQUIRED FIXES APPLIED / INDEPENDENT RE-REVIEW PENDING` (Pre-independent-review code checkpoint: `bdaf39f4bbf462ab6729d86b83ea9afbf8421233`)
-- AUR-M10-003: `NOT STARTED / NOT AUTHORIZED`
-- Independent targeted review: `PENDING`
+- AUR-M10-002: `COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT REVIEW PASS / FROZEN` (Code/config freeze SHA: `8890ba0e8325828e27d2234a3f8b242561fbe801`. Pre-independent-review code checkpoint: `bdaf39f4bbf462ab6729d86b83ea9afbf8421233` remains only as historical evidence.)
+- AUR-M10-003: `NOT STARTED / AUTHORIZED FOR PLANNING AND PREPARATION`
+- Independent targeted review: `PASS`
 - Audit date: 2026-09-14
 - Aureole audit base: `a2366ea08bc579e1368d52aaf8b5b5ee72aac195`
 - Frozen M9 production code: `e408f83311c3557706ac9fc09ac06fe754ea71b8`
