@@ -14,7 +14,9 @@ export interface SessionSafetyMarkerRead {
   value: SessionSafetyMarker | null
 }
 
-export function readSessionSafetyMarker(
+const unsafeAuthBoundaryKeys = new Set<SessionSafetyStorageKey>()
+
+function readStoredSessionSafetyMarker(
   key: SessionSafetyStorageKey,
 ): SessionSafetyMarkerRead {
   try {
@@ -23,13 +25,23 @@ export function readSessionSafetyMarker(
     if (value !== 'active' && value !== 'acknowledged') {
       return { ok: false, value: null }
     }
-    return {
-      ok: true,
-      value,
-    }
+    return { ok: true, value }
   } catch {
     return { ok: false, value: null }
   }
+}
+
+export function readSessionSafetyMarker(
+  key: SessionSafetyStorageKey,
+): SessionSafetyMarkerRead {
+  const stored = readStoredSessionSafetyMarker(key)
+  if (!unsafeAuthBoundaryKeys.has(key)) return stored
+  if (!stored.ok) return stored
+  if (stored.value !== 'active' && !writeSessionSafetyMarker(key, 'active')) {
+    return { ok: false, value: null }
+  }
+  unsafeAuthBoundaryKeys.delete(key)
+  return { ok: true, value: 'active' }
 }
 
 export function writeSessionSafetyMarker(
@@ -56,7 +68,37 @@ export function clearSessionSafetyMarker(key: SessionSafetyStorageKey) {
 export function clearSessionSafetyState() {
   let cleared = true
   for (const key of Object.values(sessionSafetyStorageKeys)) {
-    if (!clearSessionSafetyMarker(key)) cleared = false
+    if (!clearSessionSafetyMarker(key)) {
+      cleared = false
+    } else {
+      unsafeAuthBoundaryKeys.delete(key)
+    }
   }
   return cleared
+}
+
+export function prepareSessionSafetyForAuthBoundary() {
+  let prepared = true
+  for (const key of Object.values(sessionSafetyStorageKeys)) {
+    const stored = readStoredSessionSafetyMarker(key)
+    if (!stored.ok) {
+      unsafeAuthBoundaryKeys.add(key)
+      prepared = false
+      continue
+    }
+    if (
+      stored.value === 'acknowledged' &&
+      !writeSessionSafetyMarker(key, 'active')
+    ) {
+      unsafeAuthBoundaryKeys.add(key)
+      prepared = false
+      continue
+    }
+    unsafeAuthBoundaryKeys.delete(key)
+  }
+  return prepared
+}
+
+export function resetSessionSafetyRuntimeForTests() {
+  unsafeAuthBoundaryKeys.clear()
 }

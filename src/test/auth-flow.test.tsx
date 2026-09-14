@@ -143,8 +143,9 @@ describe('Auth session lifecycle', () => {
       'opaque-session-token',
     )
     expect(window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
-    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
-    expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBeNull()
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
+    expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe('active')
+    expect(useAuthSessionStore.getState().generation).toBe(1)
     expect(screen.getAllByText('member@example.com').length).toBeGreaterThan(0)
   })
 
@@ -262,6 +263,7 @@ describe('Auth session lifecycle', () => {
     expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe(
       'acknowledged',
     )
+    expect(useAuthSessionStore.getState().generation).toBe(0)
   })
 
   it.each(['AUTH_REQUIRED', 'AUTH_FAILED'])(
@@ -291,8 +293,9 @@ describe('Auth session lifecycle', () => {
       ).toBeInTheDocument()
       expect(router.state.location.pathname).toBe('/login')
       expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
-      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
-      expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBeNull()
+      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
+      expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe('active')
+      expect(useAuthSessionStore.getState().generation).toBe(1)
       expect(queryClient.getQueryData(['private-account-data'])).toBeUndefined()
     },
   )
@@ -414,6 +417,7 @@ describe('Auth session lifecycle', () => {
       'stored-session-token',
     )
     window.sessionStorage.setItem(commissionSafetyKey, 'active')
+    window.sessionStorage.setItem(withdrawalSafetyKey, 'acknowledged')
     const queryClient = createQueryClient()
     queryClient.setQueryData(['private-account-data'], { secret: 'cached' })
     const { router } = renderRoute('/dashboard', createAuthApi(), queryClient)
@@ -424,8 +428,9 @@ describe('Auth session lifecycle', () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
     expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
-    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
-    expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBeNull()
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
+    expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe('active')
+    expect(useAuthSessionStore.getState().generation).toBe(1)
     expect(queryClient.getQueryData(['private-account-data'])).toBeUndefined()
   })
 
@@ -452,6 +457,7 @@ describe('Auth session lifecycle', () => {
     expect(queryClient.getQueryData(authQueryKeys.me)).toBeUndefined()
     expect(useAuthSessionStore.getState().accessToken).toBeNull()
     expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
+    expect(useAuthSessionStore.getState().generation).toBe(1)
   })
 
   it.each(['resolve', 'reject'] as const)(
@@ -518,8 +524,9 @@ describe('Auth session lifecycle', () => {
       expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
         'session-b-token',
       )
-      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
-      expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBeNull()
+      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
+      expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe('active')
+      expect(useAuthSessionStore.getState().generation).toBe(1)
     },
   )
 })

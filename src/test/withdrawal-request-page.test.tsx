@@ -19,6 +19,11 @@ import { referralCreateLocalGuardKeys } from '@/features/referrals/referral-crea
 import { referralsApi } from '@/features/referrals/referrals-api'
 import { referralsQueryKeys } from '@/features/referrals/referrals-queries'
 import { withdrawalRequestLocalGuardKeys } from '@/features/referrals/withdrawal-request-guard'
+import {
+  financialOperationKeys,
+  hasRuntimeFinancialAttempt,
+  resetFinancialMutationRuntimeForTests,
+} from '@/features/referrals/financial-mutation-runtime'
 import { walletApi } from '@/features/wallet/wallet-api'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
@@ -120,7 +125,12 @@ function renderReferrals(queryClient: QueryClient = createQueryClient()) {
 }
 
 function renderFullRuntime(queryClient: QueryClient = createQueryClient()) {
-  useAuthSessionStore.setState({ accessToken: null, hydrated: false })
+  resetFinancialMutationRuntimeForTests()
+  useAuthSessionStore.setState({
+    accessToken: null,
+    generation: 0,
+    hydrated: false,
+  })
   const router = createAppRouter({ initialEntries: ['/referrals'] })
   const rendered = render(
     <AppProviders
@@ -385,6 +395,35 @@ describe('Withdrawal Request authority and confirmation', () => {
 })
 
 describe('Withdrawal Request outcomes and exact reconciliation', () => {
+  it('releases the runtime attempt only after Options reconciliation completes', async () => {
+    const mocks = installMocks()
+    const recovery = deferred<{ enabled: true; methods: string[] }>()
+    mocks.getWithdrawalOptions
+      .mockResolvedValueOnce({ enabled: true, methods: [methodOne] })
+      .mockReturnValueOnce(recovery.promise)
+    renderReferrals()
+    const form = await openConfirmation()
+    await confirmWithdrawal(form)
+
+    await waitFor(() => expect(mocks.requestWithdrawal).toHaveBeenCalledOnce())
+    expect(
+      hasRuntimeFinancialAttempt(financialOperationKeys.withdrawalRequest),
+    ).toBe(true)
+    expect(
+      await screen.findByText(
+        '上一笔提现申请仍在处理中，请等待结果，暂不能再次提交。',
+      ),
+    ).toBeInTheDocument()
+
+    act(() => recovery.resolve({ enabled: true, methods: [methodOne] }))
+    await waitFor(() =>
+      expect(
+        hasRuntimeFinancialAttempt(financialOperationKeys.withdrawalRequest),
+      ).toBe(false),
+    )
+    expect(await screen.findByText('提现申请已提交。')).toBeInTheDocument()
+  })
+
   it('keeps success semantics narrow and refetches only Withdrawal Options', async () => {
     const mocks = installMocks()
     renderReferrals()
@@ -710,7 +749,7 @@ describe('Withdrawal Request full-runtime and session safety', () => {
     },
   )
 
-  it('clears both financial markers on logout without changing Referral Code state', async () => {
+  it('preserves active and downgrades acknowledged markers on logout', async () => {
     installMocks()
     window.sessionStorage.setItem(withdrawalSafetyKey, 'active')
     window.sessionStorage.setItem(commissionSafetyKey, 'acknowledged')
@@ -724,8 +763,8 @@ describe('Withdrawal Request full-runtime and session safety', () => {
     expect(
       await screen.findByRole('heading', { name: '登录 Aureole' }),
     ).toBeInTheDocument()
-    expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBeNull()
-    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
+    expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe('active')
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
     expect(
       queryClient.getQueryData(referralCreateLocalGuardKeys.uncertainty),
     ).toBeUndefined()
@@ -1047,8 +1086,8 @@ describe('Withdrawal Request storage and Auth failure handling', () => {
       ).toBeInTheDocument()
       expect(router.state.location.pathname).toBe('/login')
       expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
-      expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBeNull()
-      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
+      expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe('active')
+      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
       expect(
         queryClient.getQueryData(referralsQueryKeys.overview),
       ).toBeUndefined()
@@ -1072,7 +1111,7 @@ describe('Withdrawal Request storage and Auth failure handling', () => {
       await screen.findByRole('heading', { name: '登录 Aureole' }),
     ).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/login')
-    expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBeNull()
+    expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe('active')
     expect(
       queryClient.getQueryData(referralsQueryKeys.withdrawalOptions),
     ).toBeUndefined()

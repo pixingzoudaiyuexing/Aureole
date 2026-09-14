@@ -19,10 +19,21 @@ import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invali
 import { useSynchronousActionLock } from '@/features/auth/use-synchronous-action-lock'
 import { ApiError } from '@/lib/api/errors'
 import {
+  captureAuthSessionGeneration,
+  isCurrentAuthSessionGeneration,
+} from '@/lib/auth/session-store'
+import {
   hasExactPendingMutation,
   useHasExactPendingMutation,
 } from './financial-mutation-pending'
-import type { WithdrawalOptions } from './referrals-api'
+import {
+  financialOperationKeys,
+  finishFinancialAttempt,
+  hasRuntimeFinancialAttempt,
+  tryBeginFinancialAttempt,
+  useRuntimeFinancialAttemptPending,
+} from './financial-mutation-runtime'
+import { referralsApi, type WithdrawalOptions } from './referrals-api'
 import { isAmbiguousWithdrawalRequestError } from './withdrawal-request-errors'
 import {
   getWithdrawalOptionsAuthority,
@@ -30,7 +41,6 @@ import {
   useWithdrawalRequestUncertaintyGuard,
 } from './withdrawal-request-guard'
 import {
-  referralWithdrawalOptions,
   referralsMutationKeys,
   referralsQueryKeys,
   withdrawalRequestMutationOptions,
@@ -70,9 +80,14 @@ export function WithdrawalRequestControl({
   const requestLock = useSynchronousActionLock()
   const sessionInvalidatedRef = useRef(false)
   const mutation = useMutation(withdrawalRequestMutationOptions(accessToken))
-  const sameRuntimeMutationPending = useHasExactPendingMutation(
+  const mutationCachePending = useHasExactPendingMutation(
     referralsMutationKeys.withdrawalRequest,
   )
+  const runtimeAttemptPending = useRuntimeFinancialAttemptPending(
+    financialOperationKeys.withdrawalRequest,
+  )
+  const sameRuntimeMutationPending =
+    mutationCachePending || runtimeAttemptPending
   const uncertainty = useWithdrawalRequestUncertaintyGuard()
   const [selectedMethod, setSelectedMethod] = useState('')
   const [account, setAccount] = useState('')
@@ -125,6 +140,7 @@ export function WithdrawalRequestControl({
     sameRuntimeMutationPending
   const showUnknownAcknowledgement =
     !sameRuntimeMutationPending &&
+    !recoveryFailed &&
     optionsAuthorityReady &&
     safetyStateReady &&
     (keepAcknowledgementVisible ||
@@ -145,20 +161,21 @@ export function WithdrawalRequestControl({
     closeConfirmation()
   }
 
-  const refreshWithdrawalOptions = async () => {
+  const refreshWithdrawalOptions = async (attemptGeneration: number) => {
+    if (!isCurrentAuthSessionGeneration(attemptGeneration)) return false
     await queryClient.invalidateQueries({
       queryKey: referralsQueryKeys.withdrawalOptions,
       exact: true,
       refetchType: 'none',
     })
+    if (!isCurrentAuthSessionGeneration(attemptGeneration)) return false
     try {
-      await queryClient.fetchQuery({
-        ...referralWithdrawalOptions(accessToken),
-        retry: false,
-        staleTime: 0,
-      })
+      const data = await referralsApi.getWithdrawalOptions(accessToken)
+      if (!isCurrentAuthSessionGeneration(attemptGeneration)) return false
+      queryClient.setQueryData(referralsQueryKeys.withdrawalOptions, data)
       return true
     } catch (error) {
+      if (!isCurrentAuthSessionGeneration(attemptGeneration)) return false
       if (isInvalidSessionError(error)) {
         sessionInvalidatedRef.current = true
         setSessionError(error)
@@ -173,7 +190,8 @@ export function WithdrawalRequestControl({
       hasExactPendingMutation(
         queryClient,
         referralsMutationKeys.withdrawalRequest,
-      )
+      ) ||
+      hasRuntimeFinancialAttempt(financialOperationKeys.withdrawalRequest)
     ) {
       setFieldError(null)
       return
@@ -248,12 +266,24 @@ export function WithdrawalRequestControl({
       return
     }
 
+    const runtimeAttempt = tryBeginFinancialAttempt(
+      financialOperationKeys.withdrawalRequest,
+    )
+    if (!runtimeAttempt) {
+      closeConfirmation()
+      setFieldError(null)
+      requestLock.release()
+      return
+    }
+    const attemptGeneration = captureAuthSessionGeneration()
+
     if (!uncertainty.preArm()) {
       setSafetyStorageError(
         '当前无法建立提现申请安全状态，请稍后重试或检查浏览器存储设置。',
       )
       closeConfirmation()
       requestLock.release()
+      finishFinancialAttempt(runtimeAttempt)
       return
     }
 
@@ -266,14 +296,19 @@ export function WithdrawalRequestControl({
     const request = mutation.mutateAsync(confirmation)
     try {
       await request
+      if (!isCurrentAuthSessionGeneration(attemptGeneration)) return
       clearUncertainty()
       clearSensitiveForm()
       setFeedback({ kind: 'success', reconciled: null })
-      const reconciled = await refreshWithdrawalOptions()
-      if (!sessionInvalidatedRef.current) {
+      const reconciled = await refreshWithdrawalOptions(attemptGeneration)
+      if (
+        isCurrentAuthSessionGeneration(attemptGeneration) &&
+        !sessionInvalidatedRef.current
+      ) {
         setFeedback({ kind: 'success', reconciled })
       }
     } catch (error) {
+      if (!isCurrentAuthSessionGeneration(attemptGeneration)) return
       clearSensitiveForm()
       if (isInvalidSessionError(error)) {
         sessionInvalidatedRef.current = true
@@ -286,8 +321,11 @@ export function WithdrawalRequestControl({
         setKeepAcknowledgementVisible(true)
         setFieldError(null)
         setFeedback({ kind: 'unknown', reconciled: null })
-        const reconciled = await refreshWithdrawalOptions()
-        if (!sessionInvalidatedRef.current) {
+        const reconciled = await refreshWithdrawalOptions(attemptGeneration)
+        if (
+          isCurrentAuthSessionGeneration(attemptGeneration) &&
+          !sessionInvalidatedRef.current
+        ) {
           setFeedback({ kind: 'unknown', reconciled })
         }
       } else {
@@ -305,41 +343,54 @@ export function WithdrawalRequestControl({
                   ? 'validation'
                   : 'failed'
         setFeedback({ kind, reconciled: null })
-        const reconciled = await refreshWithdrawalOptions()
-        if (!sessionInvalidatedRef.current) {
+        const reconciled = await refreshWithdrawalOptions(attemptGeneration)
+        if (
+          isCurrentAuthSessionGeneration(attemptGeneration) &&
+          !sessionInvalidatedRef.current
+        ) {
           setFeedback({ kind, reconciled })
         }
       }
     } finally {
-      mutation.reset()
-      const mutationCache = queryClient.getMutationCache()
-      mutationCache
-        .findAll({
-          mutationKey: referralsMutationKeys.withdrawalRequest,
-          exact: true,
-        })
-        .filter((entry) => entry.state.status !== 'pending')
-        .forEach((entry) => mutationCache.remove(entry))
-      setActionPending(false)
+      if (isCurrentAuthSessionGeneration(attemptGeneration)) {
+        mutation.reset()
+        const mutationCache = queryClient.getMutationCache()
+        mutationCache
+          .findAll({
+            mutationKey: referralsMutationKeys.withdrawalRequest,
+            exact: true,
+          })
+          .filter((entry) => entry.state.status !== 'pending')
+          .forEach((entry) => mutationCache.remove(entry))
+        setActionPending(false)
+      }
       requestLock.release()
+      finishFinancialAttempt(runtimeAttempt)
     }
   }
 
   const manualRecovery = async () => {
+    const recoveryGeneration = captureAuthSessionGeneration()
     if (
       recovering ||
       hasExactPendingMutation(
         queryClient,
         referralsMutationKeys.withdrawalRequest,
       ) ||
+      hasRuntimeFinancialAttempt(financialOperationKeys.withdrawalRequest) ||
       (!recoveryFailed && !(unknownGuardActive && !optionsAuthorityReady))
     ) {
       return
     }
     sessionInvalidatedRef.current = false
     setRecovering(true)
-    const reconciled = await refreshWithdrawalOptions()
-    if (sessionInvalidatedRef.current) return
+    const reconciled = await refreshWithdrawalOptions(recoveryGeneration)
+    if (
+      !isCurrentAuthSessionGeneration(recoveryGeneration) ||
+      sessionInvalidatedRef.current
+    ) {
+      return
+    }
     setRecovering(false)
     if (reconciled && feedback) setFeedback({ ...feedback, reconciled: true })
   }

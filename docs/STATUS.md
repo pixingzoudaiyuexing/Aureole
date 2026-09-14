@@ -77,8 +77,8 @@ its Independent Referral Code Mutation Review passed, and it is frozen at
 `ba106d1c7d7b69fbc9b5b52837c3abee939ef218`.
 
 AUR-M9-003 Commission Transfer has a PREVIOUS INDEPENDENT REVIEW PASS and PRIMARY HARDENING PASS at
-historical reviewed SHA `e8e83622abf38960ed41fd222a978f02323592df`. A cross-cutting same-runtime
-financial concurrency hardening is now applied with TARGETED RE-REVIEW PENDING, so the historical SHA
+historical reviewed SHA `e8e83622abf38960ed41fd222a978f02323592df`. Cross-session financial
+continuation hardening is now applied with TARGETED RE-REVIEW PENDING, so the historical SHA
 is not the current final frozen SHA. It adds only strict
 `POST /api/v1/referrals/commissions/transfer`, fresh Overview/Wallet/Account Config authority,
 exact money parsing, financial confirmation, execution-time QueryClient rechecks, same-tick
@@ -87,8 +87,9 @@ QueryClient and a session-scoped reload-persistent marker, synchronously pre-arm
 POST. This closes handled-UNKNOWN and in-flight full-reload duplicate windows without persisting
 financial data. It never predicts balances or infers mutation outcome from recovered deltas.
 
-AUR-M9-004 Withdrawal Request is IMPLEMENTATION COMPLETE with INDEPENDENT REVIEW REQUIRED FIX APPLIED
-and TARGETED RE-REVIEW PENDING. It adds only strict `POST /api/v1/referrals/withdrawal-requests`, exact
+AUR-M9-004 Withdrawal Request is IMPLEMENTATION COMPLETE with INDEPENDENT REVIEW REQUIRED FIX APPLIED,
+CROSS-SESSION FINANCIAL CONTINUATION HARDENING APPLIED and TARGETED RE-REVIEW PENDING. It adds only strict
+`POST /api/v1/referrals/withdrawal-requests`, exact
 server-provided method selection, raw masked account handling, fresh Withdrawal Options authority,
 financial confirmation, execution-time QueryClient recheck, same-tick locking, synchronous persistent
 pre-arm and Options-only reconciliation. It never accepts or calculates a withdrawal amount and never
@@ -102,6 +103,19 @@ mutation is pending, form submission, confirmation, acknowledgement and manual r
 The two mutation keys remain isolated. MutationCache does not replace the separate sessionStorage markers,
 which continue to protect full-document reload and runtime replacement uncertainty.
 
+The cross-session required fix adds a QueryClient-independent exact-operation runtime attempt registry and
+an in-memory authenticated session generation. Runtime handles use atomic begin and ownership-aware finish,
+survive `queryClient.clear()` and drive React pending UI through `useSyncExternalStore`. Each financial attempt
+captures the current generation before persistent pre-arm. A continuation whose generation is stale skips all
+marker, uncertainty, canonical query, Auth and feedback side effects, including AUTH errors, and releases only
+its own runtime handle after all allowed cleanup.
+
+Auth boundaries no longer remove unresolved financial protection: active remains active, acknowledged becomes
+active and absent remains absent. This conservative same-tab state contains no account identity or business
+payload. If storage is unavailable while preparing the boundary, the runtime records the unsafe key and later
+recovers it only as active. Full-document replacement may remove the runtime registry, but the persistent active
+marker continues to require fresh authority and explicit acknowledgement.
+
 ## Current commit
 
 This file records the latest checkpoint state. A commit cannot embed its own SHA
@@ -114,12 +128,12 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (45 files, 1057 tests)
+- `npm test`: PASS (47 files, 1074 tests)
 - `npm run build`: PASS
 - `npm ls`: PASS
 - `git diff --check`: PASS
-- Build evidence: main JS 472.50 kB raw / 148.62 kB gzip; CSS 37.84 kB raw /
-  7.51 kB gzip; Referrals route 49.02 kB raw / 11.75 kB gzip; Support route
+- Build evidence: main JS 472.98 kB raw / 148.77 kB gzip; CSS 37.84 kB raw /
+  7.51 kB gzip; Referrals route 50.30 kB raw / 12.18 kB gzip; Support route
   31.19 kB raw / 8.29 kB gzip; Wallet route 22.81 kB raw / 6.84 kB gzip;
   Subscription route 19.89 kB raw / 5.68 kB gzip; Plans route 5.15 kB gzip;
   Orders route 13.17 kB gzip. Assets remain within budget; initial-route
@@ -423,13 +437,28 @@ operational source of truth.
   recorded one POST per active attempt. Old success settlement restored the form only after authoritative
   reads, horizontal overflow was zero and browser console warning/error count was zero. This is controlled
   evidence, not production solution/V2Board runtime evidence.
+- AUR-M9 cross-session continuation automated verification: PASS for Withdrawal and Commission old Session A
+  success, definitive rejection, NETWORK_ERROR and AUTH_FAILED settlement after logout plus Session B login.
+  Tests directly prove MutationCache A was cleared while the runtime registry remained pending, Session B
+  canonical Overview/Wallet/Withdrawal Options and `/me` remained unchanged, old-token recovery GET count stayed
+  zero, Session B credential remained active, persistent marker stayed active and acknowledgement appeared only
+  after the old handle released. Registry ownership, React subscription, generation changes, auth-boundary marker
+  downgrade, storage failure recovery and logout plus full-runtime replacement are independently covered.
+- AUR-M9 cross-session continuation controlled-browser verification: PASS against a local `/api/v1` mock at
+  1280 x 720 and 390 x 844. Session A started a pending Withdrawal, navigated away, logged out and Session B logged
+  in. Session B loaded its own `bank-b` authority while runtime pending disabled the form and hid acknowledgement.
+  Old A success then released runtime pending without displaying A success, logging out B or triggering any old
+  A token Overview/Wallet/Options GET. B authority remained unchanged; active acknowledgement produced zero POST
+  and reopened an empty B form. Horizontal overflow and browser console warning/error count were zero. This is
+  controlled evidence, not production runtime evidence.
 
 ## Known gaps
 
 - Wallet Balance Read, Wallet Deposit Create, Gift Card Redeem, all Support Ticket v1 work,
   Referral / Commission Read Model and Referral Code Create are complete and independently reviewed.
-  Commission Transfer has previous review approval plus new cross-cutting concurrency hardening; Withdrawal
-  Request has its independent review required fix applied. Both await targeted financial concurrency re-review.
+  Commission Transfer has previous review approval plus cross-session continuation hardening; Withdrawal Request
+  has its independent review required fixes applied plus the same cross-session hardening. Both await the final
+  targeted cross-session financial continuation re-review.
 - Production solution/V2Board Referral Overview, Commission History, Withdrawal Options,
   Referral Code Create, Commission Transfer and Withdrawal Request behavior is NOT TESTED;
   controlled mock browser and automated contract/privacy/recovery tests are the current evidence.
@@ -455,5 +484,5 @@ operational source of truth.
 
 ## Next milestone
 
-Exact-head CI verification and the Gemini Targeted Financial Concurrency Re-Review are the next gates.
+Exact-head CI verification and the final Gemini Cross-Session Financial Continuation Targeted Re-Review are the next gates.
 Milestone 10 and Launch Readiness have not started.

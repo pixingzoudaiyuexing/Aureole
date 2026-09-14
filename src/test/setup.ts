@@ -2,12 +2,20 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterEach } from 'vitest'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
+import { resetSessionSafetyRuntimeForTests } from '@/lib/auth/session-safety-storage'
+import { resetFinancialMutationRuntimeForTests } from '@/features/referrals/financial-mutation-runtime'
 
 afterEach(() => {
   cleanup()
   window.localStorage.clear()
   window.sessionStorage.clear()
-  useAuthSessionStore.setState({ accessToken: null, hydrated: false })
+  resetFinancialMutationRuntimeForTests()
+  resetSessionSafetyRuntimeForTests()
+  useAuthSessionStore.setState({
+    accessToken: null,
+    generation: 0,
+    hydrated: false,
+  })
   document.documentElement.classList.remove('dark')
   document.documentElement.style.colorScheme = ''
 })

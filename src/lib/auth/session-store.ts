@@ -7,6 +7,7 @@ import {
 
 interface AuthSessionState {
   accessToken: string | null
+  generation: number
   hydrated: boolean
   hydrate: () => void
   setAccessToken: (accessToken: string) => void
@@ -15,6 +16,7 @@ interface AuthSessionState {
 
 export const useAuthSessionStore = create<AuthSessionState>((set) => ({
   accessToken: null,
+  generation: 0,
   hydrated: false,
   hydrate: () =>
     set({
@@ -30,3 +32,20 @@ export const useAuthSessionStore = create<AuthSessionState>((set) => ({
     set({ accessToken: null, hydrated: true })
   },
 }))
+
+export function advanceAuthSessionGeneration() {
+  let nextGeneration = 0
+  useAuthSessionStore.setState((state) => {
+    nextGeneration = state.generation + 1
+    return { generation: nextGeneration }
+  })
+  return nextGeneration
+}
+
+export function captureAuthSessionGeneration() {
+  return useAuthSessionStore.getState().generation
+}
+
+export function isCurrentAuthSessionGeneration(generation: number) {
+  return useAuthSessionStore.getState().generation === generation
+}

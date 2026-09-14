@@ -452,8 +452,10 @@ pre-arm，pending 期间、handled UNKNOWN 和旧 runtime 在 response 前被 re
 然后对账。
 
 Persistent marker 不包含金额、余额、币种、token、email、timestamp 或错误信息，也不使用 localStorage。普通 credential
-hydrate 保留 marker；logout、Auth invalidation 与 `establishSession` 除清 QueryClient 外还显式清理 session safety state，
-防止跨 authenticated session 泄漏。Referral Code Create 仍保持原 memory-only guard，不被本 hardening 修改。
+hydrate 保留 marker。真正 authenticated session boundary 会递增仅内存 session generation，并准备 financial safety state：
+`active` 保持 `active`，`acknowledged` 降级为 `active`，absent 保持 absent。这样 logout/new login/Auth invalidation 不会删除仍
+无法确认的 non-idempotent operation，也不会把旧 Session consent 继承给新 Session。Referral Code Create 仍保持原
+memory-only guard，不属于 financial runtime registry。
 
 AUR-M9-003 的历史 Independent Financial Mutation Review 与 Primary Hardening Review 已通过，历史 reviewed SHA 为
 `e8e83622abf38960ed41fd222a978f02323592df`。AUR-M9-004 独立审查随后发现两类 financial mutation 共享的 SPA
@@ -488,8 +490,10 @@ account、method 与 confirmation snapshot 立即清空，persistent/local marke
 仍需重新选择、输入、确认并再次 pre-arm `active`。
 
 Withdrawal marker 与 Commission Transfer marker 独立，均只允许 `active` / `acknowledged` / absent。普通同 session credential
-hydrate 保留二者；logout、new session、Auth invalidation 通过 sealed Session Core 统一清除。AUR-M9-004 不修改 solution、不
-直接访问 V2Board、不读取 Withdrawal status/list/detail 或 Support Ticket，也不进入 Launch Readiness。
+hydrate 保留二者；logout、new session、Auth invalidation 清 credential 与 QueryClient，但按上述 auth-boundary 规则保留或降级
+financial marker。跨账户看到 content-free active marker 是允许的 conservative same-tab safety behavior，不代表新账户拥有旧
+账户业务状态。AUR-M9-004 不修改 solution、不直接访问 V2Board、不读取 Withdrawal status/list/detail 或 Support Ticket，也不
+进入 Launch Readiness。
 
 Commission Transfer 与 Withdrawal Request 现在各自使用同一个轻量 shared pending helper，但仍按 exact mutation key 隔离。
 UI 层通过 exact `useIsMutating` 订阅同一 QueryClient 的 pending mutation；即使原 Control 因 SPA navigation unmount，只要旧
@@ -505,6 +509,22 @@ MutationCache 是 same-runtime in-flight fact；sessionStorage marker 是 cross-
 same-runtime pending settle 为 success/definitive 后，旧 continuation 可清 marker 并执行原有 authority reconciliation，因为 gate
 保证不存在 Attempt B；UNKNOWN settle 则继续保留 active marker，fresh authority 后才开放 acknowledgement。full runtime replacement
 会丢失 MutationCache，但必须保留原有 persistent active/acknowledged reload 语义，不能因 pending count 为零自动清 marker。
+
+Cross-session hardening 在上述两层之外新增 QueryClient-independent runtime financial attempt registry 与 authenticated session
+generation。Registry 只按 exact operation key 保存 opaque handle，`tryBegin` 同步完成 check + register；旧 handle 只能释放自身，
+不能清除未来 handle。`useSyncExternalStore` 让 registry 在 `queryClient.clear()` 后仍能驱动新 Session UI 的 pending 状态。真正 POST
+前顺序为 synchronous lock、current authority/validation、MutationCache exact check、runtime atomic begin、capture generation、
+persistent pre-arm、立即 mutation；pre-arm 失败时释放自己的 handle并保持零 POST。
+
+每个 financial continuation 在 mutation settle 后首先检查 captured generation。若 Session 已变化，旧 continuation 不清/确认新
+Session marker，不修改 uncertainty Query state，不 invalidate/refetch/write canonical financial queries，不使用旧 token GET，不触发
+新 Session logout，也不显示旧 outcome feedback；只在 finally 最后释放自身 runtime handle。current-session reconciliation 不直接
+把旧-token `fetchQuery` 绑定到 canonical key，而是先取得临时结果，generation 仍匹配才写 QueryClient，从而覆盖 GET 进行期间的
+Session 切换。runtime handle 始终在所有允许的 shared cleanup 之后释放，避免新 attempt 在旧 cleanup 尚未完成时启动。
+
+最终 safety layers 分工为：form-local synchronous lock；QueryClient MutationCache exact pending；QueryClient-independent runtime
+attempt registry；sessionStorage cross-runtime uncertainty；authenticated session generation stale-continuation gate。Abort 不作为
+non-idempotent POST 的安全证明。
 
 ## Theme and presentation
 

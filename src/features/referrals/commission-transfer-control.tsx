@@ -29,12 +29,25 @@ import {
   walletQueryKeys,
 } from '@/features/wallet/wallet-queries'
 import type { Wallet } from '@/features/wallet/wallet-api'
+import { walletApi } from '@/features/wallet/wallet-api'
 import { ApiError } from '@/lib/api/errors'
+import {
+  captureAuthSessionGeneration,
+  isCurrentAuthSessionGeneration,
+} from '@/lib/auth/session-store'
 import { isAmbiguousCommissionTransferError } from './commission-transfer-errors'
 import {
   hasExactPendingMutation,
   useHasExactPendingMutation,
 } from './financial-mutation-pending'
+import {
+  financialOperationKeys,
+  finishFinancialAttempt,
+  hasRuntimeFinancialAttempt,
+  tryBeginFinancialAttempt,
+  useRuntimeFinancialAttemptPending,
+} from './financial-mutation-runtime'
+import { referralsApi } from './referrals-api'
 import {
   getCommissionTransferAuthority,
   getCommissionTransferUncertaintyStatus,
@@ -42,7 +55,6 @@ import {
 } from './commission-transfer-guard'
 import {
   commissionTransferMutationOptions,
-  referralOverviewOptions,
   referralsMutationKeys,
   referralsQueryKeys,
   useReferralOverview,
@@ -83,9 +95,14 @@ export function CommissionTransferControl({
     refetchOnMount: 'always',
   })
   const mutation = useMutation(commissionTransferMutationOptions(accessToken))
-  const sameRuntimeMutationPending = useHasExactPendingMutation(
+  const mutationCachePending = useHasExactPendingMutation(
     referralsMutationKeys.commissionTransfer,
   )
+  const runtimeAttemptPending = useRuntimeFinancialAttemptPending(
+    financialOperationKeys.commissionTransfer,
+  )
+  const sameRuntimeMutationPending =
+    mutationCachePending || runtimeAttemptPending
   const uncertainty = useCommissionTransferUncertaintyGuard()
   const [amountText, setAmountText] = useState('')
   const [amountError, setAmountError] = useState<string | null>(null)
@@ -130,6 +147,7 @@ export function CommissionTransferControl({
   const showUnknownAcknowledgement =
     transferAuthorityReady &&
     !sameRuntimeMutationPending &&
+    !recoveryFailed &&
     (keepAcknowledgementVisible ||
       feedback?.kind === 'unknown' ||
       unknownGuardActive)
@@ -158,7 +176,8 @@ export function CommissionTransferControl({
       ? formatMinorMoney(wallet.data.balanceMinor, config.data)
       : null
 
-  const refreshFinancialState = async () => {
+  const refreshFinancialState = async (attemptGeneration: number) => {
+    if (!isCurrentAuthSessionGeneration(attemptGeneration)) return false
     await Promise.all([
       queryClient.invalidateQueries({
         queryKey: referralsQueryKeys.overview,
@@ -171,18 +190,12 @@ export function CommissionTransferControl({
         refetchType: 'none',
       }),
     ])
+    if (!isCurrentAuthSessionGeneration(attemptGeneration)) return false
     const results = await Promise.allSettled([
-      queryClient.fetchQuery({
-        ...referralOverviewOptions(accessToken),
-        retry: false,
-        staleTime: 0,
-      }),
-      queryClient.fetchQuery({
-        ...walletQueryOptions(accessToken),
-        retry: false,
-        staleTime: 0,
-      }),
+      referralsApi.getOverview(accessToken),
+      walletApi.getWallet(accessToken),
     ])
+    if (!isCurrentAuthSessionGeneration(attemptGeneration)) return false
     const authError = results.find(
       (result) =>
         result.status === 'rejected' && isInvalidSessionError(result.reason),
@@ -191,6 +204,16 @@ export function CommissionTransferControl({
       sessionInvalidatedRef.current = true
       setSessionError(authError.reason)
       return false
+    }
+    const [overviewResult, walletResult] = results
+    if (overviewResult.status === 'fulfilled') {
+      queryClient.setQueryData(
+        referralsQueryKeys.overview,
+        overviewResult.value,
+      )
+    }
+    if (walletResult.status === 'fulfilled') {
+      queryClient.setQueryData(walletQueryKeys.wallet, walletResult.value)
     }
     return results.every((result) => result.status === 'fulfilled')
   }
@@ -201,7 +224,8 @@ export function CommissionTransferControl({
       hasExactPendingMutation(
         queryClient,
         referralsMutationKeys.commissionTransfer,
-      )
+      ) ||
+      hasRuntimeFinancialAttempt(financialOperationKeys.commissionTransfer)
     ) {
       setAmountError(null)
       return
@@ -310,6 +334,18 @@ export function CommissionTransferControl({
       return
     }
 
+    const runtimeAttempt = tryBeginFinancialAttempt(
+      financialOperationKeys.commissionTransfer,
+    )
+    if (!runtimeAttempt) {
+      setConfirmationOpen(false)
+      setConfirmedTransfer(null)
+      setAmountError(null)
+      transferLock.release()
+      return
+    }
+    const attemptGeneration = captureAuthSessionGeneration()
+
     if (!uncertainty.preArm()) {
       setSafetyStorageError(
         '当前无法建立资金操作安全状态，请稍后重试或检查浏览器存储设置。',
@@ -317,6 +353,7 @@ export function CommissionTransferControl({
       setConfirmationOpen(false)
       setConfirmedTransfer(null)
       transferLock.release()
+      finishFinancialAttempt(runtimeAttempt)
       return
     }
 
@@ -329,16 +366,21 @@ export function CommissionTransferControl({
     const request = mutation.mutateAsync(confirmedTransfer.amountMinor)
     try {
       await request
+      if (!isCurrentAuthSessionGeneration(attemptGeneration)) return
       uncertainty.clear()
       setConfirmationOpen(false)
       setConfirmedTransfer(null)
       setAmountText('')
       setFeedback({ kind: 'success', reconciled: null })
-      const reconciled = await refreshFinancialState()
-      if (!sessionInvalidatedRef.current) {
+      const reconciled = await refreshFinancialState(attemptGeneration)
+      if (
+        isCurrentAuthSessionGeneration(attemptGeneration) &&
+        !sessionInvalidatedRef.current
+      ) {
         setFeedback({ kind: 'success', reconciled })
       }
     } catch (error) {
+      if (!isCurrentAuthSessionGeneration(attemptGeneration)) return
       if (isInvalidSessionError(error)) {
         sessionInvalidatedRef.current = true
         setSessionError(error)
@@ -353,8 +395,11 @@ export function CommissionTransferControl({
         setAmountText('')
         setAmountError(null)
         setFeedback({ kind: 'unknown', reconciled: null })
-        const reconciled = await refreshFinancialState()
-        if (!sessionInvalidatedRef.current) {
+        const reconciled = await refreshFinancialState(attemptGeneration)
+        if (
+          isCurrentAuthSessionGeneration(attemptGeneration) &&
+          !sessionInvalidatedRef.current
+        ) {
           setFeedback({ kind: 'unknown', reconciled })
         }
       } else {
@@ -367,32 +412,45 @@ export function CommissionTransferControl({
               ? 'validation'
               : 'failed'
         setFeedback({ kind, reconciled: null })
-        const reconciled = await refreshFinancialState()
-        if (!sessionInvalidatedRef.current) {
+        const reconciled = await refreshFinancialState(attemptGeneration)
+        if (
+          isCurrentAuthSessionGeneration(attemptGeneration) &&
+          !sessionInvalidatedRef.current
+        ) {
           setFeedback({ kind, reconciled })
         }
       }
     } finally {
-      setActionPending(false)
+      if (isCurrentAuthSessionGeneration(attemptGeneration)) {
+        setActionPending(false)
+      }
       transferLock.release()
+      finishFinancialAttempt(runtimeAttempt)
     }
   }
 
   const manualRecovery = async () => {
+    const recoveryGeneration = captureAuthSessionGeneration()
     if (
       recovering ||
       hasExactPendingMutation(
         queryClient,
         referralsMutationKeys.commissionTransfer,
       ) ||
+      hasRuntimeFinancialAttempt(financialOperationKeys.commissionTransfer) ||
       (!recoveryFailed && !(unknownGuardActive && !financialReadsReady))
     ) {
       return
     }
     sessionInvalidatedRef.current = false
     setRecovering(true)
-    const reconciled = await refreshFinancialState()
-    if (sessionInvalidatedRef.current) return
+    const reconciled = await refreshFinancialState(recoveryGeneration)
+    if (
+      !isCurrentAuthSessionGeneration(recoveryGeneration) ||
+      sessionInvalidatedRef.current
+    ) {
+      return
+    }
     setRecovering(false)
     if (reconciled && feedback) {
       setFeedback({ ...feedback, reconciled: true })

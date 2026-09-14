@@ -16,6 +16,11 @@ import { accountApi } from '@/features/account/account-api'
 import { accountQueryKeys } from '@/features/account/account-queries'
 import type { AuthApi } from '@/features/auth/auth-api'
 import { commissionTransferLocalGuardKeys } from '@/features/referrals/commission-transfer-guard'
+import {
+  financialOperationKeys,
+  hasRuntimeFinancialAttempt,
+  resetFinancialMutationRuntimeForTests,
+} from '@/features/referrals/financial-mutation-runtime'
 import { referralsApi } from '@/features/referrals/referrals-api'
 import { referralsQueryKeys } from '@/features/referrals/referrals-queries'
 import { walletApi } from '@/features/wallet/wallet-api'
@@ -106,7 +111,12 @@ function renderReferrals(queryClient: QueryClient = createQueryClient()) {
 }
 
 function renderFullRuntime(queryClient: QueryClient = createQueryClient()) {
-  useAuthSessionStore.setState({ accessToken: null, hydrated: false })
+  resetFinancialMutationRuntimeForTests()
+  useAuthSessionStore.setState({
+    accessToken: null,
+    generation: 0,
+    hydrated: false,
+  })
   const authApi: AuthApi = {
     login: vi.fn(),
     getCurrentUser: vi.fn().mockResolvedValue({
@@ -346,6 +356,43 @@ describe('Commission Transfer authority and confirmation', () => {
 })
 
 describe('Commission Transfer outcomes and reconciliation', () => {
+  it('releases the runtime attempt only after both financial reads complete', async () => {
+    const mocks = installMocks()
+    const overviewRecovery = deferred<typeof overview>()
+    const walletRecovery = deferred<typeof wallet>()
+    mocks.getOverview
+      .mockResolvedValueOnce(overview)
+      .mockReturnValueOnce(overviewRecovery.promise)
+    mocks.getWallet
+      .mockResolvedValueOnce(wallet)
+      .mockReturnValueOnce(walletRecovery.promise)
+    renderReferrals()
+    const form = await openConfirmation()
+    await confirmTransfer(form)
+
+    await waitFor(() => expect(mocks.transferCommission).toHaveBeenCalledOnce())
+    expect(
+      hasRuntimeFinancialAttempt(financialOperationKeys.commissionTransfer),
+    ).toBe(true)
+    expect(
+      await screen.findByText(
+        '上一笔佣金划转仍在处理中，请等待结果，暂不能再次划转。',
+      ),
+    ).toBeInTheDocument()
+
+    act(() => overviewRecovery.resolve(overview))
+    expect(
+      hasRuntimeFinancialAttempt(financialOperationKeys.commissionTransfer),
+    ).toBe(true)
+    act(() => walletRecovery.resolve(wallet))
+    await waitFor(() =>
+      expect(
+        hasRuntimeFinancialAttempt(financialOperationKeys.commissionTransfer),
+      ).toBe(false),
+    )
+    expect(await screen.findByText('佣金划转已确认。')).toBeInTheDocument()
+  })
+
   it('preserves confirmed success and refetches only Overview and Wallet', async () => {
     const mocks = installMocks()
     mocks.getOverview.mockResolvedValueOnce(overview).mockResolvedValueOnce({
@@ -578,7 +625,7 @@ describe('Commission Transfer UNKNOWN safety', () => {
     expect(mocks.transferCommission).toHaveBeenCalledTimes(2)
   })
 
-  it('keeps active uncertainty across remount and clears it on session logout', async () => {
+  it('keeps active uncertainty across remount and preserves it on session logout', async () => {
     const mocks = installMocks()
     mocks.transferCommission.mockRejectedValue(apiError('NETWORK_ERROR', 0))
     const queryClient = createQueryClient()
@@ -615,6 +662,7 @@ describe('Commission Transfer UNKNOWN safety', () => {
     expect(
       queryClient.getQueryData(commissionTransferLocalGuardKeys.uncertainty),
     ).toBeUndefined()
+    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
   })
 
   it('allows ordinary empty-form remount only after explicit acknowledgement', async () => {
@@ -918,7 +966,7 @@ describe('Commission Transfer UNKNOWN safety', () => {
         queryClient.getQueryData(referralsQueryKeys.overview),
       ).toBeUndefined()
       expect(queryClient.getQueryData(walletQueryKeys.wallet)).toBeUndefined()
-      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
+      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
     },
   )
 
@@ -936,7 +984,7 @@ describe('Commission Transfer UNKNOWN safety', () => {
       ).toBeInTheDocument()
       expect(router.state.location.pathname).toBe('/login')
       expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
-      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
+      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
       expect(
         queryClient.getQueryData(referralsQueryKeys.overview),
       ).toBeUndefined()
