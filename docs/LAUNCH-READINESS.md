@@ -322,11 +322,9 @@ browser caching behavior or automated budget gate. Dynamic route names must not 
 added to the initial total merely because they exist in `dist`. A future analyzer
 may be added only if Primary authorizes that scope.
 
-Tailwind's automatic candidate scan currently includes repository documentation.
-During this audit, a CSS position utility word in the new document generated an
-extra rule until the prose was rephrased. An independent candidate compilation now
-shows no CSS difference from the audit base, but the scan boundary remains a
-maintenance risk for future documentation-only commits.
+At the AUR-M10-001 audit checkpoint, Tailwind automatic candidate scanning included repository documentation. During that audit, documentation prose generated an unintended CSS utility rule, proving that documentation-only changes could alter the production CSS bundle.
+
+RESOLVED BY AUR-M10-002R1: automatic candidate detection is disabled with `source(none)`, production scanning is explicitly limited to root `index.html` and `src`, and controlled documentation-isolation testing proved that documentation changes no longer affect generated Tailwind CSS.
 
 ## Browser and accessibility evidence
 
