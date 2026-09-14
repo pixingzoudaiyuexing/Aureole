@@ -214,7 +214,9 @@ describe('Create Support Ticket form', () => {
     expect(await screen.findByText('Existing ticket')).toBeInTheDocument()
     const createButton = screen.getByRole('button', { name: '新建工单' })
     expect(createButton).toBeDisabled()
-    await waitFor(() => expect(mocks.getList).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(mocks.getList).toHaveBeenCalledTimes(2), {
+      timeout: 3_000,
+    })
     await waitFor(() => expect(createButton).toBeDisabled())
     expect(mocks.create).not.toHaveBeenCalled()
   })

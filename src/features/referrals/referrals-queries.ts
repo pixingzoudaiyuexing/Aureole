@@ -12,6 +12,7 @@ export const referralsQueryKeys = {
 
 export const referralsMutationKeys = {
   createCode: ['referrals', 'create-code'] as const,
+  commissionTransfer: ['referrals', 'commission-transfer'] as const,
 }
 
 export function referralOverviewOptions(accessToken: string) {
@@ -53,6 +54,15 @@ export function referralCodeCreateMutationOptions(accessToken: string) {
   return {
     mutationKey: referralsMutationKeys.createCode,
     mutationFn: () => referralsApi.createCode(accessToken),
+    retry: false as const,
+  }
+}
+
+export function commissionTransferMutationOptions(accessToken: string) {
+  return {
+    mutationKey: referralsMutationKeys.commissionTransfer,
+    mutationFn: (amountMinor: number) =>
+      referralsApi.transferCommission(accessToken, { amountMinor }),
     retry: false as const,
   }
 }

@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  commissionTransferRequestSchema,
   commissionPageRequestSchema,
   referralsApi,
 } from '@/features/referrals/referrals-api'
 import {
+  commissionTransferMutationOptions,
   referralCodeCreateMutationOptions,
   referralsMutationKeys,
 } from '@/features/referrals/referrals-queries'
@@ -42,6 +44,66 @@ function validCommissionPage() {
 }
 
 describe('Referrals API contract', () => {
+  it.each([1, 2_147_483_647])(
+    'transfers commission through the exact strict Public POST for %i minor units',
+    async (amountMinor) => {
+      const request = vi
+        .spyOn(apiClient, 'authenticatedRequest')
+        .mockResolvedValue({ transferred: true, privateBalance: 999 })
+
+      await expect(
+        referralsApi.transferCommission(token, { amountMinor }),
+      ).resolves.toEqual({ transferred: true })
+      expect(request).toHaveBeenCalledWith(
+        '/api/v1/referrals/commissions/transfer',
+        {
+          method: 'POST',
+          body: { amountMinor },
+          accessToken: token,
+        },
+      )
+    },
+  )
+
+  it.each([
+    ['zero', { amountMinor: 0 }],
+    ['negative', { amountMinor: -1 }],
+    ['float', { amountMinor: 1.5 }],
+    ['above INT_MAX', { amountMinor: 2_147_483_648 }],
+    ['numeric string', { amountMinor: '1' }],
+    ['extra field', { amountMinor: 1, currency: 'CNY' }],
+  ])('rejects invalid transfer input before HTTP: %s', async (_name, input) => {
+    const request = vi.spyOn(apiClient, 'authenticatedRequest')
+    expect(() => commissionTransferRequestSchema.parse(input)).toThrow()
+    await expect(
+      referralsApi.transferCommission(token, input as { amountMinor: number }),
+    ).rejects.toBeDefined()
+    expect(request).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['transferred false', { transferred: false }],
+    ['missing transferred', {}],
+    ['wrong type', { transferred: 'true' }],
+    ['raw V2Board result', { data: true }],
+  ])('rejects malformed Transfer success: %s', async (_name, payload) => {
+    vi.spyOn(apiClient, 'authenticatedRequest').mockResolvedValue(payload)
+    await expect(
+      referralsApi.transferCommission(token, { amountMinor: 1 }),
+    ).rejects.toMatchObject({
+      code: 'MALFORMED_RESPONSE',
+    } satisfies Partial<ApiError>)
+  })
+
+  it('uses a financial-data-free non-retrying Transfer mutation key', () => {
+    const options = commissionTransferMutationOptions(token)
+    expect(options.mutationKey).toEqual(['referrals', 'commission-transfer'])
+    expect(options.mutationKey).toBe(referralsMutationKeys.commissionTransfer)
+    expect(options.retry).toBe(false)
+    expect(JSON.stringify(options.mutationKey)).not.toContain(token)
+    expect(JSON.stringify(options.mutationKey)).not.toContain('100')
+  })
+
   it('creates through the exact bodyless Public POST and strips additions', async () => {
     const request = vi
       .spyOn(apiClient, 'authenticatedRequest')

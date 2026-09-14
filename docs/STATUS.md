@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-Milestone 9 - Referral / Commission / Withdrawal (`AUR-M9-002` Create Referral Code)
+Milestone 9 - Referral / Commission / Withdrawal (`AUR-M9-003` Commission Transfer)
 
 ## Contract baseline
 
@@ -72,14 +72,17 @@ Read/Create/Reply/Close runtime is NOT TESTED.
 
 Milestone 9 is CURRENT. AUR-M9-001 Referral / Commission Read Model is COMPLETE and its
 Independent Referral Read Review passed; it is frozen at
-`445ffac542d89977f2db5b631516b6c3bbdc955f`. AUR-M9-002 Create Referral Code is
-IMPLEMENTATION COMPLETE with INDEPENDENT REVIEW REQUIRED FIXES APPLIED and TARGETED
-RE-REVIEW PENDING. The fixes keep UNKNOWN uncertainty in a content-free, memory-only
-QueryClient local guard across feature remount until explicit acknowledgement or Session
-Core clear, and recheck current Overview query status/fetchStatus/data immediately before
-POST instead of relying only on a React prop. AUR-M9-003 Commission Transfer and AUR-M9-004
-Withdrawal Request are NOT STARTED. Production solution/V2Board Referral Read and Create
-runtime is NOT TESTED.
+`445ffac542d89977f2db5b631516b6c3bbdc955f`. AUR-M9-002 Create Referral Code is COMPLETE,
+its Independent Referral Code Mutation Review passed, and it is frozen at
+`ba106d1c7d7b69fbc9b5b52837c3abee939ef218`.
+
+AUR-M9-003 Commission Transfer is IMPLEMENTATION COMPLETE with INDEPENDENT FINANCIAL
+MUTATION REVIEW PENDING. It adds only strict `POST /api/v1/referrals/commissions/transfer`,
+fresh Overview/Wallet/Account Config authority, exact money parsing, financial confirmation,
+execution-time QueryClient rechecks, same-tick locking, Overview + Wallet reconciliation and a
+content-free session-memory UNKNOWN guard. It never predicts balances or infers mutation
+outcome from recovered deltas. AUR-M9-004 Withdrawal Request is NOT STARTED. Production
+solution/V2Board Referral Read, Create and Commission Transfer runtime is NOT TESTED.
 
 ## Current commit
 
@@ -93,13 +96,13 @@ operational source of truth.
 - `npm run format:check`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
-- `npm test`: PASS (41 files, 933 tests)
+- `npm test`: PASS (42 files, 983 tests)
 - `npm run build`: PASS
 - `npm ls`: PASS
 - `git diff --check`: PASS
-- Build evidence: main JS 471.80 kB raw / 148.39 kB gzip; CSS 37.80 kB raw /
-  7.51 kB gzip; Referrals route 19.19 kB raw / 5.79 kB gzip; Support route
-  31.19 kB raw / 8.29 kB gzip; Wallet route 23.81 kB raw / 7.06 kB gzip;
+- Build evidence: main JS 471.84 kB raw / 148.41 kB gzip; CSS 37.80 kB raw /
+  7.51 kB gzip; Referrals route 32.75 kB raw / 8.50 kB gzip; Support route
+  31.19 kB raw / 8.29 kB gzip; Wallet route 22.80 kB raw / 6.84 kB gzip;
   Subscription route 19.89 kB raw / 5.68 kB gzip; Plans route 5.15 kB gzip;
   Orders route 13.16 kB gzip. Assets remain within budget; initial-route
   composition has not been measured by a dedicated analyzer.
@@ -340,16 +343,31 @@ operational source of truth.
   additionally prove UNKNOWN marker activation before recovery completes, recovery-failure
   remount, acknowledged remount, Session Core clear, `gcTime: Infinity` and same-tick refetch
   plus immediate Confirm execution authority.
+- AUR-M9-003 controlled-browser verification: PASS against a local `/api/v1` mock at exact
+  1280 x 720 and 390 x 844 in Light/Dark/System for explicit financial confirmation, Cancel /
+  Escape focus restoration, normal confirmed success, `INSUFFICIENT_COMMISSION_BALANCE`,
+  `COMMISSION_TRANSFER_FAILED`, UNKNOWN with exact matching Overview/Wallet deltas, UNKNOWN
+  recovery failure plus GET-only recovery, real SPA navigation/remount, acknowledgement and
+  Transfer Auth invalidation. Request evidence showed zero POST before Confirm, exactly one POST
+  for the controlled UNKNOWN flow, Overview + Wallet-only financial reconciliation and zero POST
+  for acknowledgement or cancelled reconfirmation. Maximum safe Overview commission, INT_MAX
+  Transfer input and current Wallet balance remained readable in the mobile confirmation without
+  horizontal overflow or overlap; browser console warning/error count was zero. Automated
+  real-page tests additionally cover same-tick double Confirm, Config snapshot change and
+  same-tick authority refetch before React rerender, all five UNKNOWN classes, all three
+  definitive errors, success reconciliation partial failures, recovery-failure remount,
+  acknowledged remount, recovery Auth invalidation and Session Core clear. Production
+  solution/V2Board Commission Transfer runtime is NOT TESTED.
 
 ## Known gaps
 
-- Wallet Balance Read, Wallet Deposit Create, Gift Card Redeem, all Support Ticket v1 work
-  and the Referral / Commission Read Model are complete and independently reviewed. Referral
-  Code Create required fixes are applied with targeted re-review pending; Commission Transfer
-  and Withdrawal Request are not started.
-- Production solution/V2Board Referral Overview, Commission History, Withdrawal Options and
-  Referral Code Create behavior is NOT TESTED; controlled mock browser and automated
-  contract/privacy/recovery tests are the current evidence.
+- Wallet Balance Read, Wallet Deposit Create, Gift Card Redeem, all Support Ticket v1 work,
+  Referral / Commission Read Model and Referral Code Create are complete and independently
+  reviewed. Commission Transfer implementation is complete with independent financial mutation
+  review pending; Withdrawal Request is not started.
+- Production solution/V2Board Referral Overview, Commission History, Withdrawal Options,
+  Referral Code Create and Commission Transfer behavior is NOT TESTED; controlled mock browser
+  and automated contract/privacy/recovery tests are the current evidence.
 - Production solution/V2Board Ticket List, Detail, Create, Reply and Close behavior is
   NOT TESTED; controlled mock browser and automated contract/privacy tests are the
   current evidence.
@@ -372,5 +390,5 @@ operational source of truth.
 
 ## Next milestone
 
-AUR-M9-002 exact-head CI verification and targeted required-fix re-review are the next gates.
-AUR-M9-003 and AUR-M9-004 have not started.
+AUR-M9-003 exact-head CI verification and Independent Commission Transfer Financial Mutation
+Review are the next gates. AUR-M9-004 has not started.

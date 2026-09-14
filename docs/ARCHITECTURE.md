@@ -369,7 +369,7 @@ acknowledgement，且 Close 仍需标准 confirmation；Reply payload 变化会�
 失败只允许 GET Detail，所有 mutation/reconciliation/recovery 的 Auth error 继续进入 sealed Session
 Core。Reply draft 和 UNKNOWN guard 仅为 React local memory，不持久化。
 
-## Referral and commission read model and code creation
+## Referral, commission read model and guarded mutations
 
 `features/referrals` 持有 Referral Overview、Commission History 与 Withdrawal Options 的 Public DTO
 parser、canonical Query 和 `/referrals` 只读页面边界。三个 authenticated GET 分别使用
@@ -417,8 +417,35 @@ mutation uncertainty；用户明确 acknowledgement 后 marker 变为 `acknowled
 下一次真正 POST 前清除已确认 marker。Auth logout/establishSession 的 `queryClient.clear()` 自然清除整个 local
 guard，防止跨 session 泄漏。所有 mutation/recovery Auth error 继续复用 sealed Session Core。
 
-AUR-M9-002 不实现 Commission Transfer、Withdrawal Request 或其他 mutation，也不修改 solution、直接访问
-V2Board、复制 Commission 到 Wallet 或进入 Launch Readiness。
+AUR-M9-002 已完成并冻结于 `ba106d1c7d7b69fbc9b5b52837c3abee939ef218`，Independent Referral Code
+Mutation Review PASS。
+
+AUR-M9-003 增加 `POST /api/v1/referrals/commissions/transfer`。Request 使用 strict
+`{amountMinor}`（1..2147483647 integer），success 只接受并 strip `{transferred:true}`；mutation key 为
+`['referrals','commission-transfer']`，显式 `retry:false`。用户输入 major-unit 文本，金额解析和展示继续复用
+`parseMoneyInputToMinor` / `formatMinorMoney` 与 canonical Account Config，不硬编码两位小数、币种或 symbol，也不提供
+“全部划转”。
+
+Transfer 只有在 canonical Overview、Wallet 与 Account Config 都 fresh success、idle 且币种可安全处理时开放；Wallet
+在 Transfer 页面 remount 时强制 fresh read。标准 financial confirmation 保存 amount 与 currency semantics 的 React
+memory snapshot，展示当时的可用佣金和账户余额但不预测划转后余额。同步 lock 后、POST 前会直接读取 QueryClient
+current state，再次验证三项 authority、独立 uncertainty marker、币种快照和当前可用佣金；authority check 与
+`mutateAsync` 调用之间没有 await。
+
+confirmed success、`INSUFFICIENT_COMMISSION_BALANCE`、`COMMISSION_TRANSFER_FAILED` 与 `VALIDATION_ERROR` 都只通过 exact
+`GET /api/v1/referrals` 和 canonical `GET /api/v1/wallet` 对账，不刷新 Commission History、Withdrawal Options、Orders
+或 Subscription，也不使用 `setQueryData` 修改 server financial state。成功后的任一 GET 失败不推翻 confirmed success，
+但会 fail closed 并只开放双 GET manual recovery。
+
+NETWORK_ERROR、UPSTREAM_TIMEOUT、UPSTREAM_ERROR、MALFORMED_RESPONSE 与 non-ApiError 都是 UNKNOWN。分类后立即把独立
+`['referrals','commission-transfer-uncertainty']` memory-only marker 设为 `active`，再清空 amount/snapshot 并执行 Overview
+与 Wallet recovery。无论 recovered balance delta 刚好匹配还是完全不变，都不推断本次 outcome。只有双读恢复且用户明确
+acknowledgement 后 marker 才变为 `acknowledged`；取消勾选恢复 `active`，下一次仍需重新输入并确认。marker 只保存
+`active` / `acknowledged` / null，以 `gcTime:Infinity` 跨 SPA remount，不包含金额、余额、币种、token、email 或错误信息；
+Session Core `queryClient.clear()` 清除它。Full-document reload 仍不同于 SPA remount，本任务不新增持久化。
+
+AUR-M9-003 不实现 Withdrawal Request，不修改 solution、直接访问 V2Board、预测余额、自动 retry 或进入 Launch
+Readiness。
 
 ## Theme and presentation
 

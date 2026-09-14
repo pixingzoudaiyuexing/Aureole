@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
 import type { CommissionPage, ReferralOverview } from './referrals-api'
 import { ReferralCreateControl } from './referral-create-control'
+import { CommissionTransferControl } from './commission-transfer-control'
 import {
   useReferralCommissions,
   useReferralOverview,
@@ -300,6 +301,8 @@ function ReferralsContent({ accessToken }: { accessToken: string }) {
           )}
         </div>
       </section>
+
+      <CommissionTransferControl accessToken={accessToken} />
 
       <section
         className="border-t border-border py-8"

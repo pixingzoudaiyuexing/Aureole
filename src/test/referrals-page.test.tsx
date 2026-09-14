@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AppProviders } from '@/app/providers/app-providers'
@@ -10,6 +10,7 @@ import type { AuthApi } from '@/features/auth/auth-api'
 import { referralCreateLocalGuardKeys } from '@/features/referrals/referral-create-guard'
 import { referralsApi } from '@/features/referrals/referrals-api'
 import { referralsQueryKeys } from '@/features/referrals/referrals-queries'
+import { walletApi } from '@/features/wallet/wallet-api'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
 
@@ -62,7 +63,16 @@ function installMocks() {
     currency: 'CNY',
     currencySymbol: '¥',
   })
-  return { getOverview, getCommissions, getWithdrawalOptions, getConfig }
+  const getWallet = vi
+    .spyOn(walletApi, 'getWallet')
+    .mockResolvedValue({ balanceMinor: 12_345 })
+  return {
+    getOverview,
+    getCommissions,
+    getWithdrawalOptions,
+    getConfig,
+    getWallet,
+  }
 }
 
 function installClipboard() {
@@ -148,7 +158,7 @@ describe('Referrals page', () => {
     expect(screen.getByText('12')).toBeInTheDocument()
     expect(screen.getByText('10%')).toBeInTheDocument()
     for (const money of ['¥123.45 CNY', '¥6.78 CNY', '¥90.00 CNY']) {
-      expect(screen.getByText(money)).toBeInTheDocument()
+      expect(screen.getAllByText(money).length).toBeGreaterThan(0)
     }
 
     const firstOrder = screen.getByText('¥500.00 CNY')
@@ -208,15 +218,10 @@ describe('Referrals page', () => {
     expect(await screen.findByText('暂无邀请码。')).toBeInTheDocument()
     expect(screen.getByText('暂无佣金记录。')).toBeInTheDocument()
     expect(screen.getByText('当前暂未开放提现。')).toBeInTheDocument()
-    for (const command of [
-      '生成邀请码',
-      '佣金划转',
-      '转入钱包',
-      '申请提现',
-      '提交提现',
-    ]) {
+    for (const command of ['生成邀请码', '转入钱包', '申请提现', '提交提现']) {
       expect(screen.queryByRole('button', { name: command })).toBeNull()
     }
+    expect(screen.getByRole('button', { name: '佣金划转' })).toBeInTheDocument()
   })
 
   it('shows a recoverable local error when clipboard access fails', async () => {
@@ -267,7 +272,9 @@ describe('Referrals page', () => {
         },
       })
       renderReferrals()
-      expect(await screen.findAllByText(expected)).toHaveLength(3)
+      expect(await screen.findAllByText(expected)).toHaveLength(
+        amount === 12_345 ? 5 : 4,
+      )
     },
   )
 
@@ -304,8 +311,18 @@ describe('Referrals page', () => {
         { timeout: 3_000 },
       ),
     ).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: '重试' }))
-    expect(await screen.findByText('¥123.45 CNY')).toBeInTheDocument()
+    const overviewSection = screen
+      .getByRole('heading', { name: '推荐概览' })
+      .closest('section')
+    expect(overviewSection).not.toBeNull()
+    await user.click(
+      within(overviewSection as HTMLElement).getByRole('button', {
+        name: '重试',
+      }),
+    )
+    expect((await screen.findAllByText('¥123.45 CNY')).length).toBeGreaterThan(
+      0,
+    )
   })
 
   it.each([
@@ -348,7 +365,12 @@ describe('Referrals page', () => {
         expect(screen.getByText('¥500.00 CNY')).toBeInTheDocument()
       if (source !== 'withdrawal')
         expect(screen.getByText('bank_wire')).toBeInTheDocument()
-      await user.click(screen.getByRole('button', { name: '重试' }))
+      const errorMessage = screen.getByText(message)
+      const errorBox = errorMessage.closest('[role="alert"]')
+      expect(errorBox).not.toBeNull()
+      await user.click(
+        within(errorBox as HTMLElement).getByRole('button', { name: '重试' }),
+      )
       await waitFor(() => expect(method).toHaveBeenCalledTimes(3))
     },
   )

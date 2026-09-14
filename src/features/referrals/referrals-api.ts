@@ -60,11 +60,25 @@ const createdReferralCodeSchema = z
     created: z.literal(true),
   })
   .strip()
+export const commissionTransferRequestSchema = z
+  .object({
+    amountMinor: z.number().int().min(1).max(2_147_483_647),
+  })
+  .strict()
+const commissionTransferredSchema = z
+  .object({
+    transferred: z.literal(true),
+  })
+  .strip()
 
 export type ReferralOverview = z.infer<typeof referralOverviewSchema>
 export type CommissionPage = z.infer<typeof commissionPageSchema>
 export type WithdrawalOptions = z.infer<typeof withdrawalOptionsSchema>
 export type CreatedReferralCode = z.infer<typeof createdReferralCodeSchema>
+export type CommissionTransferInput = z.input<
+  typeof commissionTransferRequestSchema
+>
+export type CommissionTransferred = z.infer<typeof commissionTransferredSchema>
 
 function parse<T>(schema: z.ZodType<T>, data: unknown) {
   const parsed = schema.safeParse(data)
@@ -106,6 +120,18 @@ export const referralsApi = {
       { method: 'GET', accessToken },
     )
     return parse(commissionPageSchema, data)
+  },
+
+  async transferCommission(
+    accessToken: string,
+    input: CommissionTransferInput,
+  ) {
+    const body = commissionTransferRequestSchema.parse(input)
+    const data = await apiClient.authenticatedRequest<unknown>(
+      '/api/v1/referrals/commissions/transfer',
+      { method: 'POST', body, accessToken },
+    )
+    return parse(commissionTransferredSchema, data)
   },
 
   async getWithdrawalOptions(accessToken: string) {

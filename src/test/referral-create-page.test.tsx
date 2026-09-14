@@ -17,6 +17,7 @@ import type { AuthApi } from '@/features/auth/auth-api'
 import { referralCreateLocalGuardKeys } from '@/features/referrals/referral-create-guard'
 import { referralsApi } from '@/features/referrals/referrals-api'
 import { referralsQueryKeys } from '@/features/referrals/referrals-queries'
+import { walletApi } from '@/features/wallet/wallet-api'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
 
@@ -62,6 +63,7 @@ function installMocks() {
     currency: 'CNY',
     currencySymbol: '¥',
   })
+  vi.spyOn(walletApi, 'getWallet').mockResolvedValue({ balanceMinor: 12_345 })
   return { createCode, getCommissions, getOverview, getWithdrawalOptions }
 }
 

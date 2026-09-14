@@ -80,14 +80,20 @@ Milestone 9 按以下边界推进：
 
 - AUR-M9-001 Referral / Commission Read Model：COMPLETE，INDEPENDENT REVIEW PASS，冻结于
   `445ffac542d89977f2db5b631516b6c3bbdc955f`
-- AUR-M9-002 Create Referral Code：IMPLEMENTATION COMPLETE，INDEPENDENT REVIEW REQUIRED FIXES APPLIED，
-  TARGETED RE-REVIEW PENDING
-- AUR-M9-003 Commission Transfer：NOT STARTED
+- AUR-M9-002 Create Referral Code：COMPLETE，INDEPENDENT REFERRAL CODE MUTATION REVIEW PASS，冻结于
+  `ba106d1c7d7b69fbc9b5b52837c3abee939ef218`
+- AUR-M9-003 Commission Transfer：IMPLEMENTATION COMPLETE，INDEPENDENT FINANCIAL MUTATION REVIEW PENDING
 - AUR-M9-004 Withdrawal Request：NOT STARTED
 
 AUR-M9-002 只增量实现 bodyless `POST /api/v1/referrals/codes`。Create 使用 fresh Overview authority、
 标准 confirmation、同步锁、`retry:false` 和 Overview-only reconciliation；confirmed success 不认领具体 code，
 UNKNOWN 不根据 list diff 推断结果。Required fixes 增加 authenticated-session memory uncertainty guard，确保
 UNKNOWN 跨 feature remount 保留到明确 acknowledgement，并在 POST 前直接读取 QueryClient current authority
-关闭 stale React prop race。Commission Transfer、Withdrawal Request 与 Launch Readiness 未开始。
-Production Referral / Commission / Withdrawal / Create runtime 为 NOT TESTED。
+关闭 stale React prop race。
+
+AUR-M9-003 只增量实现 strict `POST /api/v1/referrals/commissions/transfer`。Transfer 使用 canonical Overview、Wallet 与
+Account Config 三项 fresh authority、major-to-minor 精确解析、financial confirmation、同步锁和 execution-time
+QueryClient recheck。confirmed success 与 definitive failure 只双读 Overview/Wallet；UNKNOWN 使用独立 session-memory
+uncertainty marker，双读只恢复当前资金事实，不根据余额 delta 推断 outcome，再次提交需要 acknowledgement、重新输入和
+重新确认。Withdrawal Request 与 Launch Readiness 未开始。Production Referral / Commission / Withdrawal / Create /
+Transfer runtime 为 NOT TESTED。

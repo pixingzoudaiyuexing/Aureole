@@ -40,6 +40,11 @@ describe('Exact human money input conversion', () => {
     expect(parseMoneyInputToMinor(input, 'JPY')).toBeNull()
   })
 
+  it('uses the canonical three-decimal rule for KWD', () => {
+    expect(parseMoneyInputToMinor('1.234', 'KWD')).toBe(1_234)
+    expect(parseMoneyInputToMinor('1.2345', 'KWD')).toBeNull()
+  })
+
   it('fails closed when Intl cannot identify canonical fraction digits', () => {
     expect(parseMoneyInputToMinor('1', 'ZZZ')).toBeNull()
     expect(parseMoneyInputToMinor('1', 'not-a-currency')).toBeNull()
