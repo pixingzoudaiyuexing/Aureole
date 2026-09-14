@@ -6,7 +6,29 @@ This document defines the exact minimum evidence required for Production Auth, S
 
 ## 2. Safety Boundary
 
-**Current Status:** PLAN READY FOR PRIMARY ACCEPTANCE. PENDING REVIEW.
+**Current Status:**
+
+AUR-M10-003 GATE 1:
+PLAN ACCEPTED
+
+AUR-M10-003 GATE 2:
+COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT SECURITY REVIEW PASS
+
+Independent Pages Adapter Security Review:
+PASS — PAGES ADAPTER SECURITY REVIEW
+
+Required Fixes:
+NONE
+
+Gate 3:
+NOT STARTED / PRIMARY AUTHORIZATION PENDING
+
+Gate 4:
+NOT AUTHORIZED
+
+No L3 evidence obtained yet.
+
+Cloudflare Pages deployment has NOT occurred yet.
 
 - PRODUCTION DEPLOYMENT IS **NOT AUTHORIZED**.
 - PRODUCTION ACCESS / LOGIN IS **NOT AUTHORIZED**.
@@ -194,16 +216,16 @@ The plan verifies the expected implementation behavior without recording the tok
 
 Future actions require explicit staged authorization:
 
-1. **Gate 1:** PLAN ACCEPTED
-2. **Gate 2:** IMPLEMENTED / PRIMARY CODE REVIEW PASS / TEST-EVIDENCE CLEANUP IN PROGRESS
-3. **Gate 3:** NOT AUTHORIZED
+1. **Gate 1:** COMPLETE / PASS
+2. **Gate 2:** COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT SECURITY REVIEW PASS
+3. **Gate 3:** NOT STARTED / PRIMARY AUTHORIZATION PENDING
 4. **Gate 4:** NOT AUTHORIZED
 
 No gate is automatically implied by the previous gate.
 
 ## 14. Selected Gate 2 Staging Architecture
 
-Gate 2 preparation is currently **IMPLEMENTED / PRIMARY CODE REVIEW PASS / TEST-EVIDENCE CLEANUP IN PROGRESS** for the following staging architecture:
+Gate 2 preparation is currently **COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT SECURITY REVIEW PASS** for the following staging architecture:
 
 - **Provider:** Cloudflare Pages
 - **Hostname:** `*.pages.dev`
@@ -218,3 +240,12 @@ Gate 2 preparation is currently **IMPLEMENTED / PRIMARY CODE REVIEW PASS / TEST-
 _Gate 3 actual deployment verification remains NOT AUTHORIZED._
 _Gate 4 login remains NOT AUTHORIZED._
 _No L3 evidence has been obtained yet._
+
+## 15. Gate 2 Technical Checkpoints
+
+- **Initial Pages adapter:** `460e32873b1eebadd46d83b6b9054169825a0f03`
+- **Primary-required adapter fix checkpoint:** `581af7c47a7e494098414eaebd0444d45c8958d2`
+- **Evidence-complete independent-review HEAD:** `ddf9322cf3577475e73e455fb587fcbfee48e014`
+- **Independent review verdict:** PASS — PAGES ADAPTER SECURITY REVIEW
+
+_(Note: `ddf9322cf3577475e73e455fb587fcbfee48e014` is the independent-review HEAD, not necessarily the final deployment candidate. The final deployment candidate will be frozen by the Primary after the completion of this task.)_
