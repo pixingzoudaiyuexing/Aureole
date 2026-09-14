@@ -87,7 +87,7 @@ Milestone 9 按以下边界推进：
   HARDENING PASS，FROZEN at `e408f83311c3557706ac9fc09ac06fe754ea71b8`
 - AUR-M9-004 Withdrawal Request：COMPLETE，INDEPENDENT WITHDRAWAL FINANCIAL MUTATION REVIEW PASS，REQUIRED
   FIXES PASS，SAME-RUNTIME FINANCIAL CONCURRENCY HARDENING PASS，CROSS-SESSION FINANCIAL CONTINUATION
-  HARDENING PASS，FROZEN at `e408f83311c3557706ac09ac06fe754ea71b8`
+  HARDENING PASS，FROZEN at `e408f83311c3557706ac9fc09ac06fe754ea71b8`
 
 AUR-M9-002 只增量实现 bodyless `POST /api/v1/referrals/codes`。Create 使用 fresh Overview authority、
 标准 confirmation、同步锁、`retry:false` 和 Overview-only reconciliation；confirmed success 不认领具体 code，
