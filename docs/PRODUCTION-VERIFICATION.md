@@ -203,13 +203,16 @@ No gate is automatically implied by the previous gate.
 
 ## 14. Selected Gate 2 Staging Architecture
 
-Gate 2 preparation is currently **COMPLETED** for the following staging architecture:
+Gate 2 preparation is currently **COMPLETED** with Required Fixes for the following staging architecture:
 
 - **Provider:** Cloudflare Pages
 - **Hostname:** `*.pages.dev`
 - **Proxy Adapter:** Pages Function same-origin `/api/v1/*`
 - **Upstream:** solution staging upstream
 - **Configuration:** `SOLUTION_GATEWAY_ORIGIN` deployment configuration
+- **API Namespace:** API Function strictly confined to `/api/v1` and `/api/v1/*`.
+- **SPA Routing:** Explicit SPA route rewrite strategy implemented (no wildcard HTML rewrites).
+- **404 Behavior:** Top-level `404.html` deployed; real missing static assets accurately return HTTP 404.
 
 _Gate 3 actual deployment verification remains NOT AUTHORIZED._
 _Gate 4 login remains NOT AUTHORIZED._

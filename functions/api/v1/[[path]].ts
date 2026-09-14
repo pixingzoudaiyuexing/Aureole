@@ -11,7 +11,7 @@ export type PagesFunction<Env = unknown> = (
   context: PagesFunctionContext<Env>,
 ) => Promise<Response> | Response
 
-const ALLOWED_METHODS = ['GET', 'POST', 'PATCH', 'OPTIONS']
+const ALLOWED_METHODS = ['GET', 'POST', 'PATCH']
 const ALLOWED_REQUEST_HEADERS = ['authorization', 'content-type', 'accept']
 const ALLOWED_RESPONSE_HEADERS = [
   'content-type',
@@ -53,13 +53,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     .pathname
 
   if (!normalizedPathname.startsWith('/api/v1/')) {
-    return new Response('Invalid path', { status: 400 })
+    return new Response('Invalid path namespace', { status: 400 })
   }
 
-  const finalUrl = new URL(
-    normalizedPathname + requestUrl.search,
-    gatewayOrigin,
-  )
+  let finalUrl: URL
+  try {
+    finalUrl = new URL(normalizedPathname + requestUrl.search, gatewayOrigin)
+  } catch {
+    return new Response('Invalid URL construction', { status: 500 })
+  }
+
+  // Revalidate the constructed URL to ensure it has not escaped the intended origin or path
+  if (finalUrl.origin !== gatewayUrl.origin) {
+    return new Response('Origin escape detected', { status: 400 })
+  }
+  if (!finalUrl.pathname.startsWith('/api/v1/')) {
+    return new Response('Path namespace escape detected', { status: 400 })
+  }
 
   const headers = new Headers()
   for (const [key, value] of request.headers.entries()) {
