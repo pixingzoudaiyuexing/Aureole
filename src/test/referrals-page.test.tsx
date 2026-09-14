@@ -173,7 +173,10 @@ describe('Referrals page', () => {
     ).toBeInTheDocument()
 
     expect(screen.getByRole('button', { name: '上一页' })).toBeDisabled()
-    await user.click(screen.getByRole('button', { name: '下一页' }))
+    const nextPage = screen.getByRole('button', { name: '下一页' })
+    nextPage.focus()
+    expect(nextPage).toHaveFocus()
+    await user.keyboard('{Enter}')
     await waitFor(() =>
       expect(mocks.getCommissions).toHaveBeenCalledWith(
         'referral-token',
