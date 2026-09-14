@@ -338,11 +338,14 @@
   下一次 POST 前再次 pre-arm。
 - Persistent marker 只允许 `active` / `acknowledged` / absent，不包含 amount、balance、currency、credential、identity、
   timestamp 或 error。首次 render 同步 hydrate；普通 auth reload 保留它，confirmed success 与 definitive rejection 清除，
-  logout/new session/Auth invalidation 通过 Session Core 清除。不使用 localStorage，M9-002 Create Code guard 仍不持久化。
+  不使用 localStorage，M9-002 Create Code guard 仍不持久化。Authenticated Session boundary 对 financial marker 的处理固定为：
+  `active -> active`、`acknowledged -> active`、`absent -> absent`。未决 non-idempotent financial outcome 不得通过 logout 或
+  new login 绕过；`queryClient.clear()` 只清理 Query cache，不代表底层 financial continuation 已停止。
 - Transfer/financial recovery 的 AUTH_REQUIRED/AUTH_FAILED 复用 sealed Session Core。金额、余额、币种快照、token、email
   与 raw upstream message 不进入 Query/Mutation key、local guard、storage、URL、Zustand、analytics 或 console。
 - AUR-M9-003 已通过 Independent Financial Mutation Review 与 Primary Hardening Review，并冻结于
-  `e8e83622abf38960ed41fd222a978f02323592df`。
+  `e408f83311c3557706ac9fc09ac06fe754ea71b8`。`e8e83622abf38960ed41fd222a978f02323592df` 仅保留为 historical
+  intermediate review SHA，不是最终 code freeze。
 - `POST /api/v1/referrals/withdrawal-requests` 只发送 strict `{method,account}`。method 1..255、account
   1..1024，均保持 raw string；额外字段在 request boundary 被拒绝。成功只接受并 strip
   `{requested:true}`，false、缺失、wrong type 或 raw V2Board `data:true` 均为 `MALFORMED_RESPONSE`。
@@ -371,9 +374,12 @@
 - Withdrawal account 在 success、definitive rejection、UNKNOWN 与 Auth invalidation 后清空，并在 settle 后从 Mutation
   cache 移除；不进入 Query/Mutation key、sessionStorage、localStorage、IndexedDB、URL、Zustand、analytics、console、
   error metadata 或文档真实示例。
-- Withdrawal 与 Commission Transfer persistent marker 完全独立；普通 credential hydrate 保留，logout/new session/Auth
-  invalidation 由 sealed Session Core 统一清除。AUR-M9-004 不修改 solution、不直接访问 V2Board，也不查询 Support
-  Tickets 进行结果推断。
+- Withdrawal 与 Commission Transfer persistent marker 完全独立；普通 credential hydrate 保留，Authenticated Session boundary
+  仍执行 `active -> active`、`acknowledged -> active`、`absent -> absent`。AUR-M9-004 不修改 solution、不直接访问 V2Board，
+  也不查询 Support Tickets 进行结果推断。
+- M9-003/M9-004 的最终 safety boundary 还包括 QueryClient exact MutationCache pending gate、QueryClient-independent runtime
+  financial attempt registry 和 in-memory authenticated session generation。stale Session continuation 不得清除 new-session
+  marker、使用 old token 对账、污染 new-session canonical cache、logout new Session 或暴露 old outcome feedback。
 
 ## Error and request rules
 

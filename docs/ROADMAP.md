@@ -119,13 +119,16 @@ recovery，执行边界直接 recheck MutationCache。该 same-runtime fact 不�
 runtime attempt registry 与 authenticated session generation：registry 在同 JS runtime 内跨 logout/query cache clear 保留 pending，
 generation mismatch 则禁止旧 Session continuation 清 marker、使用旧 token 对账、污染新 Session canonical cache、退出新 Session 或
 显示旧 outcome。logout/new login/Auth invalidation 对 marker 执行 active -> active、acknowledged -> active、absent -> absent；若 logout
-后 full reload 导致 registry消失，persistent active 仍要求 fresh authority 和新 acknowledgement。Milestone 10 已授权但尚未开始。
+后 full reload 导致 registry 消失，persistent active 仍要求 fresh authority 和新 acknowledgement。Milestone 10 IN PROGRESS；
+AUR-M10-001 已 COMPLETE / PRIMARY REVIEW PASS。
 
 Milestone 9：COMPLETE / PASS / FROZEN。其代码冻结 SHA 为
 `e408f83311c3557706ac9fc09ac06fe754ea71b8`；后续 documentation closure commit 不改变该 code freeze SHA。
-Milestone 10：IN PROGRESS。AUR-M10-001 Launch Readiness Evidence Inventory 已完成只读审计，状态为
-`AUDIT COMPLETE / PRIMARY REVIEW PENDING`。完整证据矩阵、安全分类、部署阻塞项和生产验证计划记录于
-[`LAUNCH-READINESS.md`](LAUNCH-READINESS.md)。本 Task 未访问生产环境、未部署、未执行生产 mutation 或真实资金操作。
+Milestone 10：IN PROGRESS。AUR-M10-001 Launch Readiness Evidence Inventory 为
+`COMPLETE / PRIMARY REVIEW PASS`，Audit SHA 为
+`5b2b994d50e8c2ac599681e1523a4a855054db3c`。完整证据矩阵、安全分类、部署阻塞项和生产验证计划记录于
+[`LAUNCH-READINESS.md`](LAUNCH-READINESS.md)。AUR-M10-001R1 只是 Documentation SSOT Reconciliation checkpoint，
+不替换原 Audit SHA；本 R1 未访问生产环境、未部署、未执行生产 mutation 或真实资金操作。
 
 审计建议后续按实际依赖顺序拆分：AUR-M10-002 Production Deployment Contract and Artifact Readiness、
 AUR-M10-003 Production Auth/Session and Read-Only Verification、AUR-M10-004 Controlled Non-Financial Mutation

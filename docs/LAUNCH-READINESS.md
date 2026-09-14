@@ -3,7 +3,7 @@
 ## Status and scope
 
 - Task: `AUR-M10-001`
-- Status: `AUDIT COMPLETE / PRIMARY REVIEW PENDING`
+- Status: `COMPLETE / PRIMARY REVIEW PASS`
 - Milestone 10: `IN PROGRESS`
 - Audit date: 2026-09-14
 - Aureole audit base: `a2366ea08bc579e1368d52aaf8b5b5ee72aac195`
@@ -480,23 +480,25 @@ must remain `UNKNOWN` until the deployment owner supplies evidence.
    content verification.
 5. Security headers and CSP are not defined at the deployment layer.
 
+### RESOLVED BY AUR-M10-001R1
+
+1. M9 financial-safety documentation drift in `docs/API-MAPPING.md` and the
+   malformed M9-004 SHA in `docs/ROADMAP.md` were reconciled. The final M9-003 and
+   M9-004 code freeze is `e408f83311c3557706ac9fc09ac06fe754ea71b8`, and the
+   authenticated Session boundary is documented as `active -> active`,
+   `acknowledged -> active`, `absent -> absent`.
+
 ### MEDIUM
 
-1. Existing documentation has M9 financial-safety drift:
-   `docs/API-MAPPING.md` still says Auth boundaries clear persistent financial
-   markers and records Commission Transfer at intermediate SHA `e8e83622...`,
-   while current code/Architecture preserve or downgrade markers and freeze both
-   financial flows at `e408f833...`. `docs/ROADMAP.md` also contains one malformed
-   Withdrawal freeze SHA. Reconcile these in a separate documentation task.
-2. Tailwind scans repository documentation for utility candidates, so future
+1. Tailwind scans repository documentation for utility candidates, so future
    documentation-only changes can alter the production CSS bundle unless source
    scope is constrained or artifact drift is gated.
-3. Historical L2 browser evidence is extensive but no committed/reproducible
+2. Historical L2 browser evidence is extensive but no committed/reproducible
    browser E2E suite exists; Safari/Firefox evidence is absent.
-4. There is no real initial-route analyzer or automated bundle budget gate.
-5. Production uptime, synthetic checks, deployed SHA visibility and request-ID
+3. There is no real initial-route analyzer or automated bundle budget gate.
+4. Production uptime, synthetic checks, deployed SHA visibility and request-ID
    correlation procedure are absent.
-6. Real reCAPTCHA remains unverified; it is non-blocking only while production
+5. Real reCAPTCHA remains unverified; it is non-blocking only while production
    onboarding does not enable that capability.
 
 ### LOW
@@ -556,4 +558,4 @@ scope, accounts, environment and mutation permissions separately.
 - NO BUSINESS CODE CHANGES PERFORMED
 - solution remained READ ONLY
 
-Status: `AUDIT COMPLETE / PRIMARY REVIEW PENDING`.
+Status: `COMPLETE / PRIMARY REVIEW PASS`.

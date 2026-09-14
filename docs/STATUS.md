@@ -126,7 +126,12 @@ operational source of truth.
 
 ## AUR-M10-001 Launch Readiness audit
 
-Status: `AUDIT COMPLETE / PRIMARY REVIEW PENDING`.
+Status: `COMPLETE / PRIMARY REVIEW PASS`.
+
+Audit SHA: `5b2b994d50e8c2ac599681e1523a4a855054db3c`.
+
+The AUR-M10-001R1 commit is a Documentation SSOT Reconciliation checkpoint only;
+it does not replace the original Audit SHA. Milestone 10 remains `IN PROGRESS`.
 
 The Launch Readiness evidence SSOT is
 [`docs/LAUNCH-READINESS.md`](LAUNCH-READINESS.md). It inventories the complete v1
@@ -142,9 +147,9 @@ acceptance, and missing approved runtime verification for exposed payment and
 financial flows. CI can currently build without `VITE_API_BASE_URL`, so a green
 build does not by itself prove a usable production artifact.
 
-AUR-M10-001 ran only SAFE-A local validation. It did not access production, deploy,
-mutate production state or perform a real financial operation. No business source
-code or solution file was changed.
+AUR-M10-001 and AUR-M10-001R1 ran only SAFE-A local/documentation validation. They
+did not access production, deploy, mutate production state or perform a real
+financial operation. No business source code or solution file was changed.
 
 ## Validation summary
 
@@ -508,5 +513,7 @@ code or solution file was changed.
 
 ## Next milestone
 
-Milestone 10 is AUTHORIZED / NOT STARTED. Its Launch Readiness work must separately collect the existing Production runtime evidence
-gaps; no production testing or Milestone 10 implementation is part of this documentation closure.
+Milestone 10 is IN PROGRESS. AUR-M10-001 is COMPLETE / PRIMARY REVIEW PASS;
+its Launch Readiness work records the existing Production runtime evidence gaps.
+No production testing or Milestone 10 implementation was performed by this
+documentation reconciliation.
