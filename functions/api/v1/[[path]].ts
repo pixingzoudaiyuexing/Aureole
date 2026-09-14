@@ -2,12 +2,12 @@ export interface Env {
   SOLUTION_GATEWAY_ORIGIN?: string
 }
 
-export type PagesFunctionContext<Env = any> = {
+export type PagesFunctionContext<Env = unknown> = {
   request: Request
   env: Env
 }
 
-export type PagesFunction<Env = any> = (
+export type PagesFunction<Env = unknown> = (
   context: PagesFunctionContext<Env>,
 ) => Promise<Response> | Response
 
