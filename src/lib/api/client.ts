@@ -31,29 +31,33 @@ function assertPublicApiPath(path: string) {
 function resolveApiOrigin(configuredUrl?: string): string | undefined {
   if (configuredUrl) {
     try {
-      const parsed = new URL(configuredUrl);
+      const parsed = new URL(configuredUrl)
       if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        return undefined; // Invalid protocol
+        return undefined // Invalid protocol
       }
       if (parsed.username || parsed.password) {
-        return undefined; // No credential-bearing URLs allowed
+        return undefined // No credential-bearing URLs allowed
       }
-      return parsed.origin;
+      return parsed.origin
     } catch {
-      return undefined;
+      return undefined
     }
   }
-  if (typeof window !== 'undefined' && window.location && window.location.origin) {
-    return window.location.origin;
+  if (
+    typeof window !== 'undefined' &&
+    window.location &&
+    window.location.origin
+  ) {
+    return window.location.origin
   }
-  return undefined;
+  return undefined
 }
 
 export function createApiClient({
   baseUrl = import.meta.env.VITE_API_BASE_URL,
   fetchImpl = fetch,
 }: ApiClientOptions = {}) {
-  const resolvedBaseUrl = resolveApiOrigin(baseUrl);
+  const resolvedBaseUrl = resolveApiOrigin(baseUrl)
   async function executeRequest<T>(
     path: string,
     options: ApiRequestOptions,

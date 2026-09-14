@@ -6,8 +6,10 @@ const baseUrl = 'https://gateway.example.com'
 
 describe('API client', () => {
   it('falls back to window.location.origin when baseUrl is absent', async () => {
-    const originalWindow = globalThis.window;
-    globalThis.window = { location: { origin: 'https://same-origin.example.com' } } as any;
+    const originalWindow = globalThis.window
+    globalThis.window = {
+      location: { origin: 'https://same-origin.example.com' },
+    } as any
 
     try {
       const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
@@ -18,19 +20,21 @@ describe('API client', () => {
           }),
           { status: 200 },
         ),
-      );
+      )
       // Pass explicitly undefined to trigger fallback
-      const client = createApiClient({ baseUrl: undefined, fetchImpl });
+      const client = createApiClient({ baseUrl: undefined, fetchImpl })
 
-      await expect(client.request<{ email: string }>('/api/v1/me')).resolves.toEqual({ email: 'user@example.com' });
+      await expect(
+        client.request<{ email: string }>('/api/v1/me'),
+      ).resolves.toEqual({ email: 'user@example.com' })
       expect(fetchImpl).toHaveBeenCalledWith(
         new URL('https://same-origin.example.com/api/v1/me'),
         expect.objectContaining({ headers: expect.any(Headers) }),
-      );
+      )
     } finally {
-      globalThis.window = originalWindow;
+      globalThis.window = originalWindow
     }
-  });
+  })
 
   it.each([
     ['invalid-url', undefined],
@@ -38,15 +42,15 @@ describe('API client', () => {
     ['https://user:pass@example.com', undefined],
     ['/api/v1', undefined],
   ])('rejects invalid or unsafe baseUrl overrides: %s', async (invalidUrl) => {
-    const fetchImpl = vi.fn<typeof fetch>();
-    const client = createApiClient({ baseUrl: invalidUrl, fetchImpl });
+    const fetchImpl = vi.fn<typeof fetch>()
+    const client = createApiClient({ baseUrl: invalidUrl, fetchImpl })
 
     await expect(client.request('/api/v1/me')).rejects.toMatchObject({
       code: 'API_BASE_URL_MISSING',
       status: 0,
-    });
-    expect(fetchImpl).not.toHaveBeenCalled();
-  });
+    })
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
 
   it('returns data from a success envelope', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
