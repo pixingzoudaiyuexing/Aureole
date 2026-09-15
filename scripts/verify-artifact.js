@@ -2,7 +2,6 @@ import { verifyCspHashes } from './csp-verifier.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import { execSync } from 'node:child_process'
-import crypto from 'node:crypto'
 
 function walkDir(dir) {
   let results = []
