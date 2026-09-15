@@ -206,6 +206,8 @@ describe('Cloudflare Pages API Adapter', () => {
           'proxy-authorization': 'Basic aaaa',
           'x-forwarded-for': '1.2.3.4',
           'cf-connecting-ip': '1.2.3.4',
+          referer: 'https://referrer.example/private',
+          'x-test-secret': 'sentinel-secret',
         },
       })
 
@@ -217,9 +219,101 @@ describe('Cloudflare Pages API Adapter', () => {
       expect(fetchArgs[1]?.headers?.has?.('proxy-authorization')).toBe(false)
       expect(fetchArgs[1]?.headers?.has?.('x-forwarded-for')).toBe(false)
       expect(fetchArgs[1]?.headers?.has?.('cf-connecting-ip')).toBe(false)
+      expect(fetchArgs[1]?.headers?.has?.('referer')).toBe(false)
+      expect(fetchArgs[1]?.headers?.has?.('x-test-secret')).toBe(false)
 
       // Kept authorization
       expect(fetchArgs[1]?.headers?.has?.('authorization')).toBe(true)
+    })
+
+    it('derives the frontend Origin from the HTTPS request URL', async () => {
+      const request = new Request(
+        'https://aureole.example/api/v1/orders/123/checkout',
+        { method: 'POST' },
+      )
+
+      await onRequest({ request, env: getEnv() })
+
+      const fetchArgs = globalFetch.mock.calls[0]
+      if (!fetchArgs) throw new Error('Expected fetchArgs')
+      expect(fetchArgs[1]?.headers?.get?.('origin')).toBe(
+        'https://aureole.example',
+      )
+    })
+
+    it('replaces a spoofed incoming Origin with the request URL origin', async () => {
+      const request = new Request(
+        'https://aureole.example/api/v1/orders/123/checkout',
+        {
+          method: 'POST',
+          headers: { origin: 'https://evil.example' },
+        },
+      )
+
+      await onRequest({ request, env: getEnv() })
+
+      const fetchArgs = globalFetch.mock.calls[0]
+      if (!fetchArgs) throw new Error('Expected fetchArgs')
+      expect(fetchArgs[1]?.headers?.get?.('origin')).toBe(
+        'https://aureole.example',
+      )
+      expect(fetchArgs[1]?.headers?.get?.('origin')).not.toBe(
+        'https://evil.example',
+      )
+    })
+
+    it.each([
+      [
+        'desktop',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Safari/537.36',
+      ],
+      [
+        'mobile',
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148',
+      ],
+    ])('preserves the exact %s browser User-Agent', async (_, userAgent) => {
+      const request = new Request(
+        'https://aureole.example/api/v1/orders/123/checkout',
+        {
+          method: 'POST',
+          headers: { 'user-agent': userAgent },
+        },
+      )
+
+      await onRequest({ request, env: getEnv() })
+
+      const fetchArgs = globalFetch.mock.calls[0]
+      if (!fetchArgs) throw new Error('Expected fetchArgs')
+      expect(fetchArgs[1]?.headers?.get?.('user-agent')).toBe(userAgent)
+    })
+
+    it('does not synthesize a User-Agent when the incoming header is absent', async () => {
+      const request = new Request(
+        'https://aureole.example/api/v1/orders/123/checkout',
+        { method: 'POST' },
+      )
+
+      await onRequest({ request, env: getEnv() })
+
+      const fetchArgs = globalFetch.mock.calls[0]
+      if (!fetchArgs) throw new Error('Expected fetchArgs')
+      expect(fetchArgs[1]?.headers?.has?.('user-agent')).toBe(false)
+    })
+
+    it('does not assert a trusted frontend Origin for local HTTP requests', async () => {
+      const request = new Request(
+        'http://localhost:8788/api/v1/orders/123/checkout',
+        {
+          method: 'POST',
+          headers: { origin: 'https://evil.example' },
+        },
+      )
+
+      await onRequest({ request, env: getEnv() })
+
+      const fetchArgs = globalFetch.mock.calls[0]
+      if (!fetchArgs) throw new Error('Expected fetchArgs')
+      expect(fetchArgs[1]?.headers?.has?.('origin')).toBe(false)
     })
 
     it('preserves configured safe response headers only', async () => {

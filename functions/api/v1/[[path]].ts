@@ -12,7 +12,12 @@ export type PagesFunction<Env = unknown> = (
 ) => Promise<Response> | Response
 
 const ALLOWED_METHODS = ['GET', 'POST', 'PATCH']
-const ALLOWED_REQUEST_HEADERS = ['authorization', 'content-type', 'accept']
+const ALLOWED_REQUEST_HEADERS = [
+  'authorization',
+  'content-type',
+  'accept',
+  'user-agent',
+]
 const ALLOWED_RESPONSE_HEADERS = [
   'content-type',
   'cache-control',
@@ -76,6 +81,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (ALLOWED_REQUEST_HEADERS.includes(key.toLowerCase())) {
       headers.set(key, value)
     }
+  }
+  if (requestUrl.protocol === 'https:') {
+    headers.set('origin', requestUrl.origin)
   }
 
   const fetchOptions: RequestInit = {

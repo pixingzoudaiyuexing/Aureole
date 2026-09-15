@@ -280,6 +280,16 @@ Production hosting must provide all of the following:
 3. A defined `/api/v1` architecture:
    - preferred same-origin reverse proxy/route to solution; or
    - a separately hosted solution origin with verified exact CORS policy.
+   - the same-origin Pages Function derives the outbound HTTPS `Origin` from
+     the actual frontend request URL and preserves the browser `User-Agent` as
+     transient payment context; it does not trust an incoming client-supplied
+     `Origin` or expand the request-header allowlist beyond the documented
+     context.
+   - before QR/payment runtime verification, Solution staging
+     `FRONTEND_ORIGINS` must add the exact frontend origin
+     `https://aureole-cc-staging-3dc609.pages.dev` while preserving every
+     currently authorized origin. This environment change is not performed by
+     AUR-M10-005C1.
 4. `dist/assets/*-[hash].js` and `*.css` may use long-lived immutable caching.
 5. `index.html` must use revalidation or short/no cache so it cannot remain pinned
    to stale chunk names after deployment or rollback.
