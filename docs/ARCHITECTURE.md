@@ -64,8 +64,9 @@ Auth response parser 对 solution 的 additive unknown fields 保持兼容，同
 
 ## Public onboarding and challenge
 
-Active onboarding Contract baseline 是 solution
-`0a37894173d1db0bbc57576c640652878f8f623d`。Onboarding config 属于 TanStack
+Active Public Contract baseline 是 re-frozen solution
+`1530acf1903d28480c66d85562392f63db5298d4`。Solution Public API 使用 wildcard
+non-credentialed CORS；Bearer 仍是显式认证机制，Origin 不参与身份或授权。Onboarding config 属于 TanStack
 Query server state，不进入 Zustand 或持久化缓存；requirements 未知时 Registration
 与 Recovery fail closed，不猜测 registration availability。
 

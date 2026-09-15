@@ -7,8 +7,10 @@ Milestone 10 - Launch Readiness (`IN PROGRESS`)
 ## Contract baseline
 
 Active solution baseline:
-`0a37894173d1db0bbc57576c640652878f8f623d` (`feat: expose anti-bot challenge
-mode`). P-09 freezes `recaptcha` + `v2-checkbox`, provider-neutral
+`1530acf1903d28480c66d85562392f63db5298d4` (`refactor: simplify public API
+CORS`). The re-frozen Contract uses wildcard non-credentialed Public CORS,
+keeps Bearer authentication explicit, and treats exact HTTPS Origin only as
+Checkout return-URL protocol metadata. P-09 continues to freeze `recaptcha` + `v2-checkbox`, provider-neutral
 `challengeToken`, V2Board authoritative verification and unsupported capability
 fail-closed behavior.
 
@@ -564,7 +566,9 @@ Milestone 10 is IN PROGRESS.
     (`dd7ff78c-efbd-4503-957e-619a9bb45433`)
   - Duplicate/retry, same-origin/Bearer, authoritative reconciliation, and Ticket cleanup: PASS
   - Email-code/Password Recovery/Rotate/Advance remain non-blocking state-constrained evidence
-- AUR-M10-005: NOT STARTED / NOT AUTHORIZED
+- AUR-M10-005: IN PROGRESS
+  - C1 payment browser-context propagation: PRIMARY / INDEPENDENT REVIEW PASS
+  - C3 staging deployment and no-payment EPayQrcode runtime verification: AUTHORIZED
 - AUR-M10-006: NOT STARTED / NOT AUTHORIZED
 
-The verified deployed application is `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef`; newer repository commits are documentation-only and are not deployed application SHAs. Financial runtime verification remains NOT AUTHORIZED.
+The verified deployed application remains `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef` until an exact later C3 deployment is verified. Financial runtime verification is in progress only within explicit per-task boundaries; overall AUR-M10-005 closure remains open.

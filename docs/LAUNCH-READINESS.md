@@ -9,14 +9,15 @@
 - AUR-M10-002: `COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT REVIEW PASS / FROZEN` (Code/config freeze SHA: `8890ba0e8325828e27d2234a3f8b242561fbe801`. Pre-independent-review code checkpoint: `bdaf39f4bbf462ab6729d86b83ea9afbf8421233` remains only as historical evidence.)
 - AUR-M10-003: `COMPLETE / PASS`
 - AUR-M10-004: `COMPLETE / PASS`
-- AUR-M10-005: `NOT STARTED / NOT AUTHORIZED`
+- AUR-M10-005: `IN PROGRESS`
 - AUR-M10-006: `NOT STARTED / NOT AUTHORIZED`
 - Current evidence update: `2026-09-15`
 - Independent targeted review: `PASS`
 - Audit date: 2026-09-14
 - Aureole audit base: `a2366ea08bc579e1368d52aaf8b5b5ee72aac195`
 - Frozen M9 production code: `e408f83311c3557706ac9fc09ac06fe754ea71b8`
-- Pinned solution Contract: `0a37894173d1db0bbc57576c640652878f8f623d`
+- Pinned solution Contract: `1530acf1903d28480c66d85562392f63db5298d4` (`PASS / CLOSED / RE-FROZEN`)
+- Reviewed Aureole payment-context application ancestor: `9294fc6baea1dca6483c17f20086b2258a53b1de`
 
 This document is the Launch Readiness evidence inventory for the Aureole hosted
 SPA. It records current evidence, missing evidence, safety boundaries and future
@@ -279,17 +280,18 @@ Production hosting must provide all of the following:
    `index.html`, while real missing hosted assets must still return 404.
 3. A defined `/api/v1` architecture:
    - preferred same-origin reverse proxy/route to solution; or
-   - a separately hosted solution origin with verified exact CORS policy.
+   - a separately hosted solution origin permitted by CSP `connect-src`.
+   - the re-frozen solution Public API uses wildcard non-credentialed CORS;
+     frontend domains are replaceable clients and changing the Aureole domain
+     requires no solution origin allowlist or deployment.
+   - Bearer authentication remains explicit. Origin is neither identity nor
+     authorization and is used by Checkout only as payment return-URL protocol
+     metadata.
    - the same-origin Pages Function derives the outbound HTTPS `Origin` from
      the actual frontend request URL and preserves the browser `User-Agent` as
      transient payment context; it does not trust an incoming client-supplied
      `Origin` or expand the request-header allowlist beyond the documented
      context.
-   - before QR/payment runtime verification, Solution staging
-     `FRONTEND_ORIGINS` must add the exact frontend origin
-     `https://aureole-cc-staging-3dc609.pages.dev` while preserving every
-     currently authorized origin. This environment change is not performed by
-     AUR-M10-005C1.
 4. `dist/assets/*-[hash].js` and `*.css` may use long-lived immutable caching.
 5. `index.html` must use revalidation or short/no cache so it cannot remain pinned
    to stale chunk names after deployment or rollback.
@@ -637,11 +639,12 @@ before a deployment contract exists:
    - Ticket Reply greatest-ID authority passed Primary/Independent review and R4
      staging runtime re-verification.
 4. `AUR-M10-005 - Payment, Wallet and Financial Runtime Verification`
-   - NOT STARTED / NOT AUTHORIZED.
-   - provider environment decision;
-   - Order/Checkout/callback/final status;
-   - Deposit, Gift Card, Commission Transfer and Withdrawal under explicit
-     per-operation authorization.
+   - IN PROGRESS under explicit per-task authorization.
+   - C1 payment browser-context propagation passed Primary and Independent Review.
+   - C3 exact-SHA staging deployment and no-payment Alipay/WxPay EPayQrcode
+     verification are authorized against re-frozen solution `1530acf...`.
+   - provider callback/real paid status and remaining positive financial paths
+     remain subject to separate Primary decisions.
 5. `AUR-M10-006 - Final Browser, Rollback and Launch Gate`
    - NOT STARTED / NOT AUTHORIZED.
    - deployed desktop/mobile/browser matrix;

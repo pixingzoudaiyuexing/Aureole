@@ -27,12 +27,14 @@ HTTP is only permitted for loopback addresses (`localhost`, `127.0.0.1`, `[::1]`
 This is an **exception mode**. For cross-origin production:
 
 - The override origin MUST be HTTPS.
-- The solution `FRONTEND_ORIGINS` configuration must contain the exact HTTPS frontend origin.
+- The re-frozen solution Public API returns `Access-Control-Allow-Origin: *` without `Access-Control-Allow-Credentials`; frontend domains are replaceable clients and require no solution origin configuration.
+- Bearer authentication remains explicit. Origin, Referer, and cookies are not authentication or authorization inputs.
 - CSP `connect-src` must permit ONLY the exact approved HTTPS solution API origin required for fetch connectivity. Do not weaken `script-src`, `img-src`, or `frame-src` merely because `connect-src` needs another origin.
 - For normal same-origin production, `connect-src` should remain constrained to the allowed origin requirements without broadly using `*`.
-- Wildcard `*` origins are forbidden.
 - Bearer authentication semantics remain unchanged.
 - Aureole still only calls solution `/api/v1` and must never call V2Board directly.
+
+For same-origin Pages deployments, the Function derives the current exact HTTPS frontend `Origin` from the request URL and forwards it only as Checkout return-URL protocol metadata. It also preserves the browser `User-Agent` for V2Board payment presentation. Neither value is persisted or treated as identity.
 
 ## 4. Multi-Domain Artifact Portability
 

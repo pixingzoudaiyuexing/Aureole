@@ -2,7 +2,7 @@
 
 ## 1. Scope
 
-This document records the completed Production Auth, Session, and Read-Only core verification (AUR-M10-003) for Aureole together with its original execution plan and historical evidence. It uses the strict Public Contract SSOT (`0a37894173d1db0bbc57576c640652878f8f623d`) and the active TanStack Router definitions.
+This document records the completed Production Auth, Session, and Read-Only core verification (AUR-M10-003) for Aureole together with its original execution plan and historical evidence. That verification used solution `0a37894173d1db0bbc57576c640652878f8f623d`; the current re-frozen Public Contract SSOT is `1530acf1903d28480c66d85562392f63db5298d4`. The active TanStack Router definitions remain authoritative for the client routes.
 
 ## 2. Safety Boundary
 
@@ -89,7 +89,7 @@ The Primary froze and approved the corrected Gate 3B deployment candidate before
 - Gate 4 completed with an explicitly authorized disposable staging test account. Login, `/me`, session restoration, page-driven authenticated reads, logout, and post-logout credential clearing passed.
 - AUR-M10-003 is **COMPLETE / PASS**.
 
-AUR-M10-003 completion did not itself authorize later phases. AUR-M10-004 was subsequently authorized and completed independently; AUR-M10-005 and AUR-M10-006 remain not started and not authorized.
+AUR-M10-003 completion did not itself authorize later phases. AUR-M10-004 was subsequently authorized and completed independently. AUR-M10-005 is now in progress under explicit staged authorization; AUR-M10-006 remains not started and not authorized.
 
 ## 5. M10-003 Minimum Acceptance Evidence
 
@@ -457,10 +457,10 @@ The disposable account reported `status = expired`, subscription eligibility was
 The only authorized mutation during Gate 4 was `POST /api/v1/auth/login`. Logout was client-side and produced no network mutation. No business mutation or financial operation was performed.
 
 - **AUR-M10-004:** COMPLETE / PASS
-- **AUR-M10-005:** NOT STARTED / NOT AUTHORIZED
+- **AUR-M10-005:** IN PROGRESS
 - **AUR-M10-006:** NOT STARTED / NOT AUTHORIZED
 
-The current repository documentation HEAD is newer than the verified deployed application SHA because subsequent commits are documentation-only. The documentation HEAD must not be described as the deployed application SHA.
+At the M10-004 closure checkpoint, the repository documentation HEAD was newer than the verified deployed application SHA because that closure commit was documentation-only. Later application commits require their own exact-SHA deployment evidence and must not be described as deployed until verified.
 
 ## 20. Final AUR-M10-004 Controlled Mutation Closure
 
@@ -513,7 +513,7 @@ All Aureole browser API traffic remained same-origin. Bearer credentials were co
 
 These state/environment constraints do not block the defined AUR-M10-004 acceptance and are not claimed as runtime-verified.
 
-- **AUR-M10-005:** NOT STARTED / NOT AUTHORIZED
+- **AUR-M10-005:** IN PROGRESS
 - **AUR-M10-006:** NOT STARTED / NOT AUTHORIZED
 
-Any repository commit after `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef` in this documentation closure is documentation-only and must not be described as the deployed application SHA.
+The M10-004 R5 closure commit after `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef` was documentation-only. Later C1 application code and any docs-only descendants must each be distinguished from the deployed application SHA until an exact runtime release identity is verified.
