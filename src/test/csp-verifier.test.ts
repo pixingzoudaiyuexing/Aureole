@@ -30,7 +30,9 @@ describe('CSP Hash Drift Verification', () => {
     const indexHtml = `<html><body><script>${newScript}</script></body></html>`
     const headersContent = buildHeaders([getHash(oldScript)])
 
-    expect(() => verifyCspHashes(indexHtml, headersContent)).toThrowError('CSP hash mismatch')
+    expect(() => verifyCspHashes(indexHtml, headersContent)).toThrowError(
+      'CSP hash mismatch',
+    )
   })
 
   it('CASE C: second executable inline script added + only first hash in CSP → FAIL', () => {
@@ -42,7 +44,9 @@ describe('CSP Hash Drift Verification', () => {
     </body></html>`
     const headersContent = buildHeaders([getHash(inlineScript1)])
 
-    expect(() => verifyCspHashes(indexHtml, headersContent)).toThrowError('CSP hash mismatch')
+    expect(() => verifyCspHashes(indexHtml, headersContent)).toThrowError(
+      'CSP hash mismatch',
+    )
   })
 
   it('CASE D: two executable inline scripts + both hashes present → PASS', () => {
@@ -52,7 +56,10 @@ describe('CSP Hash Drift Verification', () => {
       <script>${inlineScript1}</script>
       <script type="text/javascript">${inlineScript2}</script>
     </body></html>`
-    const headersContent = buildHeaders([getHash(inlineScript1), getHash(inlineScript2)])
+    const headersContent = buildHeaders([
+      getHash(inlineScript1),
+      getHash(inlineScript2),
+    ])
 
     expect(() => verifyCspHashes(indexHtml, headersContent)).not.toThrow()
   })
@@ -72,6 +79,8 @@ describe('CSP Hash Drift Verification', () => {
     const indexHtml = `<html><body><script src="/assets/main.js"></script></body></html>`
     const headersContent = buildHeaders([getHash('unused')])
 
-    expect(() => verifyCspHashes(indexHtml, headersContent)).toThrowError('No inline scripts found in index.html, expected at least one.')
+    expect(() => verifyCspHashes(indexHtml, headersContent)).toThrowError(
+      'No inline scripts found in index.html, expected at least one.',
+    )
   })
 })
