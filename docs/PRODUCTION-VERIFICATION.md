@@ -219,7 +219,7 @@ Future actions require explicit staged authorization:
 1. **Gate 1:** COMPLETE / PASS
 2. **Gate 2:** COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT SECURITY REVIEW PASS
 3. **Gate 3A:** PASS
-4. **Gate 3B:** REPOSITORY HARDENING IN PROGRESS
+4. **Gate 3B:** REPOSITORY HARDENING / REQUIRED FIXES IN PROGRESS
 5. **Gate 4:** NOT AUTHORIZED
 
 No gate is automatically implied by the previous gate.
