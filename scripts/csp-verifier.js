@@ -1,5 +1,55 @@
 import crypto from 'node:crypto'
 
+function hasGenuineSrcAttribute(attrsString) {
+  let i = 0
+  const n = attrsString.length
+
+  while (i < n) {
+    while (i < n && /[\s]/.test(attrsString[i])) i++
+    if (i >= n) break
+
+    if (
+      attrsString[i] === '=' ||
+      attrsString[i] === '/' ||
+      attrsString[i] === '>'
+    ) {
+      i++
+      continue
+    }
+
+    let attrName = ''
+    while (i < n && !/[\s=/>]/.test(attrsString[i])) {
+      attrName += attrsString[i]
+      i++
+    }
+
+    const isSrc = attrName.toLowerCase() === 'src'
+
+    while (i < n && /[\s]/.test(attrsString[i])) i++
+
+    if (i < n && attrsString[i] === '=') {
+      i++
+      while (i < n && /[\s]/.test(attrsString[i])) i++
+
+      if (i < n) {
+        if (attrsString[i] === '"' || attrsString[i] === "'") {
+          const quote = attrsString[i]
+          i++
+          while (i < n && attrsString[i] !== quote) i++
+          if (i < n) i++
+        } else {
+          while (i < n && !/[\s/>]/.test(attrsString[i])) {
+            i++
+          }
+        }
+      }
+    }
+
+    if (isSrc) return true
+  }
+  return false
+}
+
 export function verifyCspHashes(indexHtml, headersContent) {
   const cspMatch = headersContent.match(/Content-Security-Policy:\s*(.*)/i)
   if (!cspMatch)
@@ -24,8 +74,8 @@ export function verifyCspHashes(indexHtml, headersContent) {
     const attrs = m[1]
     const body = m[2]
 
-    // Genuine external script has a src attribute not prefixed by other characters
-    if (/(^|\s)src\s*=/i.test(attrs)) {
+    // Genuine external script has a real src attribute
+    if (hasGenuineSrcAttribute(attrs)) {
       continue
     }
 

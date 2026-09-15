@@ -149,4 +149,53 @@ describe('CSP Hash Drift Verification', () => {
 
     expect(() => verifyCspHashes(indexHtml, headersContent)).not.toThrow()
   })
+
+  it('CASE L: data-note=" src=" without inline hash → FAIL', () => {
+    const fakeScript = `console.log("inline")`
+    const indexHtml = `<html><body><script data-note=" src=">${fakeScript}</script></body></html>`
+    const headersContent = buildHeaders([])
+
+    expect(() => verifyCspHashes(indexHtml, headersContent)).toThrowError(
+      'CSP hash mismatch',
+    )
+  })
+
+  it('CASE M: data-note=" src=" with correct inline hash → PASS', () => {
+    const fakeScript = `console.log("inline")`
+    const indexHtml = `<html><body><script data-note=" src=">${fakeScript}</script></body></html>`
+    const headersContent = buildHeaders([getHash(fakeScript)])
+
+    expect(() => verifyCspHashes(indexHtml, headersContent)).not.toThrow()
+  })
+
+  it('CASE N: title="src=/fake.js" without hash → FAIL', () => {
+    const fakeScript = `console.log("inline")`
+    const indexHtml = `<html><body><script title="src=/fake.js">${fakeScript}</script></body></html>`
+    const headersContent = buildHeaders([])
+
+    expect(() => verifyCspHashes(indexHtml, headersContent)).toThrowError(
+      'CSP hash mismatch',
+    )
+  })
+
+  it('CASE O: async src = ... → genuine external → no inline hash required', () => {
+    const inlineScript = `console.log('theme script');`
+    const indexHtml = `<html><body>
+      <script>${inlineScript}</script>
+      <script async src = '/assets/main.js'></script>
+    </body></html>`
+    const headersContent = buildHeaders([getHash(inlineScript)])
+
+    expect(() => verifyCspHashes(indexHtml, headersContent)).not.toThrow()
+  })
+
+  it("CASE P: data-x='something src=/fake.js' → inline → missing hash FAIL", () => {
+    const fakeScript = `console.log("inline")`
+    const indexHtml = `<html><body><script data-x='something src=/fake.js'>${fakeScript}</script></body></html>`
+    const headersContent = buildHeaders([])
+
+    expect(() => verifyCspHashes(indexHtml, headersContent)).toThrowError(
+      'CSP hash mismatch',
+    )
+  })
 })

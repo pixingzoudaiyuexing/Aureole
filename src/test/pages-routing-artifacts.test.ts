@@ -75,6 +75,26 @@ describe('Cloudflare Pages Routing Artifacts', () => {
 
     const blocks = parseHeaders(content)
 
+    const cacheControlBlocks = new Set<string>()
+
+    for (const [path, headers] of blocks.entries()) {
+      const hasCacheControl = headers.some((l) =>
+        l.toLowerCase().startsWith('cache-control:'),
+      )
+      if (hasCacheControl) {
+        cacheControlBlocks.add(path)
+      }
+    }
+
+    // Exact set of Cache-Control blocks
+    const expectedCacheBlocks = ['/assets/*', '/release.json', '/index.html']
+
+    // Validate exact set equality
+    expect(cacheControlBlocks.size).toBe(expectedCacheBlocks.length)
+    for (const path of expectedCacheBlocks) {
+      expect(cacheControlBlocks.has(path)).toBe(true)
+    }
+
     // Check /assets/*
     const assetsBlock = blocks.get('/assets/*')
     expect(assetsBlock).toBeDefined()
@@ -127,30 +147,6 @@ describe('Cloudflare Pages Routing Artifacts', () => {
     expect(globalHeadersStr).toMatch(
       /Permissions-Policy:\s*camera=\(\),\s*microphone=\(\),\s*geolocation=\(\)/i,
     )
-
-    // Detect Future Broad Cache Overlap
-    // Fail if another broad wildcard rule is introduced that can apply Cache-Control to /assets/*
-    for (const [path, headers] of blocks.entries()) {
-      if (
-        path !== '/assets/*' &&
-        path !== '/release.json' &&
-        path !== '/index.html' &&
-        path !== '/*'
-      ) {
-        const hasCacheControl = headers.some((l) =>
-          l.toLowerCase().startsWith('cache-control:'),
-        )
-        if (hasCacheControl && path.includes('*')) {
-          // Simplistic overlap check for /assets/*
-          const cleanPath = path.replace('*', '')
-          if ('/assets/foo'.startsWith(cleanPath) || cleanPath === '/') {
-            throw new Error(
-              `Broad wildcard rule '${path}' overlaps with /assets/* and defines Cache-Control.`,
-            )
-          }
-        }
-      }
-    }
 
     // CSP
     expect(globalHeadersStr).toMatch(/Content-Security-Policy:/i)
