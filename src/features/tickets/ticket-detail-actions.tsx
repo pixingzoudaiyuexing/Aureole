@@ -49,10 +49,18 @@ type DetailFeedback =
 
 const defaultReply: ReplyTicketInput = { message: '' }
 
+function getLatestTicketMessage(detail: TicketDetail | undefined) {
+  if (!detail || detail.messages.length === 0) return undefined
+
+  return detail.messages.reduce((latest, candidate) =>
+    Number(candidate.id) > Number(latest.id) ? candidate : latest,
+  )
+}
+
 function getReplyTurn(detail: TicketDetail | undefined) {
-  const lastMessage = detail?.messages.at(-1)
-  if (!lastMessage) return 'empty' as const
-  return lastMessage.fromMe ? ('waiting' as const) : ('replyable' as const)
+  const latestMessage = getLatestTicketMessage(detail)
+  if (!latestMessage) return 'empty' as const
+  return latestMessage.fromMe ? ('waiting' as const) : ('replyable' as const)
 }
 
 export function TicketDetailActions({

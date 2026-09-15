@@ -553,7 +553,8 @@ Milestone 10 is IN PROGRESS.
   - Password Change / re-login / restore: PASS
   - Registration: PASS
   - Immediate new-Ticket Reply 409: expected V2Board alternation rule
-  - Aureole Ticket Reply eligibility correction: IMPLEMENTED / PRIMARY REVIEW PENDING
+  - Aureole Ticket Reply latest-message authority correction: IMPLEMENTED / PRIMARY REVIEW PENDING
+  - Latest message semantics: greatest numeric TicketMessage ID; array tail is non-authoritative
   - Successful Reply after support response: NOT YET RUNTIME VERIFIED
   - Runtime re-verification: NOT YET AUTHORIZED
 - AUR-M10-005: NOT STARTED / NOT AUTHORIZED

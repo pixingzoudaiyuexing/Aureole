@@ -8,7 +8,7 @@
 - AUR-M10-001R1: `COMPLETE`
 - AUR-M10-002: `COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT REVIEW PASS / FROZEN` (Code/config freeze SHA: `8890ba0e8325828e27d2234a3f8b242561fbe801`. Pre-independent-review code checkpoint: `bdaf39f4bbf462ab6729d86b83ea9afbf8421233` remains only as historical evidence.)
 - AUR-M10-003: `COMPLETE / PASS`
-- AUR-M10-004: `RUNTIME REQUIRED FIXES / TICKET REPLY ELIGIBILITY CORRECTION IMPLEMENTED / PRIMARY REVIEW AND RUNTIME REVERIFICATION PENDING`
+- AUR-M10-004: `RUNTIME REQUIRED FIXES / TICKET REPLY LATEST-MESSAGE AUTHORITY CORRECTION IMPLEMENTED / PRIMARY REVIEW AND RUNTIME REVERIFICATION PENDING`
 - AUR-M10-005: `NOT STARTED / NOT AUTHORIZED`
 - AUR-M10-006: `NOT STARTED / NOT AUTHORIZED`
 - Current evidence update: `2026-09-15`
@@ -197,7 +197,7 @@ The remaining runtime gaps are outside AUR-M10-003:
   Withdrawal Options GETs are verified.
 - Real Google reCAPTCHA behavior if production onboarding enables it.
 
-### AUR-M10-004 Runtime Finding and R1 Correction
+### AUR-M10-004 Runtime Finding and R1/R2 Corrections
 
 The authorized controlled mutation run established runtime PASS evidence for
 Preferences update/restore, Ticket Create and Close, Referral Code Create,
@@ -210,14 +210,17 @@ An immediate Reply to the newly created Ticket returned HTTP 409. Primary
 confirmed this as expected V2Board behavior: a user cannot send two consecutive
 Ticket messages, and Solution already maps the upstream waiting-for-support
 response to `TICKET_REPLY_FAILED`. The Aureole defect was that Reply remained
-actionable when the last authoritative message had `fromMe === true`.
+actionable when the V2Board-authoritative latest message belonged to the user.
 
-AUR-M10-004R1 now derives Reply eligibility from the final authoritative message,
-fails closed for empty message history, rechecks the exact cached Detail at the
-execution boundary, preserves Close eligibility, and returns to the waiting state
-after successful Reply reconciliation. This correction is not deployed or runtime
-reverified. A successful user Reply after a real support response remains NOT YET
-RUNTIME VERIFIED, so AUR-M10-004 remains REQUIRED FIXES.
+AUR-M10-004R1 added sender-based Reply eligibility. Primary R2 review identified
+that the upstream message array has no guaranteed order, while V2Board enforces
+Reply using the message with the greatest numeric TicketMessage ID. R2 now uses
+that same highest-ID rule in both the UI and execution boundary, without reordering
+the rendered message array. Empty history still fails closed, Close eligibility is
+unchanged, and successful Reply reconciliation derives the next state only from
+the authoritative GET. This correction is not deployed or runtime reverified. A
+successful user Reply after a real support response remains NOT YET RUNTIME
+VERIFIED, so AUR-M10-004 remains REQUIRED FIXES.
 
 For the AUR-M10-003 disposable account, `status = expired`, subscription
 eligibility was false, and `accessUrl` was absent. Active-subscription and
@@ -615,7 +618,7 @@ before a deployment contract exists:
    - RUNTIME REQUIRED FIXES.
    - Preferences, Ticket Create/Close, Referral Code, Password lifecycle, and
      Registration runtime evidence passed.
-   - Ticket Reply eligibility correction is implemented; Primary review,
+   - Ticket Reply latest-message authority correction is implemented; Primary review,
      deployment, and runtime re-verification are pending.
 4. `AUR-M10-005 - Payment, Wallet and Financial Runtime Verification`
    - NOT STARTED / NOT AUTHORIZED.

@@ -57,6 +57,24 @@ const emptyDetail: TicketDetail = {
   messages: [],
 }
 
+const highestIdSupportTailUserDetail: TicketDetail = {
+  ...ticket,
+  messages: [replyableDetail.messages[1]!, waitingDetail.messages[0]!],
+}
+
+const highestIdUserTailSupportDetail: TicketDetail = {
+  ...ticket,
+  messages: [
+    {
+      id: '13',
+      content: 'Latest user message',
+      fromMe: true,
+      createdAt: '2026-09-13T00:30:00.000Z',
+    },
+    replyableDetail.messages[1]!,
+  ],
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void
   let reject!: (error: unknown) => void
@@ -173,6 +191,39 @@ describe('Support Ticket Detail authority and actions', () => {
     expect(mocks.reply).not.toHaveBeenCalled()
   })
 
+  it('uses the greatest message ID when support is not at the array tail', async () => {
+    const mocks = installMocks()
+    mocks.getDetail.mockResolvedValue(highestIdSupportTailUserDetail)
+    renderSupport()
+    const form = await openDetail()
+
+    expect(form.reply).toBeEnabled()
+    expect(form.send).toBeEnabled()
+    expect(form.close).toBeEnabled()
+    expect(mocks.reply).not.toHaveBeenCalled()
+  })
+
+  it('uses the greatest message ID when a lower support message is at the array tail', async () => {
+    const mocks = installMocks()
+    mocks.getDetail.mockResolvedValue(highestIdUserTailSupportDetail)
+    renderSupport()
+    const { dialog } = await openDetailDialog()
+
+    expect(
+      within(dialog).getByText('已发送，等待技术支持回复后可继续回复。'),
+    ).toBeInTheDocument()
+    expect(
+      within(dialog).queryByRole('textbox', { name: '回复工单' }),
+    ).toBeNull()
+    expect(
+      within(dialog).queryByRole('button', { name: '发送回复' }),
+    ).toBeNull()
+    expect(
+      within(dialog).getByRole('button', { name: '关闭工单' }),
+    ).toBeEnabled()
+    expect(mocks.reply).not.toHaveBeenCalled()
+  })
+
   it('fails closed for empty message history while preserving Close', async () => {
     const mocks = installMocks()
     mocks.getDetail.mockResolvedValue(emptyDetail)
@@ -202,7 +253,10 @@ describe('Support Ticket Detail authority and actions', () => {
     const staleForm = form.send.closest('form')!
 
     act(() => {
-      queryClient.setQueryData(ticketsQueryKeys.detail('7'), waitingDetail)
+      queryClient.setQueryData(
+        ticketsQueryKeys.detail('7'),
+        highestIdUserTailSupportDetail,
+      )
       fireEvent.submit(staleForm)
     })
 
@@ -216,7 +270,7 @@ describe('Support Ticket Detail authority and actions', () => {
 
   it('enables Reply when authoritative Detail changes to support-last', async () => {
     const mocks = installMocks()
-    mocks.getDetail.mockResolvedValue(waitingDetail)
+    mocks.getDetail.mockResolvedValue(highestIdUserTailSupportDetail)
     const { queryClient } = renderSupport()
     const { dialog } = await openDetailDialog()
     expect(
@@ -224,7 +278,10 @@ describe('Support Ticket Detail authority and actions', () => {
     ).toBeInTheDocument()
 
     act(() => {
-      queryClient.setQueryData(ticketsQueryKeys.detail('7'), replyableDetail)
+      queryClient.setQueryData(
+        ticketsQueryKeys.detail('7'),
+        highestIdSupportTailUserDetail,
+      )
     })
 
     expect(
@@ -395,13 +452,13 @@ describe('Support Ticket Reply mutation', () => {
       recovery.resolve({
         ...replyableDetail,
         messages: [
-          ...replyableDetail.messages,
           {
-            id: '999',
+            id: '13',
             content: raw,
             fromMe: true,
             createdAt: '2026-09-13T01:01:00.000Z',
           },
+          ...replyableDetail.messages,
         ],
       }),
     )
