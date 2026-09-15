@@ -126,7 +126,7 @@ operational source of truth.
 
 ## AUR-M10-001 Launch Readiness audit
 
-Status: `COMPLETE / PRIMARY REVIEW PASS`.
+Status: `COMPLETE / PASS`.
 
 Audit SHA: `5b2b994d50e8c2ac599681e1523a4a855054db3c`.
 
@@ -139,11 +139,12 @@ feature matrix, L0-L5 evidence model, SAFE-A/SAFE-B/STATE-C/FINANCIAL-D safety
 classes, production evidence gaps, hosting/API/cache/security requirements,
 rollback readiness and proposed M10 validation tasks.
 
-The audit confirmed that the highest current Aureole business-flow evidence is L2
-controlled browser verification. No deployed Aureole production Auth, read,
-mutation or financial flow was exercised. **At the AUR-M10-001 audit checkpoint**, the deployment contract and runtime environment were missing.
+At the AUR-M10-001 audit checkpoint, the highest Aureole business-flow evidence
+was L2 controlled browser verification. No deployed Aureole production Auth,
+read, mutation or financial flow was exercised, and the deployment contract and
+runtime environment were missing.
 
-**Current Post-AUR-M10-002 Reality:**
+**AUR-M10-002 Contract Reality (Historical Checkpoint):**
 
 - vendor-neutral deployment/artifact contract now exists
 - same-origin `/api/v1` default is frozen
@@ -151,8 +152,7 @@ mutation or financial flow was exercised. **At the AUR-M10-001 audit checkpoint*
 - deterministic release identity exists
 - cache/rollback/security-header baseline contracts exist
 
-**Remaining Blocker: VERIFIED PRODUCTION DEPLOYMENT / RUNTIME EXECUTION**
-including:
+**Historical AUR-M10-001 Runtime Blockers:**
 
 - real host/provider
 - HTTPS/TLS
@@ -162,6 +162,10 @@ including:
 - deployed release SHA
 - publish/rollback execution
 - production Auth/read/mutation/financial evidence
+
+AUR-M10-003 later closed the staging deployment, Auth/Session, and read-only
+evidence. AUR-M10-004 later closed its controlled non-financial mutation scope.
+Payment/financial runtime evidence and the final M10-006 launch gate remain open.
 
 AUR-M10-001 and AUR-M10-001R1 ran only SAFE-A local/documentation validation. They
 did not access production, deploy, mutate production state or perform a real
@@ -383,9 +387,9 @@ financial operation. No business source code or solution file was changed.
   Automated tests additionally cover same-tick Reply/Close locking, cached refetch,
   reconciliation failure, manual GET-only recovery, remount safety, every required
   UNKNOWN category, strict DTOs and full Session cache clearing. Production
-  AUR-M10-004 later verified Ticket Create and Close runtime. Immediate Reply on a
-  newly created Ticket returned the expected V2Board consecutive-user-message 409;
-  actual successful Reply after a support response remains NOT YET RUNTIME VERIFIED.
+  AUR-M10-004 verified Ticket Create, Close, and Reply runtime. The initial
+  new-Ticket Reply 409 proved the expected V2Board consecutive-user-message rule;
+  after R1/R2 and review, R4 verified one successful Reply after a support response.
 - AUR-M9-001 controlled-browser verification: PASS against a local `/api/v1` mock at
   exact 1280 x 720 and 390 x 844 in Light/Dark/System for ordered multiple codes,
   all five stats, safe-integer maximum money and registered-user values, long code and
@@ -546,18 +550,21 @@ Milestone 10 is IN PROGRESS.
     (`7f379046-49ab-454d-b7ed-dd2ba8abf9df`)
   - Gate 4: COMPLETE / PASS
 
-- AUR-M10-004: RUNTIME REQUIRED FIXES
+- AUR-M10-004: COMPLETE / PASS
   - Preferences update/restore: PASS
   - Ticket Create / Close: PASS
   - Referral Code Create: PASS
   - Password Change / re-login / restore: PASS
   - Registration: PASS
   - Immediate new-Ticket Reply 409: expected V2Board alternation rule
-  - Aureole Ticket Reply latest-message authority correction: IMPLEMENTED / PRIMARY REVIEW PENDING
+  - Aureole Ticket Reply latest-message authority correction: PRIMARY / INDEPENDENT REVIEW PASS
   - Latest message semantics: greatest numeric TicketMessage ID; array tail is non-authoritative
-  - Successful Reply after support response: NOT YET RUNTIME VERIFIED
-  - Runtime re-verification: NOT YET AUTHORIZED
+  - Successful Reply after support response: RUNTIME PASS
+  - R4 deployed application: `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef`
+    (`dd7ff78c-efbd-4503-957e-619a9bb45433`)
+  - Duplicate/retry, same-origin/Bearer, authoritative reconciliation, and Ticket cleanup: PASS
+  - Email-code/Password Recovery/Rotate/Advance remain non-blocking state-constrained evidence
 - AUR-M10-005: NOT STARTED / NOT AUTHORIZED
 - AUR-M10-006: NOT STARTED / NOT AUTHORIZED
 
-The verified deployed application remains `1cd18e6a57e775b21d89b951074a44a687ececfc`; newer repository commits are documentation-only and are not deployed application SHAs. Business mutation and financial runtime verification remain NOT AUTHORIZED.
+The verified deployed application is `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef`; newer repository commits are documentation-only and are not deployed application SHAs. Financial runtime verification remains NOT AUTHORIZED.

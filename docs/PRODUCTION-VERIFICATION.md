@@ -89,7 +89,7 @@ The Primary froze and approved the corrected Gate 3B deployment candidate before
 - Gate 4 completed with an explicitly authorized disposable staging test account. Login, `/me`, session restoration, page-driven authenticated reads, logout, and post-logout credential clearing passed.
 - AUR-M10-003 is **COMPLETE / PASS**.
 
-AUR-M10-003 completion does not authorize AUR-M10-004, AUR-M10-005, or AUR-M10-006. Business mutations and financial operations require separate explicit Primary authorization.
+AUR-M10-003 completion did not itself authorize later phases. AUR-M10-004 was subsequently authorized and completed independently; AUR-M10-005 and AUR-M10-006 remain not started and not authorized.
 
 ## 5. M10-003 Minimum Acceptance Evidence
 
@@ -456,8 +456,64 @@ The disposable account reported `status = expired`, subscription eligibility was
 
 The only authorized mutation during Gate 4 was `POST /api/v1/auth/login`. Logout was client-side and produced no network mutation. No business mutation or financial operation was performed.
 
-- **AUR-M10-004:** NOT STARTED / NOT AUTHORIZED
+- **AUR-M10-004:** COMPLETE / PASS
 - **AUR-M10-005:** NOT STARTED / NOT AUTHORIZED
 - **AUR-M10-006:** NOT STARTED / NOT AUTHORIZED
 
 The current repository documentation HEAD is newer than the verified deployed application SHA because subsequent commits are documentation-only. The documentation HEAD must not be described as the deployed application SHA.
+
+## 20. Final AUR-M10-004 Controlled Mutation Closure
+
+- **AUR-M10-001:** COMPLETE / PASS
+- **AUR-M10-002:** COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT REVIEW PASS / FROZEN
+- **AUR-M10-003:** COMPLETE / PASS
+- **AUR-M10-004:** COMPLETE / PASS
+- **Milestone 10:** IN PROGRESS
+- **Reviewed and Deployed Application SHA:** `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef`
+- **Cloudflare Pages Deployment ID:** `dd7ff78c-efbd-4503-957e-619a9bb45433`
+- **Deployment URL:** `https://dd7ff78c.aureole-cc-staging-3dc609.pages.dev`
+- **Production Staging URL:** `https://aureole-cc-staging-3dc609.pages.dev`
+- **Runtime `release.json`:** HTTP 200 with exact SHA `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef`
+
+**Controlled Mutation Evidence (PASS):**
+
+- Preferences: original `autoRenewal=false`, `remindExpire=true`, and `remindTraffic=true`; one harmless value was changed through PATCH 200, authoritative GET reconciliation passed, and the original state was restored exactly.
+- Password lifecycle: mutation returned 200, the session exited and cleared its local credential, re-login with the changed password passed, the original disposable password was restored, and final re-login passed. No password value was recorded.
+- Registration: runtime onboarding permitted registration; one disposable account was created through the normal UI, register POST returned 200, and `/me` returned 200.
+- Referral Code Create: exactly one create POST returned 201 and the authoritative list count increased from 2 to 3. No referral code value was recorded.
+- Ticket Create and Close: PASS through normal UI and authoritative List/Detail reconciliation.
+- Ticket Reply: PASS after the R1/R2 correction and R4 staging runtime re-verification.
+
+**Ticket Reply Finding and Corrections:**
+
+The initial controlled run created an open Ticket and an immediate user Reply returned HTTP 409 `TICKET_REPLY_FAILED`. Primary confirmed that this was expected V2Board behavior because users may not submit consecutive Ticket messages; the Solution mapping was correct. The frontend defect was that Aureole exposed Reply while the user owned the V2Board-authoritative latest TicketMessage.
+
+AUR-M10-004R1 at `796ff3e1ce0c6d0e39f367c341be6ce8c7b482d8` added Reply turn gating, empty-history fail-closed behavior, independent Close eligibility, canonical Detail execution-boundary checks, and GET-only message authority without local optimistic message fabrication. R1 alone was not the final deployed fix.
+
+Primary then identified that the Public Ticket Detail Contract does not guarantee message-array order. AUR-M10-004R2 at `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef` aligned rendered and execution-boundary Reply authority with V2Board by selecting the greatest numeric TicketMessage ID. Array tail is non-authoritative.
+
+Primary Code Review and Independent Review both passed. Independent review covered the V2Board rule, Solution DTO/Contract boundary, greatest-ID selection, stale execution authority, unordered arrays, UNKNOWN safety, Reply/Close coordination, regression tests, and documentation. No required finding remained after R2.
+
+**R4 Focused Runtime Re-verification (PASS):**
+
+- Dedicated Ticket ID: `19`.
+- Scenario A: greatest message ID `34` belonged to the user (`fromMe=true`); waiting UI was shown, Reply controls were absent, Reply POST count was 0, and Close remained available.
+- Scenario B: the owner added one controlled support reply; greatest message ID `35` belonged to support (`fromMe=false`), Reply became available, and exactly one user Reply POST returned HTTP 200 with a pending guard and no retry or duplicate.
+- Post-Reply reconciliation: authoritative GET returned new greatest message ID `36` owned by the user (`fromMe=true`); the submitted message appeared only after that GET, confirmed success remained visible, the UI returned to waiting, Reply controls disappeared, and Close remained available.
+- Ticket 19 was closed once; Close POST returned 200 and authoritative Detail/List confirmed closed.
+
+All Aureole browser API traffic remained same-origin. Bearer credentials were confined to authenticated same-origin `/api/v1/*` requests. No browser request directly contacted Solution or V2Board, no raw Bearer was recorded, and no automatic retry, duplicate Ticket mutation, or financial operation occurred.
+
+**Non-Blocking Residual Evidence:**
+
+- Email-code E2E: NOT EXECUTABLE / NOT REQUIRED by current runtime onboarding capability.
+- Password Recovery: NOT EXECUTABLE because no mailbox/code was available.
+- Subscription Rotate Access: NOT EXECUTABLE because the authoritative account state was ineligible.
+- Subscription Advance Period: NOT EXECUTABLE because the authoritative account state was ineligible.
+
+These state/environment constraints do not block the defined AUR-M10-004 acceptance and are not claimed as runtime-verified.
+
+- **AUR-M10-005:** NOT STARTED / NOT AUTHORIZED
+- **AUR-M10-006:** NOT STARTED / NOT AUTHORIZED
+
+Any repository commit after `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef` in this documentation closure is documentation-only and must not be described as the deployed application SHA.

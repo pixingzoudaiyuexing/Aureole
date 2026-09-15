@@ -291,6 +291,10 @@
 - Reply message 仅在 form/active mutation memory 中存在，保持空格、换行与 HTML-like 文本原样；不进入
   storage、URL、Zustand、analytics、console、error metadata、Query/Mutation key。Detail 消息继续作为
   plain React text node 展示。
+- AUR-M10-004R4 在 staging 对最终 `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef` 完成运行复验：
+  Ticket 19 的最大 message ID 34 为用户时 Reply 不可用；owner 添加客服消息后最大 ID 35 为客服，唯一
+  Reply POST 返回 200；权威 GET 返回最大 ID 36 为用户后 UI 回到等待状态，未本地 append、未重复 POST，
+  随后唯一 Close POST 及 Detail/List 对账确认 closed。AUR-M10-004 最终为 COMPLETE / PASS。
 
 ## Referral and commission read mapping
 

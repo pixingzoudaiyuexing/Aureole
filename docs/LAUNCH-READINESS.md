@@ -3,12 +3,12 @@
 ## Status and scope
 
 - Task: `AUR-M10-001`
-- Status: `COMPLETE / PRIMARY REVIEW PASS`
+- Status: `COMPLETE / PASS`
 - Milestone 10: `IN PROGRESS`
 - AUR-M10-001R1: `COMPLETE`
 - AUR-M10-002: `COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT REVIEW PASS / FROZEN` (Code/config freeze SHA: `8890ba0e8325828e27d2234a3f8b242561fbe801`. Pre-independent-review code checkpoint: `bdaf39f4bbf462ab6729d86b83ea9afbf8421233` remains only as historical evidence.)
 - AUR-M10-003: `COMPLETE / PASS`
-- AUR-M10-004: `RUNTIME REQUIRED FIXES / TICKET REPLY LATEST-MESSAGE AUTHORITY CORRECTION IMPLEMENTED / PRIMARY REVIEW AND RUNTIME REVERIFICATION PENDING`
+- AUR-M10-004: `COMPLETE / PASS`
 - AUR-M10-005: `NOT STARTED / NOT AUTHORIZED`
 - AUR-M10-006: `NOT STARTED / NOT AUTHORIZED`
 - Current evidence update: `2026-09-15`
@@ -37,14 +37,14 @@ parsers, local recovery UX and 47 automated test files. The AUR-M10-001 SAFE-A
 baseline passes with 1074 tests and a production build within the documented
 bundle budgets.
 
-The highest Aureole runtime evidence is now L3 for the AUR-M10-003 deployment,
-Auth/Session, and naturally page-driven read-only matrix. Gate 3 verified the
-Cloudflare Pages staging runtime; Gate 4 verified a real browser login, `/me`,
-same-tab session restoration, core authenticated reads, credential confinement,
-and logout. Mutation and financial features remain at L2 unless separately noted.
+The highest Aureole runtime evidence is now L4 for the exact controlled
+non-financial mutations completed by AUR-M10-004. AUR-M10-003 provides L3
+deployment, Auth/Session, and page-driven read-only evidence. Payment and financial
+mutations remain at L2 unless separately noted.
 
-The principal remaining launch blockers are the separately scoped mutation,
-payment/financial, broader browser, rollback-drill, and final launch decisions.
+The principal remaining launch blockers are payment/financial verification,
+state-constrained residual coverage, the broader browser matrix, rollback drill,
+and final launch decisions.
 
 ### Current Application/Artifact Contract (AUR-M10-002):
 
@@ -56,16 +56,16 @@ payment/financial, broader browser, rollback-drill, and final launch decisions.
 - security-header/CSP baseline contract is established.
 - artifact verification and deterministic source SHA release identity exist.
 - Tailwind docs scanning isolation is rigorously proven.
-- verified Cloudflare Pages staging application SHA: `1cd18e6a57e775b21d89b951074a44a687ececfc`.
-- verified active deployment ID: `7f379046-49ab-454d-b7ed-dd2ba8abf9df`.
+- verified Cloudflare Pages staging application SHA: `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef`.
+- verified active deployment ID: `dd7ff78c-efbd-4503-957e-619a9bb45433`.
 - staging project: `aureole-cc-staging-3dc609`.
 - staging URL: `https://aureole-cc-staging-3dc609.pages.dev`.
 
-### Unresolved State Beyond AUR-M10-003:
+### Unresolved State Beyond AUR-M10-004:
 
 - active-subscription and accessUrl-present states were not available on the disposable account
 - conditional detail reads were not forced without a naturally safe ID
-- non-financial business mutation runtime verification
+- remaining state-constrained non-financial flows outside the completed AUR-M10-004 minimum
 - payment, wallet mutation, and financial runtime verification
 - rollback execution/drill
 - broader browser/device and final launch evidence
@@ -182,16 +182,16 @@ L3 within the exact authorized staging scope:
   Traffic, Notices, Orders, Wallet, Tickets, Referrals, and Withdrawal Options
 - same-origin Bearer confinement, client-side logout, and post-logout protection
 
-The remaining runtime gaps are outside AUR-M10-003:
+The remaining runtime gaps are outside the completed AUR-M10-003 and AUR-M10-004 scopes:
 
 - Production Order Create, Promotion Validation and Cancel.
 - Production billing methods, Checkout provider QR/redirect behavior, provider
   callback and final Order Status.
 - Production Rotate Access and Advance Period.
 - Production Wallet Deposit and Gift Card redemption.
-- Production successful Ticket Reply after a support response; Ticket Create and
-  Close runtime passed in AUR-M10-004, while the expected consecutive-user Reply
-  rejection exposed the frontend eligibility defect corrected by AUR-M10-004R1.
+- Production Ticket Create, Reply, and Close runtime passed in AUR-M10-004 after
+  the expected consecutive-user Reply rejection exposed and drove correction of
+  the frontend eligibility defect.
 - Production Commission Transfer and Withdrawal Request; Referral Code Create
   runtime passed in AUR-M10-004, and Referral Overview, Commission History, and
   Withdrawal Options GETs are verified.
@@ -218,9 +218,15 @@ Reply using the message with the greatest numeric TicketMessage ID. R2 now uses
 that same highest-ID rule in both the UI and execution boundary, without reordering
 the rendered message array. Empty history still fails closed, Close eligibility is
 unchanged, and successful Reply reconciliation derives the next state only from
-the authoritative GET. This correction is not deployed or runtime reverified. A
-successful user Reply after a real support response remains NOT YET RUNTIME
-VERIFIED, so AUR-M10-004 remains REQUIRED FIXES.
+the authoritative GET.
+
+Primary and Independent Review passed with no remaining required finding. R4
+deployed final SHA `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef` as Cloudflare
+Pages deployment `dd7ff78c-efbd-4503-957e-619a9bb45433`. Dedicated Ticket 19
+verified user-latest blocking at greatest ID 34, support-latest Reply availability
+at greatest ID 35, one HTTP 200 user Reply, authoritative return to user-latest at
+greatest ID 36, consecutive Reply prevention, and one authoritative Close cleanup.
+AUR-M10-004 is `COMPLETE / PASS`.
 
 For the AUR-M10-003 disposable account, `status = expired`, subscription
 eligibility was false, and `accessUrl` was absent. Active-subscription and
@@ -434,8 +440,8 @@ Gaps:
 - No client error-reporting integration or documented privacy-safe console policy
   exists beyond absence of application logging.
 - ARTIFACT SOURCE IDENTITY: IMPLEMENTED via `dist/release.json`.
-- ACTUAL STAGING DEPLOYED SHA: VERIFIED as `1cd18e6a57e775b21d89b951074a44a687ececfc`.
-- ACTIVE CLOUDFLARE PAGES DEPLOYMENT: `7f379046-49ab-454d-b7ed-dd2ba8abf9df`.
+- ACTUAL STAGING DEPLOYED SHA: VERIFIED as `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef`.
+- ACTIVE CLOUDFLARE PAGES DEPLOYMENT: `dd7ff78c-efbd-4503-957e-619a9bb45433`.
 - No production request-ID correlation procedure is documented.
 
 Classification: monitoring and SHA correlation are `MEDIUM` recommended before or
@@ -615,11 +621,11 @@ before a deployment contract exists:
    - verified deployment/runtime Gate 3 plus explicitly authorized login,
      sessionStorage, `/me`, page-driven reads, logout, and network boundaries.
 3. `AUR-M10-004 - Controlled Non-Financial Mutation Verification`
-   - RUNTIME REQUIRED FIXES.
+   - COMPLETE / PASS.
    - Preferences, Ticket Create/Close, Referral Code, Password lifecycle, and
      Registration runtime evidence passed.
-   - Ticket Reply latest-message authority correction is implemented; Primary review,
-     deployment, and runtime re-verification are pending.
+   - Ticket Reply greatest-ID authority passed Primary/Independent review and R4
+     staging runtime re-verification.
 4. `AUR-M10-005 - Payment, Wallet and Financial Runtime Verification`
    - NOT STARTED / NOT AUTHORIZED.
    - provider environment decision;
@@ -644,4 +650,4 @@ scope, accounts, environment and mutation permissions separately.
 - NO BUSINESS CODE CHANGES PERFORMED
 - solution remained READ ONLY
 
-Status: `COMPLETE / PRIMARY REVIEW PASS`.
+Status: `COMPLETE / PASS`.
