@@ -8,7 +8,7 @@
 - AUR-M10-001R1: `COMPLETE`
 - AUR-M10-002: `COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT REVIEW PASS / FROZEN` (Code/config freeze SHA: `8890ba0e8325828e27d2234a3f8b242561fbe801`. Pre-independent-review code checkpoint: `bdaf39f4bbf462ab6729d86b83ea9afbf8421233` remains only as historical evidence.)
 - AUR-M10-003: `COMPLETE / PASS`
-- AUR-M10-004: `NOT STARTED / NOT AUTHORIZED`
+- AUR-M10-004: `RUNTIME REQUIRED FIXES / TICKET REPLY ELIGIBILITY CORRECTION IMPLEMENTED / PRIMARY REVIEW AND RUNTIME REVERIFICATION PENDING`
 - AUR-M10-005: `NOT STARTED / NOT AUTHORIZED`
 - AUR-M10-006: `NOT STARTED / NOT AUTHORIZED`
 - Current evidence update: `2026-09-15`
@@ -189,10 +189,35 @@ The remaining runtime gaps are outside AUR-M10-003:
   callback and final Order Status.
 - Production Rotate Access and Advance Period.
 - Production Wallet Deposit and Gift Card redemption.
-- Production Ticket Detail/Create/Reply/Close; the page-driven Ticket List GET is verified.
-- Production Referral Code Create, Commission Transfer and Withdrawal Request;
-  Referral Overview, Commission History, and Withdrawal Options GETs are verified.
+- Production successful Ticket Reply after a support response; Ticket Create and
+  Close runtime passed in AUR-M10-004, while the expected consecutive-user Reply
+  rejection exposed the frontend eligibility defect corrected by AUR-M10-004R1.
+- Production Commission Transfer and Withdrawal Request; Referral Code Create
+  runtime passed in AUR-M10-004, and Referral Overview, Commission History, and
+  Withdrawal Options GETs are verified.
 - Real Google reCAPTCHA behavior if production onboarding enables it.
+
+### AUR-M10-004 Runtime Finding and R1 Correction
+
+The authorized controlled mutation run established runtime PASS evidence for
+Preferences update/restore, Ticket Create and Close, Referral Code Create,
+Password Change/re-login/restore, and Registration. Subscription Rotate Access
+and Advance Period were not executable because the authoritative account state
+was ineligible. Email-code delivery and Password Recovery were not executed
+without a real mailbox/code.
+
+An immediate Reply to the newly created Ticket returned HTTP 409. Primary
+confirmed this as expected V2Board behavior: a user cannot send two consecutive
+Ticket messages, and Solution already maps the upstream waiting-for-support
+response to `TICKET_REPLY_FAILED`. The Aureole defect was that Reply remained
+actionable when the last authoritative message had `fromMe === true`.
+
+AUR-M10-004R1 now derives Reply eligibility from the final authoritative message,
+fails closed for empty message history, rechecks the exact cached Detail at the
+execution boundary, preserves Close eligibility, and returns to the waiting state
+after successful Reply reconciliation. This correction is not deployed or runtime
+reverified. A successful user Reply after a real support response remains NOT YET
+RUNTIME VERIFIED, so AUR-M10-004 remains REQUIRED FIXES.
 
 For the AUR-M10-003 disposable account, `status = expired`, subscription
 eligibility was false, and `accessUrl` was absent. Active-subscription and
@@ -587,9 +612,11 @@ before a deployment contract exists:
    - verified deployment/runtime Gate 3 plus explicitly authorized login,
      sessionStorage, `/me`, page-driven reads, logout, and network boundaries.
 3. `AUR-M10-004 - Controlled Non-Financial Mutation Verification`
-   - NOT STARTED / NOT AUTHORIZED.
-   - preferences, password, onboarding lifecycle, Rotate, Advance, Tickets and
-     Referral Code with dedicated accounts and stated rollback limitations.
+   - RUNTIME REQUIRED FIXES.
+   - Preferences, Ticket Create/Close, Referral Code, Password lifecycle, and
+     Registration runtime evidence passed.
+   - Ticket Reply eligibility correction is implemented; Primary review,
+     deployment, and runtime re-verification are pending.
 4. `AUR-M10-005 - Payment, Wallet and Financial Runtime Verification`
    - NOT STARTED / NOT AUTHORIZED.
    - provider environment decision;

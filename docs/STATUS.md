@@ -383,7 +383,9 @@ financial operation. No business source code or solution file was changed.
   Automated tests additionally cover same-tick Reply/Close locking, cached refetch,
   reconciliation failure, manual GET-only recovery, remount safety, every required
   UNKNOWN category, strict DTOs and full Session cache clearing. Production
-  solution/V2Board Ticket Reply/Close runtime is NOT TESTED.
+  AUR-M10-004 later verified Ticket Create and Close runtime. Immediate Reply on a
+  newly created Ticket returned the expected V2Board consecutive-user-message 409;
+  actual successful Reply after a support response remains NOT YET RUNTIME VERIFIED.
 - AUR-M9-001 controlled-browser verification: PASS against a local `/api/v1` mock at
   exact 1280 x 720 and 390 x 844 in Light/Dark/System for ordered multiple codes,
   all five stats, safe-integer maximum money and registered-user values, long code and
@@ -544,7 +546,16 @@ Milestone 10 is IN PROGRESS.
     (`7f379046-49ab-454d-b7ed-dd2ba8abf9df`)
   - Gate 4: COMPLETE / PASS
 
-- AUR-M10-004: NOT STARTED / NOT AUTHORIZED
+- AUR-M10-004: RUNTIME REQUIRED FIXES
+  - Preferences update/restore: PASS
+  - Ticket Create / Close: PASS
+  - Referral Code Create: PASS
+  - Password Change / re-login / restore: PASS
+  - Registration: PASS
+  - Immediate new-Ticket Reply 409: expected V2Board alternation rule
+  - Aureole Ticket Reply eligibility correction: IMPLEMENTED / PRIMARY REVIEW PENDING
+  - Successful Reply after support response: NOT YET RUNTIME VERIFIED
+  - Runtime re-verification: NOT YET AUTHORIZED
 - AUR-M10-005: NOT STARTED / NOT AUTHORIZED
 - AUR-M10-006: NOT STARTED / NOT AUTHORIZED
 

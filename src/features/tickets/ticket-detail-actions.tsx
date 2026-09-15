@@ -49,6 +49,12 @@ type DetailFeedback =
 
 const defaultReply: ReplyTicketInput = { message: '' }
 
+function getReplyTurn(detail: TicketDetail | undefined) {
+  const lastMessage = detail?.messages.at(-1)
+  if (!lastMessage) return 'empty' as const
+  return lastMessage.fromMe ? ('waiting' as const) : ('replyable' as const)
+}
+
 export function TicketDetailActions({
   accessToken,
   authorityReady,
@@ -99,6 +105,7 @@ export function TicketDetailActions({
 
   const currentDetail = detail?.id === ticketId ? detail : undefined
   const currentStatus = currentDetail?.status ?? null
+  const replyTurn = getReplyTurn(currentDetail)
   const unavailable = feedback?.kind === 'not-found'
   const busy =
     coordinator.activeAction !== null ||
@@ -175,11 +182,11 @@ export function TicketDetailActions({
     return { ...detailResult, listReconciled }
   }
 
-  const hasCurrentAuthority = () => {
+  const hasCurrentAuthority = (action: 'reply' | 'close') => {
     const state = queryClient.getQueryState<TicketDetail>(
       ticketsQueryKeys.detail(ticketId),
     )
-    return (
+    const hasOpenAuthority =
       authorityReady &&
       currentStatus === 'open' &&
       !unavailable &&
@@ -188,11 +195,17 @@ export function TicketDetailActions({
       state.fetchStatus === 'idle' &&
       state.data?.id === ticketId &&
       state.data.status === 'open'
-    )
+
+    if (!hasOpenAuthority) return false
+    if (action === 'close') return true
+
+    return getReplyTurn(state.data) === 'replyable'
   }
 
   const beginAction = (action: 'reply' | 'close') => {
-    if (!hasCurrentAuthority() || !coordinator.tryAcquire(action)) return false
+    if (!hasCurrentAuthority(action) || !coordinator.tryAcquire(action)) {
+      return false
+    }
     sessionInvalidatedRef.current = false
     onBusyChange(true)
     return true
@@ -332,7 +345,9 @@ export function TicketDetailActions({
 
   const actionDisabled = !authorityReady || busy || recovering || unavailable
   const replyDisabled =
-    actionDisabled || (replyUnknownGuard && !replyUnknownAcknowledged)
+    actionDisabled ||
+    replyTurn !== 'replyable' ||
+    (replyUnknownGuard && !replyUnknownAcknowledged)
   const closeDisabled =
     actionDisabled || (closeUnknownGuard && !closeUnknownAcknowledged)
   const messageField = register('message')
@@ -379,73 +394,83 @@ export function TicketDetailActions({
             </p>
           ) : null}
 
-          <form
-            className="space-y-3"
-            onSubmit={(event) => void handleSubmit(sendReply)(event)}
-            noValidate
-          >
-            <div className="flex items-baseline justify-between gap-4">
-              <label
-                className="text-sm font-medium"
-                htmlFor="ticket-reply-message"
-              >
-                回复工单
-              </label>
-              <span className="text-xs tabular-nums text-muted-foreground">
-                {message.length} / 10000
-              </span>
-            </div>
-            <textarea
-              id="ticket-reply-message"
-              rows={5}
-              className="min-h-28 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm leading-6 text-foreground outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20"
-              autoComplete="off"
-              disabled={actionDisabled}
-              aria-invalid={Boolean(errors.message)}
-              aria-describedby={
-                errors.message
-                  ? 'ticket-reply-help ticket-reply-error'
-                  : 'ticket-reply-help'
-              }
-              {...messageField}
-              onChange={(event) => {
-                void messageField.onChange(event)
-                clearErrors('message')
-                if (feedback?.kind === 'reply-validation') setFeedback(null)
-                if (replyUnknownGuard) setReplyUnknownAcknowledged(false)
-              }}
-            />
-            <p
-              id="ticket-reply-help"
-              className="text-xs leading-5 text-muted-foreground"
+          {replyTurn === 'replyable' ? (
+            <form
+              className="space-y-3"
+              onSubmit={(event) => void handleSubmit(sendReply)(event)}
+              noValidate
             >
-              请输入 1 至 10000 个字符，换行和空格会按原文提交。
-            </p>
-            <FieldError
-              id="ticket-reply-error"
-              message={errors.message?.message}
-            />
-
-            {replyUnknownGuard && authorityReady ? (
-              <Acknowledgement
-                checked={replyUnknownAcknowledged}
+              <div className="flex items-baseline justify-between gap-4">
+                <label
+                  className="text-sm font-medium"
+                  htmlFor="ticket-reply-message"
+                >
+                  回复工单
+                </label>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {message.length} / 10000
+                </span>
+              </div>
+              <textarea
+                id="ticket-reply-message"
+                rows={5}
+                className="min-h-28 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm leading-6 text-foreground outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20"
+                autoComplete="off"
                 disabled={actionDisabled}
-                onChange={setReplyUnknownAcknowledged}
+                aria-invalid={Boolean(errors.message)}
+                aria-describedby={
+                  errors.message
+                    ? 'ticket-reply-help ticket-reply-error'
+                    : 'ticket-reply-help'
+                }
+                {...messageField}
+                onChange={(event) => {
+                  void messageField.onChange(event)
+                  clearErrors('message')
+                  if (feedback?.kind === 'reply-validation') setFeedback(null)
+                  if (replyUnknownGuard) setReplyUnknownAcknowledged(false)
+                }}
+              />
+              <p
+                id="ticket-reply-help"
+                className="text-xs leading-5 text-muted-foreground"
               >
-                我已核对当前回复记录，仍需重新发送此回复。
-              </Acknowledgement>
-            ) : null}
+                请输入 1 至 10000 个字符，换行和空格会按原文提交。
+              </p>
+              <FieldError
+                id="ticket-reply-error"
+                message={errors.message?.message}
+              />
 
-            <Button type="submit" disabled={replyDisabled}>
-              {coordinator.activeAction === 'reply' ? (
-                <LoaderCircle
-                  className="size-4 animate-spin"
-                  aria-hidden="true"
-                />
+              {replyUnknownGuard && authorityReady ? (
+                <Acknowledgement
+                  checked={replyUnknownAcknowledged}
+                  disabled={actionDisabled}
+                  onChange={setReplyUnknownAcknowledged}
+                >
+                  我已核对当前回复记录，仍需重新发送此回复。
+                </Acknowledgement>
               ) : null}
-              {coordinator.activeAction === 'reply' ? '正在发送…' : '发送回复'}
-            </Button>
-          </form>
+
+              <Button type="submit" disabled={replyDisabled}>
+                {coordinator.activeAction === 'reply' ? (
+                  <LoaderCircle
+                    className="size-4 animate-spin"
+                    aria-hidden="true"
+                  />
+                ) : null}
+                {coordinator.activeAction === 'reply'
+                  ? '正在发送…'
+                  : '发送回复'}
+              </Button>
+            </form>
+          ) : (
+            <p className="text-sm leading-6 text-muted-foreground">
+              {replyTurn === 'waiting'
+                ? '已发送，等待技术支持回复后可继续回复。'
+                : '当前回复记录为空，暂时不能回复。'}
+            </p>
+          )}
 
           <div className="space-y-3 border-t border-border pt-5">
             {closeUnknownGuard && authorityReady ? (

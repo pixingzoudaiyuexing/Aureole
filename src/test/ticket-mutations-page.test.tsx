@@ -27,7 +27,7 @@ const ticket = {
   updatedAt: '2026-09-13T01:00:00.000Z',
 }
 
-const detail: TicketDetail = {
+const waitingDetail: TicketDetail = {
   ...ticket,
   messages: [
     {
@@ -37,6 +37,24 @@ const detail: TicketDetail = {
       createdAt: '2026-09-13T00:10:00.000Z',
     },
   ],
+}
+
+const replyableDetail: TicketDetail = {
+  ...waitingDetail,
+  messages: [
+    ...waitingDetail.messages,
+    {
+      id: '12',
+      content: 'Support response',
+      fromMe: false,
+      createdAt: '2026-09-13T00:20:00.000Z',
+    },
+  ],
+}
+
+const emptyDetail: TicketDetail = {
+  ...ticket,
+  messages: [],
 }
 
 function deferred<T>() {
@@ -55,7 +73,9 @@ function apiError(code: string, status = 502) {
 
 function installMocks() {
   const getList = vi.spyOn(ticketsApi, 'getList').mockResolvedValue([ticket])
-  const getDetail = vi.spyOn(ticketsApi, 'getDetail').mockResolvedValue(detail)
+  const getDetail = vi
+    .spyOn(ticketsApi, 'getDetail')
+    .mockResolvedValue(replyableDetail)
   const reply = vi
     .spyOn(ticketsApi, 'reply')
     .mockResolvedValue({ replied: true })
@@ -87,11 +107,17 @@ function renderSupport(queryClient: QueryClient = createQueryClient()) {
   return { queryClient, router, unmount: rendered.unmount }
 }
 
-async function openDetail(user = userEvent.setup()) {
+async function openDetailDialog(user = userEvent.setup()) {
   await user.click(
     await screen.findByRole('button', { name: /Connection issue/ }),
   )
   const dialog = await screen.findByRole('dialog')
+  return { dialog, user }
+}
+
+async function openDetail(user = userEvent.setup()) {
+  const opened = await openDetailDialog(user)
+  const { dialog } = opened
   const reply = await within(dialog).findByRole('textbox', {
     name: '回复工单',
   })
@@ -100,7 +126,7 @@ async function openDetail(user = userEvent.setup()) {
     dialog,
     reply,
     send: within(dialog).getByRole('button', { name: '发送回复' }),
-    user,
+    user: opened.user,
   }
 }
 
@@ -115,9 +141,104 @@ function expectLoggedOut(
 }
 
 describe('Support Ticket Detail authority and actions', () => {
+  it('blocks Reply when the user spoke last while preserving Close', async () => {
+    const mocks = installMocks()
+    mocks.getDetail.mockResolvedValue(waitingDetail)
+    renderSupport()
+    const { dialog } = await openDetailDialog()
+
+    expect(
+      within(dialog).getByText('已发送，等待技术支持回复后可继续回复。'),
+    ).toBeInTheDocument()
+    expect(
+      within(dialog).queryByRole('textbox', { name: '回复工单' }),
+    ).toBeNull()
+    expect(
+      within(dialog).queryByRole('button', { name: '发送回复' }),
+    ).toBeNull()
+    expect(
+      within(dialog).getByRole('button', { name: '关闭工单' }),
+    ).toBeEnabled()
+    expect(mocks.reply).not.toHaveBeenCalled()
+  })
+
+  it('allows Reply when technical support spoke last', async () => {
+    const mocks = installMocks()
+    renderSupport()
+    const form = await openDetail()
+
+    expect(form.reply).toBeEnabled()
+    expect(form.send).toBeEnabled()
+    expect(form.close).toBeEnabled()
+    expect(mocks.reply).not.toHaveBeenCalled()
+  })
+
+  it('fails closed for empty message history while preserving Close', async () => {
+    const mocks = installMocks()
+    mocks.getDetail.mockResolvedValue(emptyDetail)
+    renderSupport()
+    const { dialog } = await openDetailDialog()
+
+    expect(
+      within(dialog).getByText('当前回复记录为空，暂时不能回复。'),
+    ).toBeInTheDocument()
+    expect(
+      within(dialog).queryByRole('textbox', { name: '回复工单' }),
+    ).toBeNull()
+    expect(
+      within(dialog).queryByRole('button', { name: '发送回复' }),
+    ).toBeNull()
+    expect(
+      within(dialog).getByRole('button', { name: '关闭工单' }),
+    ).toBeEnabled()
+    expect(mocks.reply).not.toHaveBeenCalled()
+  })
+
+  it('blocks a stale Reply after authoritative Detail changes to user-last', async () => {
+    const mocks = installMocks()
+    const { queryClient } = renderSupport()
+    const form = await openDetail()
+    fireEvent.change(form.reply, { target: { value: 'stale reply' } })
+    const staleForm = form.send.closest('form')!
+
+    act(() => {
+      queryClient.setQueryData(ticketsQueryKeys.detail('7'), waitingDetail)
+      fireEvent.submit(staleForm)
+    })
+
+    expect(
+      await screen.findByText('已发送，等待技术支持回复后可继续回复。'),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '发送回复' })).toBeNull()
+    expect(screen.getByRole('button', { name: '关闭工单' })).toBeEnabled()
+    expect(mocks.reply).not.toHaveBeenCalled()
+  })
+
+  it('enables Reply when authoritative Detail changes to support-last', async () => {
+    const mocks = installMocks()
+    mocks.getDetail.mockResolvedValue(waitingDetail)
+    const { queryClient } = renderSupport()
+    const { dialog } = await openDetailDialog()
+    expect(
+      within(dialog).getByText('已发送，等待技术支持回复后可继续回复。'),
+    ).toBeInTheDocument()
+
+    act(() => {
+      queryClient.setQueryData(ticketsQueryKeys.detail('7'), replyableDetail)
+    })
+
+    expect(
+      await within(dialog).findByRole('textbox', { name: '回复工单' }),
+    ).toBeEnabled()
+    expect(
+      within(dialog).getByRole('button', { name: '发送回复' }),
+    ).toBeEnabled()
+    expect(mocks.reply).not.toHaveBeenCalled()
+  })
+
   it('does not expose mutation controls before the initial Detail succeeds', async () => {
     const mocks = installMocks()
-    const pending = deferred<typeof detail>()
+    const pending = deferred<typeof replyableDetail>()
     mocks.getDetail.mockReturnValue(pending.promise)
     renderSupport()
     const user = userEvent.setup()
@@ -131,7 +252,7 @@ describe('Support Ticket Detail authority and actions', () => {
     expect(mocks.reply).not.toHaveBeenCalled()
     expect(mocks.close).not.toHaveBeenCalled()
 
-    act(() => pending.resolve(detail))
+    act(() => pending.resolve(replyableDetail))
     expect(
       await screen.findByRole('button', { name: '发送回复' }),
     ).toBeEnabled()
@@ -140,7 +261,10 @@ describe('Support Ticket Detail authority and actions', () => {
 
   it('shows closed state without Reply or Close actions', async () => {
     const mocks = installMocks()
-    mocks.getDetail.mockResolvedValue({ ...detail, status: 'closed' })
+    mocks.getDetail.mockResolvedValue({
+      ...replyableDetail,
+      status: 'closed',
+    })
     renderSupport()
     const user = userEvent.setup()
     await user.click(
@@ -154,10 +278,10 @@ describe('Support Ticket Detail authority and actions', () => {
 
   it('disables actions for cached Detail during refetch and restores them only after success', async () => {
     const mocks = installMocks()
-    const pending = deferred<typeof detail>()
+    const pending = deferred<typeof replyableDetail>()
     mocks.getDetail.mockReturnValue(pending.promise)
     const queryClient = createQueryClient()
-    queryClient.setQueryData(ticketsQueryKeys.detail('7'), detail, {
+    queryClient.setQueryData(ticketsQueryKeys.detail('7'), replyableDetail, {
       updatedAt: 0,
     })
     renderSupport(queryClient)
@@ -172,7 +296,7 @@ describe('Support Ticket Detail authority and actions', () => {
     fireEvent.submit(send.closest('form')!)
     expect(mocks.reply).not.toHaveBeenCalled()
 
-    act(() => pending.resolve(detail))
+    act(() => pending.resolve(replyableDetail))
     await waitFor(() => expect(send).toBeEnabled())
     expect(screen.getByRole('button', { name: '关闭工单' })).toBeEnabled()
   })
@@ -182,9 +306,9 @@ describe('Support Ticket Detail authority and actions', () => {
     mocks.getDetail
       .mockRejectedValueOnce(apiError('UPSTREAM_ERROR'))
       .mockRejectedValueOnce(apiError('UPSTREAM_ERROR'))
-      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce(replyableDetail)
     const queryClient = createQueryClient()
-    queryClient.setQueryData(ticketsQueryKeys.detail('7'), detail, {
+    queryClient.setQueryData(ticketsQueryKeys.detail('7'), replyableDetail, {
       updatedAt: 0,
     })
     renderSupport(queryClient)
@@ -207,9 +331,9 @@ describe('Support Ticket Detail authority and actions', () => {
 
   it('checks authority again when a background Detail refetch starts with action UI open', async () => {
     const mocks = installMocks()
-    const refetch = deferred<typeof detail>()
+    const refetch = deferred<typeof replyableDetail>()
     mocks.getDetail
-      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce(replyableDetail)
       .mockReturnValueOnce(refetch.promise)
     const { queryClient } = renderSupport()
     const form = await openDetail()
@@ -226,7 +350,7 @@ describe('Support Ticket Detail authority and actions', () => {
     fireEvent.click(confirm)
     expect(mocks.reply).not.toHaveBeenCalled()
     expect(mocks.close).not.toHaveBeenCalled()
-    act(() => refetch.resolve(detail))
+    act(() => refetch.resolve(replyableDetail))
   })
 })
 
@@ -234,11 +358,11 @@ describe('Support Ticket Reply mutation', () => {
   it('preserves raw input, sends once for same-tick submits, locks Close, and reconciles without local append', async () => {
     const mocks = installMocks()
     const post = deferred<{ replied: true }>()
-    const recovery = deferred<typeof detail>()
+    const recovery = deferred<typeof replyableDetail>()
     const raw = ' first line\n<script>alert(1)</script> '
     mocks.reply.mockReturnValue(post.promise)
     mocks.getDetail
-      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce(replyableDetail)
       .mockReturnValueOnce(recovery.promise)
     renderSupport()
     const form = await openDetail()
@@ -269,9 +393,9 @@ describe('Support Ticket Reply mutation', () => {
 
     act(() =>
       recovery.resolve({
-        ...detail,
+        ...replyableDetail,
         messages: [
-          ...detail.messages,
+          ...replyableDetail.messages,
           {
             id: '999',
             content: raw,
@@ -287,6 +411,13 @@ describe('Support Ticket Reply mutation', () => {
       ),
     ).toBeInTheDocument()
     expect(document.querySelector('script')).toBeNull()
+    expect(
+      screen.getByText('已发送，等待技术支持回复后可继续回复。'),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: '回复工单' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '发送回复' })).toBeNull()
+    expect(mocks.reply).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: '关闭工单' })).toBeEnabled()
   })
 
   it('keeps confirmed Reply success when Detail reconciliation fails and recovers with GET only', async () => {
@@ -297,9 +428,9 @@ describe('Support Ticket Reply mutation', () => {
       mutations: { retry: false },
     })
     mocks.getDetail
-      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce(replyableDetail)
       .mockRejectedValueOnce(apiError('UPSTREAM_ERROR'))
-      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce(replyableDetail)
     renderSupport(queryClient)
     const form = await openDetail()
     fireEvent.change(form.reply, { target: { value: 'confirmed reply' } })
@@ -408,18 +539,9 @@ describe('Support Ticket Reply mutation', () => {
       const mocks = installMocks()
       const submitted = 'same looking reply'
       mocks.reply.mockRejectedValue(error)
-      mocks.getDetail.mockResolvedValueOnce(detail).mockResolvedValueOnce({
-        ...detail,
-        messages: [
-          ...detail.messages,
-          {
-            id: '999',
-            content: submitted,
-            fromMe: true,
-            createdAt: '2026-09-13T01:00:01.000Z',
-          },
-        ],
-      })
+      mocks.getDetail
+        .mockResolvedValueOnce(replyableDetail)
+        .mockResolvedValueOnce(replyableDetail)
       renderSupport()
       const form = await openDetail()
       fireEvent.change(form.reply, { target: { value: submitted } })
@@ -454,8 +576,8 @@ describe('Support Ticket Reply mutation', () => {
     const mocks = installMocks()
     mocks.reply.mockRejectedValue(apiError('UPSTREAM_ERROR'))
     mocks.getDetail
-      .mockResolvedValueOnce(detail)
-      .mockResolvedValueOnce({ ...detail, status: 'closed' })
+      .mockResolvedValueOnce(replyableDetail)
+      .mockResolvedValueOnce({ ...replyableDetail, status: 'closed' })
     renderSupport()
     const form = await openDetail()
     fireEvent.change(form.reply, { target: { value: 'uncertain reply' } })
@@ -476,10 +598,10 @@ describe('Support Ticket Reply mutation', () => {
     const readError = apiError('UPSTREAM_ERROR')
     mocks.reply.mockRejectedValue(apiError('NETWORK_ERROR', 0))
     mocks.getDetail
-      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce(replyableDetail)
       .mockRejectedValueOnce(readError)
       .mockRejectedValueOnce(readError)
-      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce(replyableDetail)
     const queryClient = createQueryClient()
     queryClient.setDefaultOptions({
       queries: {
@@ -544,10 +666,10 @@ describe('Support Ticket Close mutation', () => {
   it('requires confirmation, restores focus on cancel, sends once, and waits for authoritative closed Detail', async () => {
     const mocks = installMocks()
     const post = deferred<{ closed: true }>()
-    const recovery = deferred<typeof detail>()
+    const recovery = deferred<typeof replyableDetail>()
     mocks.close.mockReturnValue(post.promise)
     mocks.getDetail
-      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce(replyableDetail)
       .mockReturnValueOnce(recovery.promise)
     renderSupport()
     const form = await openDetail()
@@ -575,7 +697,7 @@ describe('Support Ticket Close mutation', () => {
     expect(await screen.findByText('工单已关闭。')).toBeInTheDocument()
     expect(screen.getAllByText('处理中')).not.toHaveLength(0)
     expect(screen.queryByText('该工单已关闭。')).toBeNull()
-    act(() => recovery.resolve({ ...detail, status: 'closed' }))
+    act(() => recovery.resolve({ ...replyableDetail, status: 'closed' }))
     expect(await screen.findByText('该工单已关闭。')).toBeInTheDocument()
     expect(mocks.getDetail).toHaveBeenCalledTimes(2)
     expect(mocks.getList).toHaveBeenCalledTimes(2)
@@ -607,9 +729,9 @@ describe('Support Ticket Close mutation', () => {
       mutations: { retry: false },
     })
     mocks.getDetail
-      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce(replyableDetail)
       .mockRejectedValueOnce(apiError('UPSTREAM_ERROR'))
-      .mockResolvedValueOnce({ ...detail, status: 'closed' })
+      .mockResolvedValueOnce({ ...replyableDetail, status: 'closed' })
     renderSupport(queryClient)
     const form = await openDetail()
     await form.user.click(form.close)
@@ -655,8 +777,8 @@ describe('Support Ticket Close mutation', () => {
     const mocks = installMocks()
     mocks.close.mockRejectedValue(apiError('UPSTREAM_TIMEOUT', 504))
     mocks.getDetail
-      .mockResolvedValueOnce(detail)
-      .mockResolvedValueOnce({ ...detail, status: 'closed' })
+      .mockResolvedValueOnce(replyableDetail)
+      .mockResolvedValueOnce({ ...replyableDetail, status: 'closed' })
     renderSupport()
     const form = await openDetail()
     await form.user.click(form.close)
@@ -678,9 +800,9 @@ describe('Support Ticket Close mutation', () => {
       .mockRejectedValueOnce(apiError('NETWORK_ERROR', 0))
       .mockResolvedValueOnce({ closed: true })
     mocks.getDetail
-      .mockResolvedValueOnce(detail)
-      .mockResolvedValueOnce(detail)
-      .mockResolvedValueOnce({ ...detail, status: 'closed' })
+      .mockResolvedValueOnce(replyableDetail)
+      .mockResolvedValueOnce(replyableDetail)
+      .mockResolvedValueOnce({ ...replyableDetail, status: 'closed' })
     renderSupport()
     const form = await openDetail()
     await form.user.click(form.close)
@@ -714,9 +836,9 @@ describe('Support Ticket Close mutation', () => {
     })
     mocks.close.mockRejectedValue(apiError('MALFORMED_RESPONSE', 200))
     mocks.getDetail
-      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce(replyableDetail)
       .mockRejectedValueOnce(apiError('UPSTREAM_ERROR'))
-      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce(replyableDetail)
     renderSupport(queryClient)
     const form = await openDetail()
     await form.user.click(form.close)
@@ -776,7 +898,7 @@ describe('Support Ticket mutation Auth invalidation', () => {
     const mocks = installMocks()
     mocks.reply.mockRejectedValue(apiError('NETWORK_ERROR', 0))
     mocks.getDetail
-      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce(replyableDetail)
       .mockRejectedValueOnce(apiError('AUTH_FAILED', 401))
     const { queryClient, router } = renderSupport()
     const form = await openDetail()
@@ -794,7 +916,7 @@ describe('Support Ticket mutation Auth invalidation', () => {
     const mocks = installMocks()
     mocks.close.mockRejectedValue(apiError('UPSTREAM_ERROR'))
     mocks.getDetail
-      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce(replyableDetail)
       .mockRejectedValueOnce(apiError('AUTH_REQUIRED', 401))
     const { queryClient, router } = renderSupport()
     const form = await openDetail()
@@ -817,7 +939,7 @@ describe('Support Ticket mutation Auth invalidation', () => {
     })
     mocks.reply.mockRejectedValue(apiError('NETWORK_ERROR', 0))
     mocks.getDetail
-      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce(replyableDetail)
       .mockRejectedValueOnce(apiError('UPSTREAM_ERROR'))
       .mockRejectedValueOnce(apiError('AUTH_FAILED', 401))
     const { router } = renderSupport(queryClient)

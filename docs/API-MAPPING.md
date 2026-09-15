@@ -265,20 +265,27 @@
   `MALFORMED_RESPONSE`。Mutation key 是 content/credential/ID-free 的 `['tickets','reply']` 与
   `['tickets','close']`，均为 `retry:false`。
 - Reply/Close 只在 selected canonical Detail `isSuccess && !isFetching`、query fetch idle、Detail ID
-  与 selection 一致且 status 为 `open` 时可执行。该 authority 在按钮和最终 mutation function 两层检查；
+  与 selection 一致且 status 为 `open` 时可执行。Reply 还遵循 V2Board 的消息交替规则：authoritative
+  `messages` 必须非空，且最后一条 `fromMe === false`，即客服最后发言；用户最后发言时显示正常等待状态，
+  空消息历史 fail closed。Close 仍只要求 authoritative open Ticket，不受 Reply 轮次限制。
+- Reply/Close authority 在渲染和最终 mutation execution boundary 两层检查；Reply 最终边界会重新读取
+  exact canonical Detail cache 并核对最后一条 sender，防止后台 refetch 与 stale form submit 绕过 UI。
   initial/error/cached-refetch/fresh-refetch-failure/remount 都 fail closed。两个动作共享同步锁，最多一个
   same-tick POST；closed Detail 不提供 mutation 或 Reopen。
 - Reply success 清空 textarea，Close success 关闭 confirmation；两者随后只通过 GET Detail/List 对账，
   不 append message、生成 ID/time、改 status/updatedAt 或调用 `setQueryData`。Detail reconciliation
   failure 保留 confirmed success 并只开放 GET-only recovery；List failure 由 canonical List gate 继续
-  约束 Create。
+  约束 Create。成功 Reply 的 authoritative Detail 若返回新的最后一条 `fromMe === true`，UI 自动回到
+  等待客服状态，不能连续发送第二条 Reply。
 - `TICKET_REPLY_FAILED` / `TICKET_CLOSE_FAILED` 使用泛化文案并重新读取 Detail；`TICKET_NOT_FOUND`
   重新读取 List 且不本地删 row；Reply `VALIDATION_ERROR` 保留可编辑原文。所有边界的 Auth error 复用
-  sealed Session Core。
+  sealed Session Core。AUR-M10-004 runtime 观察到的新建 Ticket 立即 Reply 返回 409，是 V2Board
+  拒绝用户连续消息的正常业务规则；Solution 将该状态映射为 `TICKET_REPLY_FAILED`，不需要 Contract 变化。
 - Reply/Close 的 NETWORK_ERROR、UPSTREAM_TIMEOUT、UPSTREAM_ERROR、MALFORMED_RESPONSE 与
   non-ApiError 都是 UNKNOWN。Detail recovery 后只展示当前 open/closed 事实，不按 message 内容、数量、
-  ID、createdAt 或 status 做因果推断；open 状态再次执行相同 mutation 前需专用 acknowledgement，Close
-  还需标准 confirmation。Reply payload change 清除 acknowledgement；recovery failure 只允许 GET。
+  ID、createdAt 或 status 做因果推断；再次执行相同 mutation 前需专用 acknowledgement，Close 还需
+  authoritative open 状态与标准 confirmation，Reply 还需 authoritative non-empty messages 且客服最后
+  发言。Reply payload change 清除 acknowledgement；recovery failure 只允许 GET。
 - Reply message 仅在 form/active mutation memory 中存在，保持空格、换行与 HTML-like 文本原样；不进入
   storage、URL、Zustand、analytics、console、error metadata、Query/Mutation key。Detail 消息继续作为
   plain React text node 展示。
