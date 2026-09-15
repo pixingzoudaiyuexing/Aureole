@@ -7,7 +7,11 @@
 - Milestone 10: `IN PROGRESS`
 - AUR-M10-001R1: `COMPLETE`
 - AUR-M10-002: `COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT REVIEW PASS / FROZEN` (Code/config freeze SHA: `8890ba0e8325828e27d2234a3f8b242561fbe801`. Pre-independent-review code checkpoint: `bdaf39f4bbf462ab6729d86b83ea9afbf8421233` remains only as historical evidence.)
-- AUR-M10-003: `NOT STARTED / AUTHORIZED FOR PLANNING AND PREPARATION`
+- AUR-M10-003: `COMPLETE / PASS`
+- AUR-M10-004: `NOT STARTED / NOT AUTHORIZED`
+- AUR-M10-005: `NOT STARTED / NOT AUTHORIZED`
+- AUR-M10-006: `NOT STARTED / NOT AUTHORIZED`
+- Current evidence update: `2026-09-15`
 - Independent targeted review: `PASS`
 - Audit date: 2026-09-14
 - Aureole audit base: `a2366ea08bc579e1368d52aaf8b5b5ee72aac195`
@@ -16,11 +20,14 @@
 
 This document is the Launch Readiness evidence inventory for the Aureole hosted
 SPA. It records current evidence, missing evidence, safety boundaries and future
-validation plans. It does not declare Aureole launch-ready or production-verified.
+validation plans. AUR-M10-003 production staging Auth/Session and read-only L3
+verification is complete, but this does not declare Aureole fully launch-ready or
+authorize later mutation, financial, or final launch gates.
 
 No production API, account, payment provider, deployment, DNS, Cloudflare or
-server was accessed during this audit. The solution repository and Contract were
-read-only.
+server was accessed during the original AUR-M10-001 audit. Later authorized
+AUR-M10-003 execution established the deployment and Auth/read-only evidence
+recorded below. The solution repository and Contract remained read-only.
 
 ## Executive summary
 
@@ -30,15 +37,14 @@ parsers, local recovery UX and 47 automated test files. The AUR-M10-001 SAFE-A
 baseline passes with 1074 tests and a production build within the documented
 bundle budgets.
 
-The highest Aureole runtime evidence for business features is currently L2:
-controlled browser verification against local `/api/v1` mocks. The repository
-contains no evidence that the Aureole production deployment itself has completed
-Auth, read, mutation or financial flows. The pinned solution Contract records
-separate upstream runtime acceptance for selected Gateway/V2Board behavior, but
-that evidence does not prove the Aureole deployment, browser integration, CORS,
-production environment or real provider path.
+The highest Aureole runtime evidence is now L3 for the AUR-M10-003 deployment,
+Auth/Session, and naturally page-driven read-only matrix. Gate 3 verified the
+Cloudflare Pages staging runtime; Gate 4 verified a real browser login, `/me`,
+same-tab session restoration, core authenticated reads, credential confinement,
+and logout. Mutation and financial features remain at L2 unless separately noted.
 
-The principal launch blockers remain actual production deployment and integration evidence.
+The principal remaining launch blockers are the separately scoped mutation,
+payment/financial, broader browser, rollback-drill, and final launch decisions.
 
 ### Current Application/Artifact Contract (AUR-M10-002):
 
@@ -50,23 +56,27 @@ The principal launch blockers remain actual production deployment and integratio
 - security-header/CSP baseline contract is established.
 - artifact verification and deterministic source SHA release identity exist.
 - Tailwind docs scanning isolation is rigorously proven.
+- verified Cloudflare Pages staging application SHA: `1cd18e6a57e775b21d89b951074a44a687ececfc`.
+- verified active deployment ID: `7f379046-49ab-454d-b7ed-dd2ba8abf9df`.
+- staging project: `aureole-cc-staging-3dc609`.
+- staging URL: `https://aureole-cc-staging-3dc609.pages.dev`.
 
-### Unresolved Production State (NOT VERIFIED):
+### Unresolved State Beyond AUR-M10-003:
 
-- actual production frontend hostname(s)
-- actual hosting/CDN provider selection
-- TLS termination
-- actual `/api/v1` edge/reverse-proxy route
-- applied production cache and security headers/CSP
-- actual deployed release SHA
-- production publish and rollback execution/drill
-- production Auth/read/mutation/financial runtime integration
+- active-subscription and accessUrl-present states were not available on the disposable account
+- conditional detail reads were not forced without a naturally safe ID
+- non-financial business mutation runtime verification
+- payment, wallet mutation, and financial runtime verification
+- rollback execution/drill
+- broader browser/device and final launch evidence
+- production uptime monitoring and request-ID correlation procedure
 
-A complete v1 launch must also close the production Auth/Session gate and make an
-explicit validation decision for exposed payment and financial mutations. Real
-financial testing is not automatically required if a provider sandbox or isolated
-test environment can prove the same integration. If those features remain exposed
-without such evidence, they remain a launch blocker.
+The production Auth/Session and read-only gate is closed by AUR-M10-003. A
+complete v1 launch must still make explicit validation decisions for exposed
+business mutations and payment/financial flows. Real financial testing is not
+automatically required if a provider sandbox or isolated test environment can
+prove the same integration. If those features remain exposed without such
+evidence, they remain a launch blocker.
 
 ## Evidence-level model
 
@@ -91,7 +101,7 @@ Rules:
 
 ## Safety-class model
 
-| Class       | Meaning                                                                                         | AUR-M10-001 execution                                |
+| Class       | Meaning                                                                                         | AUR-M10-001 audit execution                          |
 | ----------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | SAFE-A      | Local tests, source analysis, builds, dependency and mock-browser work with no production state | Allowed and executed where listed below              |
 | SAFE-B      | Production read-only requests that do not create, update or delete business state               | Planned only; not executed                           |
@@ -102,10 +112,16 @@ Login is classified as STATE-C because it can create an upstream session and
 update account login metadata. Promotion validation is SAFE-B despite using POST
 because the pinned Contract defines it as a non-reserving preview.
 
-## Complete feature evidence matrix
+Later AUR-M10-003 execution separately authorized one disposable-account login and
+the SAFE-B authenticated read matrix. No other STATE-C operation and no
+FINANCIAL-D operation was authorized or performed.
 
-`VERIFIED` below means only the evidence column in which it appears. All production
-entries refer to the deployed Aureole browser path, not only upstream Gateway code.
+## AUR-M10-001 Audit Feature Evidence Matrix (Historical)
+
+This matrix preserves the evidence state at the 2026-09-14 AUR-M10-001 audit
+checkpoint. `VERIFIED` means only the evidence column in which it appears. Current
+AUR-M10-003 production staging evidence is recorded after the matrix and supersedes
+the historical `NOT VERIFIED` values only for its exact authorized scope.
 
 | Feature                                       | Aureole route                                  | Public API route(s)                                                     | Read or mutation                  | Current level  | Automated tests                                                     | Controlled browser evidence                                                | Production runtime evidence  | Safety                                             | Launch blocker and required action                                                      | Notes                                                                            |
 | --------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------- | -------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
@@ -153,34 +169,48 @@ entries refer to the deployed Aureole browser path, not only upstream Gateway co
 | Withdrawal request                            | `/referrals`                                   | `POST /api/v1/referrals/withdrawal-requests`, recovery GET options      | Non-idempotent financial request  | L2             | VERIFIED: withdrawal, reload, concurrency and cross-session tests   | VERIFIED: account privacy, UNKNOWN, F5 and session isolation               | NOT VERIFIED                 | FINANCIAL-D                                        | BLOCKER if exposed; dedicated account and explicit authorization                        | Creates a request Ticket; no Public cancellation or payout status route.         |
 | Subscription content download                 | NOT APPLICABLE                                 | `GET /api/v1/access/subscription`                                       | Credential-bearing content read   | NOT APPLICABLE | VERIFIED absence in production source                               | VERIFIED historical absence of raw subscription fetch                      | NOT APPLICABLE to Aureole UI | NOT APPLICABLE                                     | Not a launch action for Aureole                                                         | Subscription clients, not the SPA, consume this route.                           |
 
-## Production runtime evidence gaps
+## Current Production Staging Runtime Evidence
 
-No Aureole feature currently has repository evidence at L3, L4 or L5. The following
-historical gaps remain real after checking current code, tests and the pinned
-Contract:
+AUR-M10-003 is `COMPLETE / PASS`. The following real deployed Aureole evidence is
+L3 within the exact authorized staging scope:
 
-- Production Aureole deployment, HTTPS, SPA navigation and `/api/v1` routing.
-- Production onboarding config, login, `/me`, refresh bootstrap, invalid-session
-  handling and local logout.
-- Production Products, Account Config, Subscription, Resources, Traffic, Notices,
-  Orders, Wallet, Tickets and Referrals reads.
+- deployed SHA, HTTPS/TLS, canonical SPA routing, security headers, cache behavior,
+  404 behavior, `/api/v1` Pages Function confinement, onboarding, and OPTIONS policy
+- real browser login and `GET /api/v1/me`
+- sessionStorage-only credential persistence and hard-refresh restoration
+- page-driven HTTP 200 reads for Account, Products, Subscription, Resources,
+  Traffic, Notices, Orders, Wallet, Tickets, Referrals, and Withdrawal Options
+- same-origin Bearer confinement, client-side logout, and post-logout protection
+
+The remaining runtime gaps are outside AUR-M10-003:
+
 - Production Order Create, Promotion Validation and Cancel.
 - Production billing methods, Checkout provider QR/redirect behavior, provider
   callback and final Order Status.
 - Production Rotate Access and Advance Period.
 - Production Wallet Deposit and Gift Card redemption.
-- Production Ticket List/Detail/Create/Reply/Close.
-- Production Referral Overview, Commission History, Withdrawal Options, Referral
-  Code Create, Commission Transfer and Withdrawal Request.
+- Production Ticket Detail/Create/Reply/Close; the page-driven Ticket List GET is verified.
+- Production Referral Code Create, Commission Transfer and Withdrawal Request;
+  Referral Overview, Commission History, and Withdrawal Options GETs are verified.
 - Real Google reCAPTCHA behavior if production onboarding enables it.
+
+For the AUR-M10-003 disposable account, `status = expired`, subscription
+eligibility was false, and `accessUrl` was absent. Active-subscription and
+accessUrl-present states remain non-blocking residual evidence and are not claimed
+as production-verified. Conditional detail GETs were not forced without a safe
+natural ID. `/api/v1/access/subscription` was never fetched.
 
 The pinned solution Contract includes selected upstream runtime acceptance for
 official V2Board compatibility, simulated payment callback, order state,
 subscription access and subscription byte parity. That is useful upstream evidence,
-but it does not prove the Aureole production host, environment, browser, CORS or
-current provider configuration.
+but it does not by itself prove the Aureole production host, environment, browser,
+CORS or current provider configuration.
 
-## Deployment readiness
+## AUR-M10-001 Deployment Readiness Snapshot (Historical)
+
+The table below preserves the 2026-09-14 audit checkpoint. Gate 3 later verified
+Cloudflare Pages hosting, HTTPS/TLS, explicit SPA routing, same-origin `/api/v1`,
+cache/security headers, 404 behavior, deployment identity, and release metadata.
 
 | Requirement                                 | Status                          | Evidence and action                                                                                                              |
 | ------------------------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
@@ -326,27 +356,27 @@ At the AUR-M10-001 audit checkpoint, Tailwind automatic candidate scanning inclu
 
 RESOLVED BY AUR-M10-002R1: automatic candidate detection is disabled with `source(none)`, production scanning is explicitly limited to root `index.html` and `src`, and controlled documentation-isolation testing proved that documentation changes no longer affect generated Tailwind CSS.
 
-## Browser and accessibility evidence
+## Browser and Accessibility Evidence
 
 | Area                  | Current evidence                                                       | Gap                                                                     |
 | --------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Desktop               | VERIFIED at 1280 x 720 across documented milestones                    | Historical controlled evidence, not current deployed production         |
+| Desktop               | VERIFIED historically and by deployed headless Chrome Auth/read smoke  | Full M10-006 deployed desktop matrix is not complete                    |
 | Mobile                | VERIFIED at 390 x 844 across documented milestones                     | No smaller general matrix and no production device evidence             |
-| Light/Dark            | VERIFIED broadly                                                       | Production host not verified                                            |
+| Light/Dark            | VERIFIED broadly                                                       | Full deployed theme matrix was not repeated in AUR-M10-003              |
 | System theme          | VERIFIED for later feature flows and theme infrastructure              | Not every historical flow explicitly repeated in System                 |
 | Keyboard/focus        | VERIFIED for navigation, Retry, dialogs, Escape and key mutation flows | No committed browser E2E suite                                          |
-| Loading/empty/error   | VERIFIED across feature page tests and controlled browser notes        | Production API latency/outage behavior not verified                     |
-| Auth refresh          | VERIFIED in controlled browser and automated tests                     | Production session/cookie/CORS environment not verified                 |
-| SPA navigation        | VERIFIED in controlled browser, including M9 pending mutation remounts | Static-host history fallback not verified                               |
+| Loading/empty/error   | Valid deployed empty states verified in AUR-M10-003                    | Production API latency/outage behavior not verified                     |
+| Auth refresh          | VERIFIED in deployed staging with `/me` restoration                    | Invalid-session production path was not deliberately induced            |
+| SPA navigation        | VERIFIED for canonical deep links and authenticated page navigation    | Trailing-slash public routes are a documented non-blocking 404          |
 | Financial full reload | VERIFIED for Commission Transfer and Withdrawal against local mocks    | Real network/provider continuation not verified                         |
 | Reduced motion        | CSS baseline and code evidence VERIFIED                                | Dedicated controlled-browser reduced-motion behavior is NOT VERIFIED    |
 | Cross-browser         | NOT VERIFIED                                                           | Evidence names Chrome/controlled browser; Safari and Firefox are absent |
 | Long text/overflow    | VERIFIED extensively at desktop/mobile                                 | Production localized/provider values may differ                         |
 
 There is no Playwright, Cypress, WebDriver or other committed browser automation
-configuration. The L2 evidence is documented historical controlled-browser work,
-not a reproducible repository command. This is a MEDIUM launch-evidence gap and
-should be addressed by targeted deployed smoke tests at minimum.
+configuration. AUR-M10-003 added real deployed Chrome runtime evidence, but it is
+not a reproducible repository command and does not provide Safari/Firefox or the
+full M10-006 browser matrix. This remains a MEDIUM launch-evidence gap.
 
 ## CI maintenance
 
@@ -376,7 +406,8 @@ Gaps:
 - No client error-reporting integration or documented privacy-safe console policy
   exists beyond absence of application logging.
 - ARTIFACT SOURCE IDENTITY: IMPLEMENTED via `dist/release.json`.
-- ACTUAL PRODUCTION DEPLOYED SHA: NOT VERIFIED.
+- ACTUAL STAGING DEPLOYED SHA: VERIFIED as `1cd18e6a57e775b21d89b951074a44a687ececfc`.
+- ACTIVE CLOUDFLARE PAGES DEPLOYMENT: `7f379046-49ab-454d-b7ed-dd2ba8abf9df`.
 - No production request-ID correlation procedure is documented.
 
 Classification: monitoring and SHA correlation are `MEDIUM` recommended before or
@@ -395,15 +426,21 @@ At AUR-M10-001 audit time, rollback readiness was entirely unverified.
 **Current Rollback State:**
 
 - vendor-neutral rollback contract: DEFINED in `DEPLOYMENT.md`.
-- provider-specific rollback command: UNKNOWN.
+- known provider rollback targets: RECORDED from Cloudflare Pages deployment history.
 - production rollback drill: NOT VERIFIED.
-- artifact registry/provider release history: UNKNOWN unless proven.
+- artifact registry/provider release history: VERIFIED for the three recorded Gate 3 deployments.
 
-Status: `CONTRACT READY / EXECUTION NOT VERIFIED`. This remains part of the deployment execution BLOCKER.
+Status: `TARGETS RECORDED / ROLLBACK DRILL NOT VERIFIED`. The drill remains in AUR-M10-006 scope.
 
 ## Production read-only verification plan
 
 No step in this section was executed by AUR-M10-001.
+
+AUR-M10-003 later executed the authorized hosting, onboarding, Auth/session,
+account/config, and core page-driven read scope. The active-subscription,
+accessUrl-present, conditional detail, representative Notice HTML, and
+deliberately induced invalid-session states were not forced and remain bounded
+residual evidence.
 
 | Plan                   | Prerequisites and account state                                                         | API/UI path                                                                                                       | Expected and authoritative verification                                                                                                               | Cleanup/side effects                                                          | Safety and approval                                           |
 | ---------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------- |
@@ -472,10 +509,10 @@ must remain `UNKNOWN` until the deployment owner supplies evidence.
 
 ### BLOCKER
 
-1. Production hosting and runtime configuration are unverified. While the application contract is ready, there is no verified host, HTTPS/fallback/proxy/applied cache/header execution, deployment command, or rollback drill execution.
+1. RESOLVED BY AUR-M10-003 GATE 3: Cloudflare Pages staging host, HTTPS/TLS, SPA routing, `/api/v1` confinement, cache/security headers, deployment identity, and rollback targets are verified. The rollback drill remains in AUR-M10-006.
 2. RESOLVED BY AUR-M10-002: Same-origin `/api/v1` default implemented. Artifact verification command implemented.
-3. No deployed Aureole Auth/Session evidence exists. Login, `/me`, refresh,
-   invalid-session handling and protected route behavior must pass before launch.
+3. RESOLVED BY AUR-M10-003 GATE 4: deployed browser login, `/me`, refresh
+   restoration, protected navigation, credential confinement, and logout passed.
 4. Full v1 exposes payment and financial mutations, but none has deployed Aureole
    runtime evidence. Payment callback/final Order Status and each exposed
    irreversible financial path must be validated in an approved environment or
@@ -484,13 +521,15 @@ must remain `UNKNOWN` until the deployment owner supplies evidence.
 ### HIGH
 
 1. RESOLVED BY AUR-M10-002: Same-origin `/api/v1` is the DEFAULT. Cross-origin is an explicit exception.
-2. Production read authorities required for mutation recovery are unverified:
-   Orders, Wallet, Subscription, Tickets, Referrals and Withdrawal Options.
+2. AUR-M10-003 verified the baseline Orders, Wallet, Subscription, Ticket List,
+   Referrals, Commission History, and Withdrawal Options GET authorities. Populated
+   mutation-recovery semantics remain unverified until their separately authorized
+   mutation phases.
 3. Non-financial destructive flows such as password change, Rotate Access and
    Advance Period have no production runtime evidence and limited/no rollback.
 4. Notice HTML has strong local sanitizer evidence but no representative production
    content verification.
-5. Security header/CSP CONTRACT exists, but actual production-applied headers remain NOT VERIFIED.
+5. RESOLVED BY AUR-M10-003 GATE 3: deployed CSP and required static security headers passed.
 
 ### RESOLVED BY AUR-M10-001R1
 
@@ -510,11 +549,11 @@ must remain `UNKNOWN` until the deployment owner supplies evidence.
    - controlled documentation-isolation proof passed
    - documentation-only changes no longer participate in Tailwind candidate scanning.
 
-2. Historical L2 browser evidence is extensive but no committed/reproducible
-   browser E2E suite exists; Safari/Firefox evidence is absent.
+2. AUR-M10-003 adds deployed Chrome evidence, but no committed/reproducible browser
+   E2E suite exists and Safari/Firefox evidence remains absent.
 3. There is no real initial-route analyzer or automated bundle budget gate.
-4. Production uptime, synthetic checks, production deployed SHA visibility and request-ID
-   correlation procedure are absent.
+4. Deployed SHA visibility is verified through `release.json`; production uptime,
+   recurring synthetic checks, and request-ID correlation procedure remain absent.
 5. Real reCAPTCHA remains unverified; it is non-blocking only while production
    onboarding does not enable that capability.
 
@@ -542,21 +581,23 @@ The audit findings justify this order rather than starting with production reads
 before a deployment contract exists:
 
 1. `AUR-M10-002 - Production Deployment Contract and Artifact Readiness`
-   - INDEPENDENT REVIEW REQUIRED FIXES APPLIED / INDEPENDENT RE-REVIEW PENDING.
+   - COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT REVIEW PASS / FROZEN.
 2. `AUR-M10-003 - Production Auth, Session and Read-Only Verification`
-   - Next proposed task.
-   - NOT STARTED / NOT AUTHORIZED.
-   - execute the SAFE-B matrix plus explicitly authorized login/session checks;
-   - verify request IDs, CORS/same-origin behavior and sensitive reads.
+   - COMPLETE / PASS.
+   - verified deployment/runtime Gate 3 plus explicitly authorized login,
+     sessionStorage, `/me`, page-driven reads, logout, and network boundaries.
 3. `AUR-M10-004 - Controlled Non-Financial Mutation Verification`
+   - NOT STARTED / NOT AUTHORIZED.
    - preferences, password, onboarding lifecycle, Rotate, Advance, Tickets and
      Referral Code with dedicated accounts and stated rollback limitations.
 4. `AUR-M10-005 - Payment, Wallet and Financial Runtime Verification`
+   - NOT STARTED / NOT AUTHORIZED.
    - provider environment decision;
    - Order/Checkout/callback/final status;
    - Deposit, Gift Card, Commission Transfer and Withdrawal under explicit
      per-operation authorization.
 5. `AUR-M10-006 - Final Browser, Rollback and Launch Gate`
+   - NOT STARTED / NOT AUTHORIZED.
    - deployed desktop/mobile/browser matrix;
    - cache/rollback drill and observability check;
    - final BLOCKER closure and release checklist.

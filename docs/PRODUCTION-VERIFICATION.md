@@ -1,8 +1,8 @@
-# Production Auth / Session and Read-Only Verification Plan (AUR-M10-003)
+# Production Auth / Session and Read-Only Verification Evidence (AUR-M10-003)
 
 ## 1. Scope
 
-This document defines the exact minimum evidence required for Production Auth, Session, and Read-Only core verification (AUR-M10-003) for Aureole. It uses the strict Public Contract SSOT (`0a37894173d1db0bbc57576c640652878f8f623d`) and the active TanStack Router definitions.
+This document records the completed Production Auth, Session, and Read-Only core verification (AUR-M10-003) for Aureole together with its original execution plan and historical evidence. It uses the strict Public Contract SSOT (`0a37894173d1db0bbc57576c640652878f8f623d`) and the active TanStack Router definitions.
 
 ## 2. Safety Boundary
 
@@ -48,20 +48,23 @@ Current Active Staging Deployment:
 `1cd18e6a57e775b21d89b951074a44a687ececfc` (`7f379046-49ab-454d-b7ed-dd2ba8abf9df`)
 
 Gate 4:
-NOT AUTHORIZED
+COMPLETE / PASS
 
 Authenticated Login:
-NOT PERFORMED
+COMPLETE / PASS
 
 Authenticated L3 Read Verification:
-NOT OBTAINED YET
+COMPLETE / PASS
+
+AUR-M10-003:
+COMPLETE / PASS
 
 - FINAL PRODUCTION LAUNCH HAS **NOT OCCURRED**.
 - GATE 3 IS **COMPLETE / PASS**.
-- GATE 4 IS **NOT AUTHORIZED**.
-- AUTHENTICATED ACCESS / LOGIN IS **NOT AUTHORIZED**.
-- AUTHENTICATED READ VERIFICATION IS **NOT AUTHORIZED**.
-- MUTATIONS ARE **NOT AUTHORIZED**.
+- GATE 4 IS **COMPLETE / PASS**.
+- AUTHENTICATED ACCESS / LOGIN VERIFICATION IS **COMPLETE / PASS**.
+- AUTHENTICATED READ VERIFICATION IS **COMPLETE / PASS**.
+- BUSINESS MUTATIONS BEYOND THE COMPLETED AUTHORIZED GATE 4 LOGIN ARE **NOT AUTHORIZED**.
 - FINANCIAL OPERATIONS ARE **NOT AUTHORIZED**.
 
 ## 3. Release SHA and Deployment Semantics
@@ -83,13 +86,14 @@ The Primary froze and approved the corrected Gate 3B deployment candidate before
 - The corrected candidate `1cd18e6a57e775b21d89b951074a44a687ececfc` was deployed as `7f379046-49ab-454d-b7ed-dd2ba8abf9df` and passed final Gate 3 runtime verification.
 - Gate 3A, Gate 3B, and aggregate Gate 3 are **COMPLETE / PASS**.
 - Final production launch has not occurred.
-- Authenticated Gate 4 verification has not occurred; no login or authenticated L3 read evidence has been obtained.
+- Gate 4 completed with an explicitly authorized disposable staging test account. Login, `/me`, session restoration, page-driven authenticated reads, logout, and post-logout credential clearing passed.
+- AUR-M10-003 is **COMPLETE / PASS**.
 
-Gate 3 PASS does not authorize Gate 4. Login, test-account use, authenticated reads, mutations, and financial operations require separate explicit Primary authorization.
+AUR-M10-003 completion does not authorize AUR-M10-004, AUR-M10-005, or AUR-M10-006. Business mutations and financial operations require separate explicit Primary authorization.
 
 ## 5. M10-003 Minimum Acceptance Evidence
 
-The minimum required evidence to pass M10-003 is:
+The minimum required evidence for M10-003 was completed:
 
 - **Infrastructure readiness:** deployment candidate exact SHA, `release.json` exact match, HTTPS, static routing, `/api/v1` routing, cache, security headers, rollback defined.
 - **Auth/session evidence:** authorized test account login, `/me` resolution, session restoration, logout, credential clearing.
@@ -254,7 +258,8 @@ Future actions require explicit staged authorization:
 3. **Gate 3A:** COMPLETE / PASS
 4. **Gate 3B:** COMPLETE / PASS
 5. **Gate 3:** COMPLETE / PASS
-6. **Gate 4:** NOT AUTHORIZED
+6. **Gate 4:** COMPLETE / PASS
+7. **AUR-M10-003:** COMPLETE / PASS
 
 No gate is automatically implied by the previous gate.
 
@@ -275,8 +280,8 @@ Gate 2 preparation is currently **COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT S
 _Gate 3A is COMPLETE / PASS._
 _Gate 3B is COMPLETE / PASS._
 _Aggregate Gate 3 is COMPLETE / PASS._
-_Gate 4 login remains NOT AUTHORIZED._
-_No authenticated L3 evidence has been obtained yet._
+_Gate 4 is COMPLETE / PASS._
+_Authenticated L3 evidence was obtained through the explicitly authorized staging verification._
 
 ## 15. Gate 2 Technical Checkpoints
 
@@ -383,7 +388,7 @@ The repository correction changes only the 13 explicit known-route proxy destina
 - Older Gate 3A deployment: `a93a03e9-7bd4-4a5d-ab65-54341b5cf764` at SHA `3dc60910b0d58a11bfff1ac77389def6f9c98455`.
 - No rollback was performed during Gate 3 closure.
 
-**Gate 4 Boundary:**
+**Gate 4 State at Gate 3 Closure (Historical):**
 
 - **Gate 4:** NOT AUTHORIZED
 - **Login:** NOT PERFORMED
@@ -393,3 +398,66 @@ The repository correction changes only the 13 explicit known-route proxy destina
 - **Financial Operations:** NOT AUTHORIZED
 
 Gate 3 PASS does not automatically authorize Gate 4.
+
+## 19. Final AUR-M10-003 Gate 4 Closure
+
+- **Gate 4:** COMPLETE / PASS
+- **AUR-M10-003:** COMPLETE / PASS
+- **Verified Deployed Application SHA:** `1cd18e6a57e775b21d89b951074a44a687ececfc`
+- **Active Cloudflare Pages Deployment ID:** `7f379046-49ab-454d-b7ed-dd2ba8abf9df`
+- **Project:** `aureole-cc-staging-3dc609`
+- **Staging URL:** `https://aureole-cc-staging-3dc609.pages.dev`
+
+**Gate 4 Runtime Findings (PASS):**
+
+- an explicitly authorized disposable test account was used
+- real browser `POST /api/v1/auth/login` returned HTTP 200 through the same-origin API boundary
+- a non-empty opaque Bearer credential was returned and stored only in `sessionStorage` under `aureole.auth.access-token`
+- no credential appeared in `localStorage`, cookies, URL, DOM, or console
+- `GET /api/v1/me` returned HTTP 200 and authenticated bootstrap completed
+- hard-refresh session restoration passed on `/dashboard` and `/subscription`
+- a separate new tab did not inherit sessionStorage and correctly returned to login
+- all authenticated application pages rendered without read errors or crashes
+- 16 naturally page-driven authenticated GET categories returned HTTP 200
+- Bearer credentials were confined to authenticated same-origin `/api/v1/*` requests
+- no browser request directly contacted solution or V2Board
+- client-side logout cleared the sessionStorage credential and produced no network mutation
+- protected navigation after logout returned to login without reusing the old Bearer
+- no unexpected business mutation occurred
+- `/api/v1/access/subscription` was never fetched
+- no raw token or credential-bearing subscription URL was disclosed
+
+**Authenticated GET Matrix (HTTP 200):**
+
+- `/api/v1/me`
+- `/api/v1/me/preferences`
+- `/api/v1/me/stats`
+- `/api/v1/wallet`
+- `/api/v1/products`
+- `/api/v1/orders`
+- `/api/v1/subscription`
+- `/api/v1/subscription/overview`
+- `/api/v1/resources`
+- `/api/v1/notices`
+- `/api/v1/tickets`
+- `/api/v1/traffic/logs`
+- `/api/v1/referrals`
+- `/api/v1/referrals/commissions`
+- `/api/v1/referrals/withdrawal-options`
+- `/api/v1/config/account`
+
+Conditional detail GETs were not forced because no safe natural ID was required by the page-driven verification.
+
+**Non-Blocking Subscription Coverage Limitation:**
+
+The disposable account reported `status = expired`, subscription eligibility was false, and `accessUrl` was absent. Active-subscription and accessUrl-present states were not exercised and are not claimed as production-verified. This did not block the defined minimum AUR-M10-003 acceptance.
+
+**Mutation Boundary:**
+
+The only authorized mutation during Gate 4 was `POST /api/v1/auth/login`. Logout was client-side and produced no network mutation. No business mutation or financial operation was performed.
+
+- **AUR-M10-004:** NOT STARTED / NOT AUTHORIZED
+- **AUR-M10-005:** NOT STARTED / NOT AUTHORIZED
+- **AUR-M10-006:** NOT STARTED / NOT AUTHORIZED
+
+The current repository documentation HEAD is newer than the verified deployed application SHA because subsequent commits are documentation-only. The documentation HEAD must not be described as the deployed application SHA.

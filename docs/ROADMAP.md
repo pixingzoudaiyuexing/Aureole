@@ -125,7 +125,7 @@ AUR-M10-001R1 COMPLETE。
 AUR-M10-002 COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT REVIEW PASS / FROZEN。
 AUR-M10-002 CODE/CONFIG FREEZE: `8890ba0e8325828e27d2234a3f8b242561fbe801` (Historical pre-independent-review code/config checkpoint `bdaf39f4bbf462ab6729d86b83ea9afbf8421233` remains only as historical evidence)。
 Milestone 10 IN PROGRESS。
-AUR-M10-003 IN PROGRESS
+AUR-M10-003 COMPLETE / PASS
 Gate 1: COMPLETE / PASS
 Gate 2: COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT SECURITY REVIEW PASS
 Gate 3A: COMPLETE / PASS
@@ -133,7 +133,11 @@ Gate 3B: COMPLETE / PASS
 Gate 3: COMPLETE / PASS
 Verified Gate 3 deployment SHA: `1cd18e6a57e775b21d89b951074a44a687ececfc`
 Active Cloudflare Pages deployment: `7f379046-49ab-454d-b7ed-dd2ba8abf9df`
-Gate 4: NOT AUTHORIZED
+Later documentation-only repository commits do not change the deployed application SHA.
+Gate 4: COMPLETE / PASS
+AUR-M10-004: NOT STARTED / NOT AUTHORIZED
+AUR-M10-005: NOT STARTED / NOT AUTHORIZED
+AUR-M10-006: NOT STARTED / NOT AUTHORIZED
 
 Milestone 9：COMPLETE / PASS / FROZEN。其代码冻结 SHA 为
 `e408f83311c3557706ac9fc09ac06fe754ea71b8`；后续 documentation closure commit 不改变该 code freeze SHA。
@@ -146,5 +150,5 @@ Milestone 10：IN PROGRESS。AUR-M10-001 Launch Readiness Evidence Inventory 为
 审计建议后续按实际依赖顺序拆分：AUR-M10-002 Production Deployment Contract and Artifact Readiness、
 AUR-M10-003 Production Auth/Session and Read-Only Verification、AUR-M10-004 Controlled Non-Financial Mutation
 Verification、AUR-M10-005 Payment/Wallet/Financial Runtime Verification、AUR-M10-006 Final Browser/Rollback/Launch
-Gate。AUR-M10-003 Gate 3 已完成；Gate 4 以及 AUR-M10-004 至 AUR-M10-006 均未启动，必须等待 Primary
-审核并分别授权。
+Gate。AUR-M10-003 已完成并通过；AUR-M10-004 至 AUR-M10-006 均未启动且未授权，必须等待 Primary
+分别审核和授权。

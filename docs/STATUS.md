@@ -525,7 +525,7 @@ financial operation. No business source code or solution file was changed.
   current evidence.
 - Production solution/V2Board Notice behavior is NOT TESTED; controlled mock
   browser and automated contract/security tests are the current evidence.
-- Hosting provider is undecided; production requires SPA fallback.
+- Cloudflare Pages staging routing, headers, cache, API confinement, and Auth/read-only runtime are verified through AUR-M10-003. Final launch and later mutation/financial phases remain separate decisions.
 
 ## Next milestone
 
@@ -534,7 +534,7 @@ Milestone 10 is IN PROGRESS.
 - AUR-M10-002 is COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT REVIEW PASS / FROZEN.
 - AUR-M10-002 CODE/CONFIG FREEZE: `8890ba0e8325828e27d2234a3f8b242561fbe801`
   (Historical pre-independent-review code/config checkpoint `bdaf39f4bbf462ab6729d86b83ea9afbf8421233` remains only as historical evidence)
-- AUR-M10-003: IN PROGRESS
+- AUR-M10-003: COMPLETE / PASS
   - Gate 1: COMPLETE / PASS
   - Gate 2: COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT SECURITY REVIEW PASS
   - Gate 3A: COMPLETE / PASS
@@ -542,6 +542,10 @@ Milestone 10 is IN PROGRESS.
   - Gate 3: COMPLETE / PASS
   - Verified deployment: `1cd18e6a57e775b21d89b951074a44a687ececfc`
     (`7f379046-49ab-454d-b7ed-dd2ba8abf9df`)
-  - Gate 4: NOT AUTHORIZED
+  - Gate 4: COMPLETE / PASS
 
-Gate 4 authenticated production testing remains NOT AUTHORIZED.
+- AUR-M10-004: NOT STARTED / NOT AUTHORIZED
+- AUR-M10-005: NOT STARTED / NOT AUTHORIZED
+- AUR-M10-006: NOT STARTED / NOT AUTHORIZED
+
+The verified deployed application remains `1cd18e6a57e775b21d89b951074a44a687ececfc`; newer repository commits are documentation-only and are not deployed application SHAs. Business mutation and financial runtime verification remain NOT AUTHORIZED.
