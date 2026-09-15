@@ -537,7 +537,11 @@ Milestone 10 is IN PROGRESS.
 - AUR-M10-003: IN PROGRESS
   - Gate 1: COMPLETE / PASS
   - Gate 2: COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT SECURITY REVIEW PASS
-  - Gate 3: NOT STARTED / PRIMARY AUTHORIZATION PENDING
+  - Gate 3A: COMPLETE / PASS
+  - Gate 3B: COMPLETE / PASS
+  - Gate 3: COMPLETE / PASS
+  - Verified deployment: `1cd18e6a57e775b21d89b951074a44a687ececfc`
+    (`7f379046-49ab-454d-b7ed-dd2ba8abf9df`)
   - Gate 4: NOT AUTHORIZED
 
-Actual production testing remains NOT AUTHORIZED.
+Gate 4 authenticated production testing remains NOT AUTHORIZED.

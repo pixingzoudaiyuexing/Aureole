@@ -128,7 +128,11 @@ Milestone 10 IN PROGRESS。
 AUR-M10-003 IN PROGRESS
 Gate 1: COMPLETE / PASS
 Gate 2: COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT SECURITY REVIEW PASS
-Gate 3: NOT STARTED / PRIMARY AUTHORIZATION PENDING
+Gate 3A: COMPLETE / PASS
+Gate 3B: COMPLETE / PASS
+Gate 3: COMPLETE / PASS
+Verified Gate 3 deployment SHA: `1cd18e6a57e775b21d89b951074a44a687ececfc`
+Active Cloudflare Pages deployment: `7f379046-49ab-454d-b7ed-dd2ba8abf9df`
 Gate 4: NOT AUTHORIZED
 
 Milestone 9：COMPLETE / PASS / FROZEN。其代码冻结 SHA 为
@@ -142,4 +146,5 @@ Milestone 10：IN PROGRESS。AUR-M10-001 Launch Readiness Evidence Inventory 为
 审计建议后续按实际依赖顺序拆分：AUR-M10-002 Production Deployment Contract and Artifact Readiness、
 AUR-M10-003 Production Auth/Session and Read-Only Verification、AUR-M10-004 Controlled Non-Financial Mutation
 Verification、AUR-M10-005 Payment/Wallet/Financial Runtime Verification、AUR-M10-006 Final Browser/Rollback/Launch
-Gate。除 AUR-M10-002 外，上述后续 Task 均未启动，必须等待 Primary 审核并分别授权。
+Gate。AUR-M10-003 Gate 3 已完成；Gate 4 以及 AUR-M10-004 至 AUR-M10-006 均未启动，必须等待 Primary
+审核并分别授权。
