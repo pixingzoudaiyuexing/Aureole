@@ -198,4 +198,33 @@ describe('CSP Hash Drift Verification', () => {
       'CSP hash mismatch',
     )
   })
+
+  it('CASE Q: data-x=foo/src=/fake.js → inline → missing hash FAIL', () => {
+    const fakeScript = `console.log("inline")`
+    const indexHtml = `<html><body><script data-x=foo/src=/fake.js>${fakeScript}</script></body></html>`
+    const headersContent = buildHeaders([])
+
+    expect(() => verifyCspHashes(indexHtml, headersContent)).toThrowError(
+      'CSP hash mismatch',
+    )
+  })
+
+  it('CASE R: data-x=foo/src=/fake.js → inline → correct hash PASS', () => {
+    const fakeScript = `console.log("inline")`
+    const indexHtml = `<html><body><script data-x=foo/src=/fake.js>${fakeScript}</script></body></html>`
+    const headersContent = buildHeaders([getHash(fakeScript)])
+
+    expect(() => verifyCspHashes(indexHtml, headersContent)).not.toThrow()
+  })
+
+  it('CASE S: genuine unquoted src → treated as external script', () => {
+    const inlineScript = `console.log('theme script');`
+    const indexHtml = `<html><body>
+      <script>${inlineScript}</script>
+      <script src=/assets/main.js></script>
+    </body></html>`
+    const headersContent = buildHeaders([getHash(inlineScript)])
+
+    expect(() => verifyCspHashes(indexHtml, headersContent)).not.toThrow()
+  })
 })

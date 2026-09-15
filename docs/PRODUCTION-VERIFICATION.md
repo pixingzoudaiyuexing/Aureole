@@ -9,7 +9,7 @@ This document defines the exact minimum evidence required for Production Auth, S
 **Current Status:**
 
 AUR-M10-003 GATE 1:
-PLAN ACCEPTED
+COMPLETE / PASS
 
 AUR-M10-003 GATE 2:
 COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT SECURITY REVIEW PASS
@@ -17,42 +17,65 @@ COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT SECURITY REVIEW PASS
 Independent Pages Adapter Security Review:
 PASS — PAGES ADAPTER SECURITY REVIEW
 
-Required Fixes:
+Pages Adapter Required Fixes:
 NONE
 
-Gate 3:
-NOT STARTED / PRIMARY AUTHORIZATION PENDING
+Gate 3A:
+PASS
+
+Gate 3A Deployed Candidate:
+`3dc60910b0d58a11bfff1ac77389def6f9c98455`
+
+Cloudflare Pages Staging Project:
+`aureole-cc-staging-3dc609`
+
+Staging URL:
+`https://aureole-cc-staging-3dc609.pages.dev`
+
+Gate 3B:
+REPOSITORY HARDENING COMPLETE / INDEPENDENT SECURITY REVIEW REQUIRED FIXES IN PROGRESS
+
+Current New Gate 3B Configuration:
+NOT DEPLOYED YET
+
+Current Deployed Staging Site Still Serves:
+`3dc60910b0d58a11bfff1ac77389def6f9c98455`
 
 Gate 4:
 NOT AUTHORIZED
 
-No L3 evidence obtained yet.
+Authenticated Login:
+NOT PERFORMED
 
-Cloudflare Pages deployment has NOT occurred yet.
+Authenticated L3 Read Verification:
+NOT OBTAINED YET
 
-- PRODUCTION DEPLOYMENT IS **NOT AUTHORIZED**.
-- PRODUCTION ACCESS / LOGIN IS **NOT AUTHORIZED**.
-- PRODUCTION READ VERIFICATION IS **NOT AUTHORIZED**.
-- PRODUCTION MUTATIONS ARE **NOT AUTHORIZED**.
+- FINAL PRODUCTION LAUNCH HAS **NOT OCCURRED**.
+- GATE 3B DEPLOYMENT IS **NOT AUTHORIZED**.
+- AUTHENTICATED ACCESS / LOGIN IS **NOT AUTHORIZED**.
+- AUTHENTICATED READ VERIFICATION IS **NOT AUTHORIZED**.
+- MUTATIONS ARE **NOT AUTHORIZED**.
 - FINANCIAL OPERATIONS ARE **NOT AUTHORIZED**.
 
 ## 3. Release SHA and Deployment Semantics
 
-Before deployment, the Primary will freeze one exact source commit as the **deployment candidate SHA**.
+Before Gate 3B deployment, the Primary will freeze one exact source commit as the **Gate 3B deployment candidate SHA** after implementation, tests, exact-SHA CI, Primary review, and targeted independent finding-closure re-review.
 
 - **Code/Config Freeze Checkpoint:** `8890ba0e8325828e27d2234a3f8b242561fbe801` (from AUR-M10-002).
-- **Deployment candidate SHA:** NOT YET SELECTED.
+- **Gate 3A Deployed Candidate:** `3dc60910b0d58a11bfff1ac77389def6f9c98455`.
+- **Gate 3B Deployment Candidate SHA:** NOT YET FROZEN BY PRIMARY.
+- **Current Gate 3B Review Base:** `4524b258449a236c1baee8f443bc2e9cc90d7b55`; this review base is not automatically the deployment candidate after the required-fix commit.
 - **`release.json` SHA:** Must equal the exact Git HEAD from which `npm run build:release` generates the artifacts.
 
-## 4. Existing-vs-New Deployment Decision Model
+## 4. Deployment State Model
 
-No production or production-equivalent Aureole deployment is currently documented and verified in repository evidence.
+- A Gate 3A Cloudflare Pages staging deployment exists and is verified for its authorized unauthenticated scope.
+- The deployed staging site currently serves `3dc60910b0d58a11bfff1ac77389def6f9c98455` at `https://aureole-cc-staging-3dc609.pages.dev`.
+- The Gate 3B hardened configuration has not been deployed or runtime-verified.
+- Final production launch has not occurred.
+- Authenticated Gate 4 verification has not occurred; no login or authenticated L3 read evidence has been obtained.
 
-The plan supports BOTH:
-A. The user already has a suitable deployment
-B. A new deployment must be created
-
-The Primary/User will determine which case applies. M10-003 execution depends entirely on the completion of **AUR-M10-002 Production Deployment Contract and Artifact Readiness** and cannot begin until an authenticated deployment is established and explicitly authorized by the Primary.
+Further deployment or authenticated execution requires explicit Primary authorization and the applicable gate to pass. Gate 3A evidence does not authorize Gate 3B deployment or Gate 4 login.
 
 ## 5. M10-003 Minimum Acceptance Evidence
 
@@ -219,7 +242,7 @@ Future actions require explicit staged authorization:
 1. **Gate 1:** COMPLETE / PASS
 2. **Gate 2:** COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT SECURITY REVIEW PASS
 3. **Gate 3A:** PASS
-4. **Gate 3B:** VERIFIER CLOSURE COMPLETE
+4. **Gate 3B:** REPOSITORY HARDENING COMPLETE / INDEPENDENT SECURITY REVIEW REQUIRED FIXES IN PROGRESS
 5. **Gate 4:** NOT AUTHORIZED
 
 No gate is automatically implied by the previous gate.
@@ -236,11 +259,12 @@ Gate 2 preparation is currently **COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT S
 - **API Namespace:** API Function strictly confined to `/api/v1` and `/api/v1/*`.
 - **SPA Routing:** Explicit SPA rewrites prepared (no wildcard HTML rewrites).
 - **404 Behavior:** Top-level `404.html` prepared in deployment artifact; expected missing-static-asset behavior is HTTP 404.
-- **Runtime Disclaimer:** Actual Cloudflare runtime behavior remains NOT VERIFIED until Gate 3.
+- **Runtime Evidence Boundary:** Gate 3A runtime behavior is verified only for its authorized unauthenticated scope; the new Gate 3B hardened configuration remains not deployed and not runtime-verified.
 
-_Gate 3 actual deployment verification remains NOT AUTHORIZED._
+_Gate 3A staging deployment exists and passed its authorized runtime scope._
+_Gate 3B deployment remains NOT AUTHORIZED._
 _Gate 4 login remains NOT AUTHORIZED._
-_No L3 evidence has been obtained yet._
+_No authenticated L3 evidence has been obtained yet._
 
 ## 15. Gate 2 Technical Checkpoints
 
@@ -275,4 +299,4 @@ _(Note: `ddf9322cf3577475e73e455fb587fcbfee48e014` is the independent-review HEA
 - Strict-Transport-Security (HSTS)
 - Permissions-Policy
 
-_(Note: The new Gate 3B headers are repository hardening in progress and have not been deployed or runtime-verified yet.)_
+_(Note: Gate 3B repository hardening is complete, independent security review required fixes are in progress, and the new Gate 3B configuration has not been deployed or runtime-verified.)_

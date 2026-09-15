@@ -38,7 +38,7 @@ function hasGenuineSrcAttribute(attrsString) {
           while (i < n && attrsString[i] !== quote) i++
           if (i < n) i++
         } else {
-          while (i < n && !/[\s/>]/.test(attrsString[i])) {
+          while (i < n && !/[\s>]/.test(attrsString[i])) {
             i++
           }
         }
