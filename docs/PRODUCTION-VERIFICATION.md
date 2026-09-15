@@ -33,13 +33,22 @@ Staging URL:
 `https://aureole-cc-staging-3dc609.pages.dev`
 
 Gate 3B:
-REPOSITORY HARDENING COMPLETE / INDEPENDENT SECURITY REVIEW REQUIRED FIXES IN PROGRESS
+RUNTIME REQUIRED FIXES
 
-Current New Gate 3B Configuration:
-NOT DEPLOYED YET
+Gate 3B Repository / Security Hardening:
+PASS
 
-Current Deployed Staging Site Still Serves:
-`3dc60910b0d58a11bfff1ac77389def6f9c98455`
+Gate 3B Runtime Attempt Candidate:
+`ce79eef9c99f23faf7f1e1054dc7e2454557e4b8`
+
+Gate 3B Runtime Attempt Deployment ID:
+`7ec2bc89-8253-4c9d-a4e2-a6967a557aee`
+
+Current Active Staging Deployment:
+`ce79eef9c99f23faf7f1e1054dc7e2454557e4b8` (`7ec2bc89-8253-4c9d-a4e2-a6967a557aee`)
+
+New Corrected Gate 3B Deployment Candidate:
+NOT YET FROZEN BY PRIMARY
 
 Gate 4:
 NOT AUTHORIZED
@@ -51,7 +60,7 @@ Authenticated L3 Read Verification:
 NOT OBTAINED YET
 
 - FINAL PRODUCTION LAUNCH HAS **NOT OCCURRED**.
-- GATE 3B DEPLOYMENT IS **NOT AUTHORIZED**.
+- FURTHER GATE 3B DEPLOYMENT IS **NOT AUTHORIZED**.
 - AUTHENTICATED ACCESS / LOGIN IS **NOT AUTHORIZED**.
 - AUTHENTICATED READ VERIFICATION IS **NOT AUTHORIZED**.
 - MUTATIONS ARE **NOT AUTHORIZED**.
@@ -59,23 +68,26 @@ NOT OBTAINED YET
 
 ## 3. Release SHA and Deployment Semantics
 
-Before Gate 3B deployment, the Primary will freeze one exact source commit as the **Gate 3B deployment candidate SHA** after implementation, tests, exact-SHA CI, Primary review, and targeted independent finding-closure re-review.
+Before a corrected Gate 3B deployment, the Primary will freeze one exact source commit as the **corrected Gate 3B deployment candidate SHA** after implementation, tests, exact-SHA CI, and Primary review.
 
 - **Code/Config Freeze Checkpoint:** `8890ba0e8325828e27d2234a3f8b242561fbe801` (from AUR-M10-002).
 - **Gate 3A Deployed Candidate:** `3dc60910b0d58a11bfff1ac77389def6f9c98455`.
-- **Gate 3B Deployment Candidate SHA:** NOT YET FROZEN BY PRIMARY.
-- **Current Gate 3B Review Base:** `4524b258449a236c1baee8f443bc2e9cc90d7b55`; this review base is not automatically the deployment candidate after the required-fix commit.
+- **Gate 3B Runtime Attempt Candidate:** `ce79eef9c99f23faf7f1e1054dc7e2454557e4b8`.
+- **Gate 3B Runtime Attempt Deployment ID:** `7ec2bc89-8253-4c9d-a4e2-a6967a557aee`.
+- **Corrected Gate 3B Deployment Candidate SHA:** NOT YET FROZEN BY PRIMARY.
 - **`release.json` SHA:** Must equal the exact Git HEAD from which `npm run build:release` generates the artifacts.
 
 ## 4. Deployment State Model
 
 - A Gate 3A Cloudflare Pages staging deployment exists and is verified for its authorized unauthenticated scope.
-- The deployed staging site currently serves `3dc60910b0d58a11bfff1ac77389def6f9c98455` at `https://aureole-cc-staging-3dc609.pages.dev`.
-- The Gate 3B hardened configuration has not been deployed or runtime-verified.
+- A Gate 3B runtime attempt deployed `ce79eef9c99f23faf7f1e1054dc7e2454557e4b8` as deployment `7ec2bc89-8253-4c9d-a4e2-a6967a557aee` to `https://aureole-cc-staging-3dc609.pages.dev`.
+- The Gate 3B runtime attempt passed release identity, TLS, security headers, cache behavior, missing-asset 404, Pages Function boundary, public onboarding, and OPTIONS policy checks.
+- Gate 3B remains **REQUIRED FIXES** because known SPA deep links returned `308 Location: /`, and trailing-slash forms returned 404.
+- The corrected Gate 3B deployment candidate is not yet frozen by the Primary.
 - Final production launch has not occurred.
 - Authenticated Gate 4 verification has not occurred; no login or authenticated L3 read evidence has been obtained.
 
-Further deployment or authenticated execution requires explicit Primary authorization and the applicable gate to pass. Gate 3A evidence does not authorize Gate 3B deployment or Gate 4 login.
+Further deployment or authenticated execution requires explicit Primary authorization and the applicable gate to pass. The Gate 3B runtime attempt does not authorize another deployment or Gate 4 login.
 
 ## 5. M10-003 Minimum Acceptance Evidence
 
@@ -242,7 +254,7 @@ Future actions require explicit staged authorization:
 1. **Gate 1:** COMPLETE / PASS
 2. **Gate 2:** COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT SECURITY REVIEW PASS
 3. **Gate 3A:** PASS
-4. **Gate 3B:** REPOSITORY HARDENING COMPLETE / INDEPENDENT SECURITY REVIEW REQUIRED FIXES IN PROGRESS
+4. **Gate 3B:** RUNTIME REQUIRED FIXES
 5. **Gate 4:** NOT AUTHORIZED
 
 No gate is automatically implied by the previous gate.
@@ -257,12 +269,12 @@ Gate 2 preparation is currently **COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT S
 - **Upstream:** solution staging upstream
 - **Configuration:** `SOLUTION_GATEWAY_ORIGIN` deployment configuration
 - **API Namespace:** API Function strictly confined to `/api/v1` and `/api/v1/*`.
-- **SPA Routing:** Explicit SPA rewrites prepared (no wildcard HTML rewrites).
+- **SPA Routing:** Explicit known-route SPA proxies only (no wildcard HTML rewrites); the runtime-attempt routing defect is corrected in the repository but awaits Primary review and a later authorized deployment.
 - **404 Behavior:** Top-level `404.html` prepared in deployment artifact; expected missing-static-asset behavior is HTTP 404.
-- **Runtime Evidence Boundary:** Gate 3A runtime behavior is verified only for its authorized unauthenticated scope; the new Gate 3B hardened configuration remains not deployed and not runtime-verified.
+- **Runtime Evidence Boundary:** Gate 3B runtime evidence covers only the named static, security, public onboarding, OPTIONS, and Pages Function checks. The routing patch has not been deployed or runtime-verified.
 
 _Gate 3A staging deployment exists and passed its authorized runtime scope._
-_Gate 3B deployment remains NOT AUTHORIZED._
+_Gate 3B runtime attempt completed with REQUIRED FIXES; another deployment remains NOT AUTHORIZED._
 _Gate 4 login remains NOT AUTHORIZED._
 _No authenticated L3 evidence has been obtained yet._
 
@@ -299,4 +311,39 @@ _(Note: `ddf9322cf3577475e73e455fb587fcbfee48e014` is the independent-review HEA
 - Strict-Transport-Security (HSTS)
 - Permissions-Policy
 
-_(Note: Gate 3B repository hardening is complete, independent security review required fixes are in progress, and the new Gate 3B configuration has not been deployed or runtime-verified.)_
+_(Note: These requirements passed during the Gate 3B runtime attempt described below. Gate 3B remains REQUIRED FIXES solely because the SPA deep-link proxy target caused redirects.)_
+
+## 17. Gate 3B Runtime Attempt Evidence
+
+- **Gate 3B Repository / Security Hardening:** PASS
+- **Runtime Attempt Candidate:** `ce79eef9c99f23faf7f1e1054dc7e2454557e4b8`
+- **Deployment ID:** `7ec2bc89-8253-4c9d-a4e2-a6967a557aee`
+- **Project Name:** `aureole-cc-staging-3dc609`
+- **Staging URL:** `https://aureole-cc-staging-3dc609.pages.dev`
+- **Gate 3B Runtime:** REQUIRED FIXES
+
+**Runtime Findings (PASS):**
+
+- exact release identity
+- TLS
+- CSP and security headers
+- hashed JavaScript and CSS immutable cache behavior
+- HTML and `release.json` revalidation safety
+- missing asset 404
+- Pages Function boundary
+- public onboarding
+- OPTIONS policy
+- no CSP console errors
+
+**Runtime Failure:**
+
+Direct requests to `/login`, `/register`, `/forgot-password`, `/dashboard`, and `/subscription` returned `308` with `Location: /`. Their trailing-slash forms returned 404. The deployed `public/_redirects` rules proxied each known SPA route to `/index.html`; Cloudflare Pages HTML canonicalization redirected that target to the canonical root path instead of serving the SPA document at the requested route.
+
+The repository correction changes only the 13 explicit known-route proxy destinations from `/index.html` to `/`. It does not add a wildcard, remove `public/404.html`, or change the `/api/v1` Pages Function boundary.
+
+- **Current Active Staging SHA:** `ce79eef9c99f23faf7f1e1054dc7e2454557e4b8`
+- **Current Active Staging Deployment:** `7ec2bc89-8253-4c9d-a4e2-a6967a557aee`
+- **Known Rollback Deployment:** `a93a03e9-7bd4-4a5d-ab65-54341b5cf764`
+- **Known Rollback SHA:** `3dc60910b0d58a11bfff1ac77389def6f9c98455`
+- **New Corrected Gate 3B Deployment Candidate:** NOT YET FROZEN BY PRIMARY
+- **Gate 4:** NOT AUTHORIZED

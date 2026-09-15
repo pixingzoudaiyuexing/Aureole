@@ -19,10 +19,6 @@ describe('Cloudflare Pages Routing Artifacts', () => {
 
   it('validates public/_redirects', async () => {
     const content = await fs.readFile('./public/_redirects', 'utf-8')
-
-    // Must NOT contain wildcard
-    expect(content).not.toMatch(/\/\*\s+\/index\.html\s+200/)
-
     const expectedRoutes = [
       '/dashboard',
       '/notices',
@@ -39,18 +35,34 @@ describe('Cloudflare Pages Routing Artifacts', () => {
       '/register',
     ]
 
-    const lines = content
+    const rules: Array<{
+      source: string
+      destination: string
+      status: string
+    }> = content
       .split('\n')
       .map((line: string) => line.trim())
-      .filter(Boolean)
+      .filter((line: string) => line && !line.startsWith('#'))
+      .map((line: string) => {
+        const fields = line.split(/\s+/)
+        expect(fields).toHaveLength(3)
 
-    for (const route of expectedRoutes) {
-      const match = lines.find(
-        (line: string) =>
-          line.startsWith(route + ' ') && line.includes('/index.html 200'),
-      )
-      expect(match).toBeDefined()
-    }
+        const [source, destination, status] = fields
+        return { source, destination, status }
+      })
+
+    expect(rules.map(({ source }) => source)).toEqual(expectedRoutes)
+    expect(new Set(rules.map(({ source }) => source)).size).toBe(
+      expectedRoutes.length,
+    )
+    expect(rules.every(({ destination }) => destination === '/')).toBe(true)
+    expect(rules.every(({ status }) => status === '200')).toBe(true)
+    expect(rules.some(({ destination }) => destination === '/index.html')).toBe(
+      false,
+    )
+    expect(rules.some(({ source }) => source.includes('*'))).toBe(false)
+
+    expect(rules).toHaveLength(expectedRoutes.length)
   })
 
   it('validates public/_headers', async () => {
