@@ -1,3 +1,4 @@
+import { verifyCspHashes } from './csp-verifier.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import { execSync } from 'node:child_process'
@@ -99,21 +100,11 @@ function verify() {
     }
   }
 
-  const scriptRegex = /<script>([\s\S]*?)<\/script>/
-  const match = indexHtml.match(scriptRegex)
-  if (!match) throw new Error('Inline script not found in index.html')
-  const inlineScript = match[1]
-  const hash = crypto.createHash('sha256').update(inlineScript).digest('base64')
-  const cspHash = `'sha256-${hash}'`
-
   const headersPath = path.join(dist, '_headers')
   if (!fs.existsSync(headersPath)) throw new Error('_headers missing in dist/')
   const headersContent = fs.readFileSync(headersPath, 'utf8')
-  if (!headersContent.includes(cspHash)) {
-    throw new Error(
-      `CSP hash mismatch: expected ${cspHash} in _headers but not found.`,
-    )
-  }
+
+  verifyCspHashes(indexHtml, headersContent)
   console.log('Artifact verification passed.')
 }
 
