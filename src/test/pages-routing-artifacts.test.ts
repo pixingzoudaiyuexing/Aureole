@@ -56,36 +56,105 @@ describe('Cloudflare Pages Routing Artifacts', () => {
   it('validates public/_headers', async () => {
     const content = await fs.readFile('./public/_headers', 'utf-8')
 
-    // /assets/* caching
-    expect(content).toMatch(
-      /\/assets\/\*[\s\S]+?Cache-Control:\s*public,\s*max-age=31536000,\s*immutable/i,
+    const parseHeaders = (text: string) => {
+      const lines = text.split('\n')
+      const blocks = new Map<string, string[]>()
+      let currentPath = ''
+
+      for (const line of lines) {
+        if (!line.trim() || line.startsWith('#')) continue
+        if (!line.startsWith(' ') && !line.startsWith('\t')) {
+          currentPath = line.trim()
+          if (!blocks.has(currentPath)) blocks.set(currentPath, [])
+        } else if (currentPath) {
+          blocks.get(currentPath)!.push(line.trim())
+        }
+      }
+      return blocks
+    }
+
+    const blocks = parseHeaders(content)
+
+    // Check /assets/*
+    const assetsBlock = blocks.get('/assets/*')
+    expect(assetsBlock).toBeDefined()
+    const assetsCacheControl = assetsBlock!.filter((l) =>
+      l.toLowerCase().startsWith('cache-control:'),
+    )
+    expect(assetsCacheControl.length).toBe(1)
+    expect(assetsCacheControl[0]).toMatch(
+      /public,\s*max-age=31536000,\s*immutable/i,
     )
 
-    // /release.json caching
-    expect(content).toMatch(
-      /\/release\.json[\s\S]+?Cache-Control:\s*public,\s*max-age=0,\s*must-revalidate/i,
+    // Check /release.json
+    const releaseBlock = blocks.get('/release.json')
+    expect(releaseBlock).toBeDefined()
+    const releaseCacheControl = releaseBlock!.filter((l) =>
+      l.toLowerCase().startsWith('cache-control:'),
+    )
+    expect(releaseCacheControl.length).toBe(1)
+    expect(releaseCacheControl[0]).toMatch(
+      /public,\s*max-age=0,\s*must-revalidate/i,
     )
 
-    // /* caching (index.html is covered by this)
-    expect(content).toMatch(
-      /\/\*[\s\S]+?Cache-Control:\s*public,\s*max-age=0,\s*must-revalidate/i,
+    // Check /index.html
+    const indexBlock = blocks.get('/index.html')
+    expect(indexBlock).toBeDefined()
+    const indexCacheControl = indexBlock!.filter((l) =>
+      l.toLowerCase().startsWith('cache-control:'),
+    )
+    expect(indexCacheControl.length).toBe(1)
+    expect(indexCacheControl[0]).toMatch(
+      /public,\s*max-age=0,\s*must-revalidate/i,
     )
 
-    // Security Headers
-    expect(content).toMatch(/X-Content-Type-Options:\s*nosniff/i)
-    expect(content).toMatch(
+    // Check /*
+    const globalBlock = blocks.get('/*')
+    expect(globalBlock).toBeDefined()
+    const globalCacheControl = globalBlock!.filter((l) =>
+      l.toLowerCase().startsWith('cache-control:'),
+    )
+    expect(globalCacheControl.length).toBe(0) // MUST NOT contain Cache-Control
+
+    const globalHeadersStr = globalBlock!.join('\n')
+    expect(globalHeadersStr).toMatch(/X-Content-Type-Options:\s*nosniff/i)
+    expect(globalHeadersStr).toMatch(
       /Referrer-Policy:\s*strict-origin-when-cross-origin/i,
     )
-    expect(content).toMatch(
+    expect(globalHeadersStr).toMatch(
       /Strict-Transport-Security:\s*max-age=31536000\b(?!.*includeSubDomains)(?!.*preload)/i,
     )
-    expect(content).toMatch(
+    expect(globalHeadersStr).toMatch(
       /Permissions-Policy:\s*camera=\(\),\s*microphone=\(\),\s*geolocation=\(\)/i,
     )
 
+    // Detect Future Broad Cache Overlap
+    // Fail if another broad wildcard rule is introduced that can apply Cache-Control to /assets/*
+    for (const [path, headers] of blocks.entries()) {
+      if (
+        path !== '/assets/*' &&
+        path !== '/release.json' &&
+        path !== '/index.html' &&
+        path !== '/*'
+      ) {
+        const hasCacheControl = headers.some((l) =>
+          l.toLowerCase().startsWith('cache-control:'),
+        )
+        if (hasCacheControl && path.includes('*')) {
+          // Simplistic overlap check for /assets/*
+          const cleanPath = path.replace('*', '')
+          if ('/assets/foo'.startsWith(cleanPath) || cleanPath === '/') {
+            throw new Error(
+              `Broad wildcard rule '${path}' overlaps with /assets/* and defines Cache-Control.`,
+            )
+          }
+        }
+      }
+    }
+
     // CSP
-    expect(content).toMatch(/Content-Security-Policy:/i)
-    const cspMatch = content.match(/Content-Security-Policy:\s*(.*)/i)
+    expect(globalHeadersStr).toMatch(/Content-Security-Policy:/i)
+    const cspMatch = globalHeadersStr.match(/Content-Security-Policy:\s*(.*)/i)
     expect(cspMatch).toBeDefined()
     const csp = cspMatch![1]
 

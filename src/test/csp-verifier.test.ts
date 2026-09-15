@@ -75,12 +75,78 @@ describe('CSP Hash Drift Verification', () => {
     expect(() => verifyCspHashes(indexHtml, headersContent)).not.toThrow()
   })
 
-  it('fails if no inline scripts are found', () => {
-    const indexHtml = `<html><body><script src="/assets/main.js"></script></body></html>`
-    const headersContent = buildHeaders([getHash('unused')])
+  it('CASE F: data-src inline script with no corresponding hash → MUST FAIL', () => {
+    const inlineScript1 = `console.log('theme script');`
+    const fakeScript = `console.log('inline');`
+    const indexHtml = `<html><body>
+      <script>${inlineScript1}</script>
+      <script data-src="/fake.js">${fakeScript}</script>
+    </body></html>`
+    const headersContent = buildHeaders([getHash(inlineScript1)])
 
     expect(() => verifyCspHashes(indexHtml, headersContent)).toThrowError(
-      'No inline scripts found in index.html, expected at least one.',
+      'CSP hash mismatch',
     )
+  })
+
+  it('CASE G: data-src inline script with correct hash → PASS', () => {
+    const fakeScript = `console.log('inline');`
+    const indexHtml = `<html><body>
+      <script data-src="/fake.js">${fakeScript}</script>
+    </body></html>`
+    const headersContent = buildHeaders([getHash(fakeScript)])
+
+    expect(() => verifyCspHashes(indexHtml, headersContent)).not.toThrow()
+  })
+
+  it('CASE H: genuine external script with SRC=... → treated as external script', () => {
+    const inlineScript = `console.log('theme script');`
+    const indexHtml = `<html><body>
+      <script>${inlineScript}</script>
+      <script SRC = "/assets/main.js"></script>
+    </body></html>`
+    const headersContent = buildHeaders([getHash(inlineScript)])
+
+    expect(() => verifyCspHashes(indexHtml, headersContent)).not.toThrow()
+  })
+
+  it('CASE I: x-src inline script with no corresponding hash → MUST FAIL', () => {
+    const fakeScript = `console.log('inline');`
+    const indexHtml = `<html><body>
+      <script x-src="/fake.js">${fakeScript}</script>
+    </body></html>`
+    // Missing hash
+    const headersContent = buildHeaders([])
+
+    expect(() => verifyCspHashes(indexHtml, headersContent)).toThrowError(
+      'CSP hash mismatch',
+    )
+  })
+
+  it('CASE J: one inline executable script with one correct hash and one stale hash → FAIL', () => {
+    const inlineScript = `console.log('theme script');`
+    const indexHtml = `<html><body><script>${inlineScript}</script></body></html>`
+    const staleHash = `'sha256-invalidhash='`
+    const headersContent = buildHeaders([getHash(inlineScript), staleHash])
+
+    expect(() => verifyCspHashes(indexHtml, headersContent)).toThrowError(
+      'stale/extra hash',
+    )
+  })
+
+  it('CASE K: two inline executable scripts and exactly two matching hashes → PASS', () => {
+    const inlineScript1 = `console.log('theme script');`
+    const inlineScript2 = `console.log('second script');`
+    const indexHtml = `<html><body>
+      <script>${inlineScript1}</script>
+      <script>${inlineScript2}</script>
+    </body></html>`
+    // Reverse order
+    const headersContent = buildHeaders([
+      getHash(inlineScript2),
+      getHash(inlineScript1),
+    ])
+
+    expect(() => verifyCspHashes(indexHtml, headersContent)).not.toThrow()
   })
 })

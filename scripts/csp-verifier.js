@@ -18,24 +18,34 @@ export function verifyCspHashes(indexHtml, headersContent) {
   const matches = [...indexHtml.matchAll(scriptRegex)]
 
   let inlineScriptCount = 0
+  const computedHashes = new Set()
 
   for (const m of matches) {
     const attrs = m[1]
     const body = m[2]
 
-    // External script
-    if (attrs.includes('src=')) {
+    // Genuine external script has a src attribute not prefixed by other characters
+    if (/(^|\s)src\s*=/i.test(attrs)) {
       continue
     }
 
-    // Fail closed if we cannot safely classify. For now, any script without src= is inline executable.
+    // Fail closed if we cannot safely classify. For now, any script without real src= is inline executable.
     inlineScriptCount++
     const hash = crypto.createHash('sha256').update(body).digest('base64')
     const cspHash = `'sha256-${hash}'`
+    computedHashes.add(cspHash)
 
     if (!allowedHashes.has(cspHash)) {
       throw new Error(
         `CSP hash mismatch: executable inline script with hash ${cspHash} not found in CSP script-src.`,
+      )
+    }
+  }
+
+  for (const allowedHash of allowedHashes) {
+    if (!computedHashes.has(allowedHash)) {
+      throw new Error(
+        `CSP hash mismatch: stale/extra hash ${allowedHash} in CSP script-src without a matching inline script.`,
       )
     }
   }
