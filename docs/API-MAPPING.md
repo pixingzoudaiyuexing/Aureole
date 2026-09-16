@@ -89,10 +89,11 @@
   当前显示 credential 仍只认 selected entry-access re-resolution。
   `accessUrl` 不进入 query key、storage、URL、Zustand、console 或 analytics；Aureole 不 probe、
   fetch 或解析 credential URL。
-- `POST /api/v1/subscription/advance-period` 是无 body 的非幂等周期 mutation。入口仅依据
-  authoritative Overview 的 `renewalAllowed` 功能开关；当前用户是否满足流量、reset policy 与
-  剩余有效期条件仍由 POST 最终判断，前端不计算 remaining traffic、使用百分比、剩余天数或
-  `canAdvance`。
+- `POST /api/v1/subscription/advance-period` 是无 body 的非幂等周期 mutation。只要 authenticated
+  Subscription Overview panel 可用，Advance action 始终显示；`renewalAllowed` 仅作为服务端返回的
+  信息字段展示，不控制 action visibility、enabled state 或是否允许尝试 POST。当前用户是否满足流量、
+  reset policy 与剩余有效期条件只由 POST 最终判断，前端不计算 remaining traffic、使用百分比、
+  剩余天数或 `canAdvance`。
 - Advance success 只接受 `advanced=true` 并 strip additive fields，随后只重新读取 canonical
   Overview；不本地归零 traffic、不修改 expiresAt/resetDay，也不刷新或伪造 Traffic History。
 - `SUBSCRIPTION_PERIOD_ADVANCE_DISABLED`、`SUBSCRIPTION_TRAFFIC_NOT_EXHAUSTED`、
@@ -101,8 +102,9 @@
   MALFORMED_RESPONSE 属于 UNKNOWN；不声明成功或失败、不自动重试，并在再次提交前要求核对状态与
   新的明确确认。
 - Advance 与 Rotate 共用 Subscription destructive-action synchronous lock。Advance 的权威读取
-  恢复失败时两类 destructive mutation 都 fail closed，直到手动 Overview read 成功；所有 Auth
-  failure 仍由 Session Core 清理 credential 与完整 Query cache。
+  恢复失败时两类 destructive mutation 都 fail closed，直到手动 Overview read 成功；Advance action
+  在 pending/shared lock/recovery block 期间仍可见但临时 disabled。所有 Auth failure 仍由 Session Core
+  清理 credential 与完整 Query cache。自动 Advance、timer、scheduler 或持久化偏好均未实现。
 
 ## Catalog, resources and traffic mapping
 

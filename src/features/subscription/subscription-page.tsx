@@ -69,7 +69,6 @@ function SubscriptionContent({ accessToken }: { accessToken: string }) {
               <DeviceAndPeriodDetails overview={overview.data} />
               <SubscriptionPeriodAdvancePanel
                 accessToken={accessToken}
-                overview={overview.data}
                 mutationCoordinator={mutationCoordinator}
               />
             </div>

@@ -54,6 +54,26 @@ and credential text, local QR, all import actions, selection reset and no horizo
 application console warning/error. This browser run used local mock Public API responses and is
 not production runtime evidence.
 
+## AUR-CF04 Advance Period Always-Visible Action
+
+Status: `IMPLEMENTATION COMPLETE / ENGINEERING REVIEW PENDING`.
+
+Advance Period now remains visible whenever the authenticated Subscription Overview panel is
+available. `renewalAllowed` remains a displayed Public DTO field but no longer controls action
+visibility, enabled state or whether the user may attempt the existing bodyless POST. Solution
+remains the final business eligibility authority. Shared mutation pending, Rotate/Advance lock and
+authoritative recovery failure continue to keep the visible action temporarily disabled without
+weakening UNKNOWN acknowledgement or reconciliation. Automatic Advance, timer, scheduler and
+persistent user preference are not implemented. Production runtime is `NOT TESTED` and no
+deployment was performed.
+
+Controlled local desktop-browser verification passed with mock Public API responses for
+`renewalAllowed=true` and `false`, confirmation, accepted POST, normalized business rejection,
+shared recovery block visibility/disabled state and manual recovery re-enablement. Three explicit
+Advance POSTs were observed across accepted, rejected and recovery-failure scenarios; raw upstream
+text was not rendered and the browser console had no application warning/error. This is local mock
+evidence, not production Solution/V2Board runtime evidence.
+
 ## Foundation status
 
 Milestone 2 is COMPLETE. Repository bootstrap, frontend foundation, app shell,

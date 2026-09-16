@@ -141,8 +141,8 @@ refetch；失败 key 不交给 observer 触发隐式重读。`422 SUBSCRIPTION_E
 
 Overview 只展示 Public Contract 原始字段。Byte formatting 与 absolute date formatting 仅是
 presentation；不得生成 remaining traffic、usage percentage、remaining days、expiry flag 或
-next reset date。`renewalAllowed` 只显示为“新周期功能已启用/未启用”，不表示当前用户可以执行
-Advance Period。
+next reset date。`renewalAllowed` 只显示为“新周期功能已启用/未启用”，不作为 Advance action 的
+visibility、enabled state 或 POST eligibility authority。
 
 AUR-M6-001 的 `POST /api/v1/subscription/rotate-access` 继续没有 request body、显式 `retry:false`，
 并使用 Subscription Page 共享 synchronous lock 防止 same-tick 重复提交。入口只依据当前 selected
@@ -167,8 +167,9 @@ Reveal/Copy/QR/Import 仍由 `accessUrl` keyed child 独立重置。Recovery blo
 AUR-M6-002 增加 bodyless `POST /api/v1/subscription/advance-period`，成功只接受
 `advanced=true`，additive fields 在 API boundary 被 strip。Advance 与 Rotate 共用同一个同步锁，
 因此任一 mutation pending 时另一个不能提交，same-tick 跨操作确认也最多产生一个 destructive
-POST。`renewalAllowed` 只控制功能入口，不表示用户当前一定有资格；流量耗尽、reset policy 与剩余
-有效期均不在前端计算，最终由 POST 权威判断。
+POST。Advance action 在 authenticated Overview panel 可用时始终渲染；`renewalAllowed` 不控制是否可尝试。
+流量耗尽、reset policy 与剩余有效期均不在前端计算，最终由 POST 权威判断。仅当 shared action pending、
+recovery failure 或 `recoveryBlocked` 使 mutation 暂时不安全时，visible action 才被 disabled。
 
 Advance 成功、四类 definitive error 与四类 UNKNOWN 均重新读取 canonical
 `['subscription', 'overview']`，不本地归零流量或修改到期时间。成功 POST 后的 GET 失败不改变
@@ -176,6 +177,7 @@ mutation 已成功的结论，但会 fail closed；UNKNOWN 不根据 Overview �
 要求新的专用 acknowledgement 才允许再次提交。任何 recovery read 失败都会同时禁止 Advance 与
 Rotate，直到手动 Overview read 成功；任一边界的 AUTH_REQUIRED/AUTH_FAILED 继续复用 Auth Session
 Core。Advance 不 invalidate Access 或 Traffic History，也不请求 subscription content。
+CF-04 不实现 automatic Advance、background timer、scheduler、feature flag 或 browser-storage preference。
 
 ## Read-only catalog, resources and traffic
 

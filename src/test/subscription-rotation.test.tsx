@@ -437,9 +437,12 @@ describe('Subscription access rotation', () => {
       ),
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /重置订阅地址/ })).toBeNull()
-    expect(
-      screen.queryByRole('button', { name: '提前进入下一周期' }),
-    ).toBeNull()
+    const advanceButton = screen.getByRole('button', {
+      name: '提前进入下一周期',
+    })
+    expect(advanceButton).toBeDisabled()
+    fireEvent.click(advanceButton)
+    expect(mocks.advancePeriod).not.toHaveBeenCalled()
     expect(mocks.rotateAccess).toHaveBeenCalledOnce()
     expect(mocks.advancePeriod).not.toHaveBeenCalled()
 
@@ -477,9 +480,12 @@ describe('Subscription access rotation', () => {
     await acknowledgeAndConfirm(first.dialog, first.user)
 
     expect(await screen.findByText('订阅地址重置未完成。')).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: '提前进入下一周期' }),
-    ).toBeNull()
+    const advanceButton = screen.getByRole('button', {
+      name: '提前进入下一周期',
+    })
+    expect(advanceButton).toBeDisabled()
+    fireEvent.click(advanceButton)
+    expect(mocks.advancePeriod).not.toHaveBeenCalled()
     expect(mocks.rotateAccess).toHaveBeenCalledOnce()
     expect(mocks.advancePeriod).not.toHaveBeenCalled()
   })
@@ -501,9 +507,12 @@ describe('Subscription access rotation', () => {
         '新订阅地址暂时无法重新读取，请恢复读取后再使用订阅功能。',
       ),
     ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: '提前进入下一周期' }),
-    ).toBeNull()
+    const advanceButton = screen.getByRole('button', {
+      name: '提前进入下一周期',
+    })
+    expect(advanceButton).toBeDisabled()
+    fireEvent.click(advanceButton)
+    expect(mocks.advancePeriod).not.toHaveBeenCalled()
     expect(mocks.rotateAccess).toHaveBeenCalledOnce()
     expect(mocks.advancePeriod).not.toHaveBeenCalled()
 
@@ -553,9 +562,10 @@ describe('Subscription access rotation', () => {
     expect(
       await screen.findByRole('button', { name: '重新读取订阅地址' }),
     ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: '提前进入下一周期' }),
-    ).toBeNull()
+    const advanceButton = screen.getByRole('button', {
+      name: '提前进入下一周期',
+    })
+    expect(advanceButton).toBeDisabled()
 
     await first.user.selectOptions(
       screen.getByRole('combobox', { name: '订阅入口' }),
@@ -565,9 +575,7 @@ describe('Subscription access rotation', () => {
     expect(
       screen.getByRole('button', { name: '重新读取订阅地址' }),
     ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: '提前进入下一周期' }),
-    ).toBeNull()
+    expect(advanceButton).toBeDisabled()
 
     await first.user.click(
       screen.getByRole('button', { name: '重新读取订阅地址' }),
@@ -678,9 +686,10 @@ describe('Subscription access rotation', () => {
       screen.getByText('请先重新选择可用的订阅入口，再重新读取订阅地址。'),
     ).toBeInTheDocument()
     expect(screen.queryByText(entryBCredentialUrl)).toBeNull()
-    expect(
-      screen.queryByRole('button', { name: '提前进入下一周期' }),
-    ).toBeNull()
+    const advanceButton = screen.getByRole('button', {
+      name: '提前进入下一周期',
+    })
+    expect(advanceButton).toBeDisabled()
 
     await first.user.click(
       await screen.findByRole('button', { name: '使用入口 2' }),

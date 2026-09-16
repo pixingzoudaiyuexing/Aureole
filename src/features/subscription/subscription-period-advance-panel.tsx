@@ -12,7 +12,6 @@ import {
 import { isInvalidSessionError } from '@/features/auth/auth-errors'
 import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invalid-session-error'
 import { ApiError } from '@/lib/api/errors'
-import type { SubscriptionOverview } from './subscription-api'
 import { isAmbiguousSubscriptionAdvanceError } from './subscription-errors'
 import type { SubscriptionMutationCoordinator } from './subscription-mutation-coordinator'
 import {
@@ -36,11 +35,9 @@ interface AdvanceFeedback {
 
 export function SubscriptionPeriodAdvancePanel({
   accessToken,
-  overview,
   mutationCoordinator,
 }: {
   accessToken: string
-  overview: SubscriptionOverview
   mutationCoordinator: SubscriptionMutationCoordinator
 }) {
   const queryClient = useQueryClient()
@@ -166,10 +163,8 @@ export function SubscriptionPeriodAdvancePanel({
 
   const recoveryFailed = feedback?.reconciled === false
   const actionBusy = mutationCoordinator.activeAction !== null
-  const canStartAdvance =
-    overview.renewalAllowed &&
-    !recoveryFailed &&
-    !mutationCoordinator.recoveryBlocked
+  const actionSafetyBlocked =
+    recoveryFailed || mutationCoordinator.recoveryBlocked
 
   return (
     <div className="space-y-4 border-t border-border pt-5">
@@ -179,12 +174,6 @@ export function SubscriptionPeriodAdvancePanel({
           此操作不是延长订阅。进入下一周期后，本周期流量使用记录会按服务端规则重置，到期时间也可能提前。
         </p>
       </div>
-
-      {!overview.renewalAllowed && feedback?.kind !== 'disabled' ? (
-        <p className="text-sm text-muted-foreground">
-          当前未开启提前进入下一周期。
-        </p>
-      ) : null}
 
       {feedback ? <AdvanceFeedbackMessage feedback={feedback} /> : null}
 
@@ -209,21 +198,19 @@ export function SubscriptionPeriodAdvancePanel({
           else closeConfirmation()
         }}
       >
-        {canStartAdvance ? (
-          <DialogTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={actionBusy}
-              onClick={() => setAcknowledged(false)}
-            >
-              <CalendarClock className="size-4" aria-hidden="true" />
-              {requiresResubmitAcknowledgement
-                ? '再次进入下一周期'
-                : '提前进入下一周期'}
-            </Button>
-          </DialogTrigger>
-        ) : null}
+        <DialogTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={actionBusy || actionSafetyBlocked}
+            onClick={() => setAcknowledged(false)}
+          >
+            <CalendarClock className="size-4" aria-hidden="true" />
+            {requiresResubmitAcknowledgement
+              ? '再次进入下一周期'
+              : '提前进入下一周期'}
+          </Button>
+        </DialogTrigger>
         <DialogContent
           className="max-w-lg"
           closeLabel="关闭周期确认"

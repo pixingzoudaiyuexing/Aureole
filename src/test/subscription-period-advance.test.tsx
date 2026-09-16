@@ -147,17 +147,25 @@ function expectLoggedOut(
 }
 
 describe('Subscription period advance', () => {
-  it('shows only server feature availability without deriving eligibility', async () => {
+  it('allows the backend to decide when renewalAllowed is false', async () => {
     const mocks = installMocks({ ...overview, renewalAllowed: false })
     renderSubscription()
+    const user = userEvent.setup()
 
+    expect(await screen.findByText('未启用')).toBeInTheDocument()
+    expect(screen.queryByText('当前未开启提前进入下一周期。')).toBeNull()
+    const advanceButton = screen.getByRole('button', {
+      name: '提前进入下一周期',
+    })
+    expect(advanceButton).toBeEnabled()
+
+    const { dialog } = await openAdvanceConfirmation('提前进入下一周期', user)
+    await acknowledgeAndConfirm(dialog, user)
+
+    expect(mocks.advancePeriod).toHaveBeenCalledOnce()
     expect(
-      await screen.findByText('当前未开启提前进入下一周期。'),
+      await screen.findByText('已进入下一周期，已重新读取最新订阅状态。'),
     ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: '提前进入下一周期' }),
-    ).toBeNull()
-    expect(mocks.advancePeriod).not.toHaveBeenCalled()
   })
 
   it('requires consequence acknowledgement and restores trigger focus', async () => {
@@ -165,6 +173,7 @@ describe('Subscription period advance', () => {
     renderSubscription()
     const { dialog, opener, user } = await openAdvanceConfirmation()
 
+    expect(opener).toBeEnabled()
     expect(mocks.advancePeriod).not.toHaveBeenCalled()
     expect(
       within(dialog).getByRole('heading', { name: '确认进入下一周期' }),
@@ -270,17 +279,18 @@ describe('Subscription period advance', () => {
         '操作已提交成功，但暂时无法读取最新订阅状态。请先重新读取订阅状态。',
       ),
     ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: '提前进入下一周期' }),
-    ).toBeNull()
+    const advanceButton = screen.getByRole('button', {
+      name: '提前进入下一周期',
+    })
+    expect(advanceButton).toBeDisabled()
+    fireEvent.click(advanceButton)
+    expect(mocks.advancePeriod).toHaveBeenCalledOnce()
     expect(screen.getByRole('button', { name: '重置订阅地址' })).toBeDisabled()
     expect(mocks.advancePeriod).toHaveBeenCalledOnce()
 
     await user.click(screen.getByRole('button', { name: '重新读取订阅状态' }))
 
-    expect(
-      await screen.findByRole('button', { name: '提前进入下一周期' }),
-    ).toBeInTheDocument()
+    expect(advanceButton).toBeEnabled()
     expect(screen.getByRole('button', { name: '重置订阅地址' })).toBeEnabled()
     expect(mocks.advancePeriod).toHaveBeenCalledOnce()
   })
@@ -311,6 +321,9 @@ describe('Subscription period advance', () => {
         .mockResolvedValueOnce(overview)
         .mockResolvedValueOnce(recoveredOverview)
       renderSubscription()
+      expect(
+        await screen.findByRole('button', { name: '提前进入下一周期' }),
+      ).toBeEnabled()
       const { dialog, user } = await openAdvanceConfirmation()
       await acknowledgeAndConfirm(dialog, user)
 
@@ -355,9 +368,12 @@ describe('Subscription period advance', () => {
       expect(
         await screen.findByRole('button', { name: '重新读取订阅状态' }),
       ).toBeInTheDocument()
-      expect(
-        screen.queryByRole('button', { name: '提前进入下一周期' }),
-      ).toBeNull()
+      const advanceButton = screen.getByRole('button', {
+        name: '提前进入下一周期',
+      })
+      expect(advanceButton).toBeDisabled()
+      fireEvent.click(advanceButton)
+      expect(mocks.advancePeriod).toHaveBeenCalledOnce()
       expect(
         screen.getByRole('button', { name: '重置订阅地址' }),
       ).toBeDisabled()
@@ -460,6 +476,12 @@ describe('Subscription period advance', () => {
         '当前订阅状态也暂时无法重新读取。请先重新读取订阅状态，避免重复操作。',
       ),
     ).toBeInTheDocument()
+    const advanceButton = screen.getByRole('button', {
+      name: '提前进入下一周期',
+    })
+    expect(advanceButton).toBeDisabled()
+    fireEvent.click(advanceButton)
+    expect(mocks.advancePeriod).toHaveBeenCalledOnce()
     expect(screen.getByRole('button', { name: '重置订阅地址' })).toBeDisabled()
     expect(mocks.advancePeriod).toHaveBeenCalledOnce()
 
@@ -469,7 +491,7 @@ describe('Subscription period advance', () => {
 
     expect(
       await screen.findByRole('button', { name: '再次进入下一周期' }),
-    ).toBeInTheDocument()
+    ).toBeEnabled()
     expect(screen.getByRole('button', { name: '重置订阅地址' })).toBeEnabled()
     expect(mocks.getOverview).toHaveBeenCalledTimes(3)
     expect(mocks.advancePeriod).toHaveBeenCalledOnce()
