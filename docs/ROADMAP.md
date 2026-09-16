@@ -1,18 +1,18 @@
 # Roadmap
 
-| Milestone | Status      | Scope                                                                    |
-| --------- | ----------- | ------------------------------------------------------------------------ |
-| 0         | COMPLETE    | Product framing and workflow baseline                                    |
-| 1         | COMPLETE    | solution Public Contract and upstream architecture baseline              |
-| 2         | COMPLETE    | Aureole repository, frontend foundation, app shell, quality and Git SSOT |
-| 3         | COMPLETE    | Auth / Account                                                           |
-| 4         | COMPLETE    | Read-only Core                                                           |
-| 5         | COMPLETE    | Commerce / Payment                                                       |
-| 6         | COMPLETE    | Subscription Mutations                                                   |
-| 7         | COMPLETE    | Wallet / Gift Card                                                       |
-| 8         | COMPLETE    | Support                                                                  |
-| 9         | COMPLETE    | Referral / Commission / Withdrawal                                       |
-| 10        | IN PROGRESS | Launch Readiness                                                         |
+| Milestone | Status   | Scope                                                                    |
+| --------- | -------- | ------------------------------------------------------------------------ |
+| 0         | COMPLETE | Product framing and workflow baseline                                    |
+| 1         | COMPLETE | solution Public Contract and upstream architecture baseline              |
+| 2         | COMPLETE | Aureole repository, frontend foundation, app shell, quality and Git SSOT |
+| 3         | COMPLETE | Auth / Account                                                           |
+| 4         | COMPLETE | Read-only Core                                                           |
+| 5         | COMPLETE | Commerce / Payment                                                       |
+| 6         | COMPLETE | Subscription Mutations                                                   |
+| 7         | COMPLETE | Wallet / Gift Card                                                       |
+| 8         | COMPLETE | Support                                                                  |
+| 9         | COMPLETE | Referral / Commission / Withdrawal                                       |
+| 10        | COMPLETE | Launch Readiness                                                         |
 
 ## Post-v1 Enhancements
 
@@ -119,12 +119,13 @@ recovery，执行边界直接 recheck MutationCache。该 same-runtime fact 不�
 runtime attempt registry 与 authenticated session generation：registry 在同 JS runtime 内跨 logout/query cache clear 保留 pending，
 generation mismatch 则禁止旧 Session continuation 清 marker、使用旧 token 对账、污染新 Session canonical cache、退出新 Session 或
 显示旧 outcome。logout/new login/Auth invalidation 对 marker 执行 active -> active、acknowledged -> active、absent -> absent；若 logout
-后 full reload 导致 registry 消失，persistent active 仍要求 fresh authority 和新 acknowledgement。Milestone 10 IN PROGRESS；
+后 full reload 导致 registry 消失，persistent active 仍要求 fresh authority 和新 acknowledgement。在该代码冻结
+checkpoint，Milestone 10 尚为 IN PROGRESS；
 AUR-M10-001 COMPLETE / PASS。
 AUR-M10-001R1 COMPLETE。
 AUR-M10-002 COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT REVIEW PASS / FROZEN。
 AUR-M10-002 CODE/CONFIG FREEZE: `8890ba0e8325828e27d2234a3f8b242561fbe801` (Historical pre-independent-review code/config checkpoint `bdaf39f4bbf462ab6729d86b83ea9afbf8421233` remains only as historical evidence)。
-Milestone 10 IN PROGRESS。
+在 AUR-M10-002 checkpoint，Milestone 10 为 IN PROGRESS。
 AUR-M10-003 COMPLETE / PASS
 Gate 1: COMPLETE / PASS
 Gate 2: COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT SECURITY REVIEW PASS
@@ -141,11 +142,12 @@ Verified Cloudflare Pages deployment: `dd7ff78c-efbd-4503-957e-619a9bb45433`
 AUR-M10-005: COMPLETE / PASS
 AUR-M10-005C1: PRIMARY / INDEPENDENT REVIEW PASS
 AUR-M10-005C3: RUNTIME PASS
-AUR-M10-006: AUTHORIZED / IN PROGRESS
+AUR-M10-006: COMPLETE / PASS
+Aureole v1: LAUNCH READY / NOT PRODUCTION DEPLOYED
 
 Milestone 9：COMPLETE / PASS / FROZEN。其代码冻结 SHA 为
 `e408f83311c3557706ac9fc09ac06fe754ea71b8`；后续 documentation closure commit 不改变该 code freeze SHA。
-Milestone 10：IN PROGRESS。AUR-M10-001 Launch Readiness Evidence Inventory 为
+Milestone 10：COMPLETE / PASS。AUR-M10-001 Launch Readiness Evidence Inventory 为
 `COMPLETE / PASS`，Audit SHA 为
 `5b2b994d50e8c2ac599681e1523a4a855054db3c`。完整证据矩阵、安全分类、部署阻塞项和生产验证计划记录于
 [`LAUNCH-READINESS.md`](LAUNCH-READINESS.md)。AUR-M10-001R1 只是 Documentation SSOT Reconciliation checkpoint，
@@ -156,4 +158,6 @@ AUR-M10-003 Production Auth/Session and Read-Only Verification、AUR-M10-004 Con
 Verification、AUR-M10-005 Payment/Wallet/Financial Runtime Verification、AUR-M10-006 Final Browser/Rollback/Launch
 Gate。AUR-M10-003、AUR-M10-004 与 AUR-M10-005 已完成并通过；M10-005 的真实付款、Gift Card、
 Commission Transfer 与 Withdrawal accepted 正向路径由 Owner 于 2026-09-16 手工确认，内部 callback payload/trace
-未由 Codex 直接捕获。AUR-M10-006 已获 staging-only 授权并进入最终浏览器、rollback 与 launch gate。
+未由 Codex 直接捕获。AUR-M10-006 已完成 deployed Chrome browser matrix、cache/artifact 验证、
+Cloudflare Pages staging rollback/restore drill、request-ID observability 与 final blocker review。Aureole v1 为
+LAUNCH READY，但 production deployment、DNS 与 Post-v1 工作均未执行。

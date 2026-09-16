@@ -458,7 +458,7 @@ The only authorized mutation during Gate 4 was `POST /api/v1/auth/login`. Logout
 
 - **AUR-M10-004:** COMPLETE / PASS
 - **AUR-M10-005:** COMPLETE / PASS
-- **AUR-M10-006:** AUTHORIZED / IN PROGRESS
+- **AUR-M10-006 at this historical checkpoint:** NOT STARTED / NOT AUTHORIZED
 
 At the M10-004 closure checkpoint, the repository documentation HEAD was newer than the verified deployed application SHA because that closure commit was documentation-only. Later application commits require their own exact-SHA deployment evidence and must not be described as deployed until verified.
 
@@ -468,7 +468,7 @@ At the M10-004 closure checkpoint, the repository documentation HEAD was newer t
 - **AUR-M10-002:** COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT REVIEW PASS / FROZEN
 - **AUR-M10-003:** COMPLETE / PASS
 - **AUR-M10-004:** COMPLETE / PASS
-- **Milestone 10:** IN PROGRESS
+- **Milestone 10 at this historical checkpoint:** IN PROGRESS
 - **Reviewed and Deployed Application SHA:** `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef`
 - **Cloudflare Pages Deployment ID:** `dd7ff78c-efbd-4503-957e-619a9bb45433`
 - **Deployment URL:** `https://dd7ff78c.aureole-cc-staging-3dc609.pages.dev`
@@ -514,7 +514,7 @@ All Aureole browser API traffic remained same-origin. Bearer credentials were co
 These state/environment constraints do not block the defined AUR-M10-004 acceptance and are not claimed as runtime-verified.
 
 - **AUR-M10-005:** COMPLETE / PASS
-- **AUR-M10-006:** AUTHORIZED / IN PROGRESS
+- **AUR-M10-006 at this historical checkpoint:** NOT STARTED / NOT AUTHORIZED
 
 The M10-004 R5 closure commit after `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef` was documentation-only. Later C1 application code and any docs-only descendants must each be distinguished from the deployed application SHA until an exact runtime release identity is verified.
 
@@ -547,4 +547,55 @@ These manual results are confirmed by the Owner and are not represented as Codex
 
 The combined evidence covers the exposed v1 payment/financial operations, authoritative reads, duplicate prevention, non-idempotent uncertainty handling and functional real-payment completion. Missing callback telemetry and mobile-provider behavior are retained as explicit residual evidence gaps for final launch review rather than fabricated closure evidence.
 
-- **AUR-M10-006:** AUTHORIZED / IN PROGRESS (staging only)
+- **AUR-M10-006 after this closure:** AUTHORIZED / IN PROGRESS (staging only)
+
+## 22. Final AUR-M10-006 Launch Gate Closure
+
+- **AUR-M10-006:** COMPLETE / PASS
+- **Milestone 10:** COMPLETE / PASS
+- **Aureole v1:** LAUNCH READY
+- **Production Deployment:** NOT PERFORMED / NOT AUTHORIZED BY THIS CLOSURE
+- **Active Staging Application SHA:** `71f24b88aab2d9ae569936494d3392ad9a5e4db7`
+- **Active Staging Deployment ID:** `4a17f147-192e-45c2-a23f-bc84d0f50ae5`
+- **Solution Frozen Baseline:** `1530acf1903d28480c66d85562392f63db5298d4`
+
+**Browser/device launch smoke:**
+
+- Deployed Desktop Chrome passed Login, session restoration, Dashboard, Subscription, Plans, Resources, Orders, Wallet, Notices, Support, Referrals, Settings, Light/Dark themes, Logout and protected-route redirect.
+- Deployed Chrome at `390 x 844` passed the same ten protected routes, responsive navigation drawer and horizontal-overflow checks.
+- No broken route chunk, application page error, sensitive URL state, browser direct Solution/V2Board API request, bearer outside same-origin `/api/v1`, Cookie auth dependency or unexpected business mutation was observed.
+- Payment presentation was not naturally available on the launch-smoke account because it had no pending Order; deployed Alipay/WxPay in-page QR presentation remains covered by AUR-M10-005C3.
+- Actual Safari, Firefox and physical-mobile execution were not available in the instrumented environment and remain explicit Owner device spot-checks. Playwright WebKit was not installed and was not presented as Safari evidence.
+
+**Cache/artifact and routing:**
+
+- `index.html`, application routes and `release.json` use `public, max-age=0, must-revalidate`.
+- Every JS/CSS asset referenced by the current `index.html` returned HTTP 200 with `public, max-age=31536000, immutable`.
+- `/login` deep-link, same-origin onboarding API, unknown-route 404 and missing-asset 404 passed.
+- Runtime `release.json` remained exact for `71f24b88aab2d9ae569936494d3392ad9a5e4db7`.
+
+**Staging rollback drill:**
+
+- Start: deployment `4a17f147-192e-45c2-a23f-bc84d0f50ae5`, SHA `71f24b88aab2d9ae569936494d3392ad9a5e4db7`.
+- Rollback: deployment `dd7ff78c-efbd-4503-957e-619a9bb45433`, SHA `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef`.
+- Restore: deployment `4a17f147-192e-45c2-a23f-bc84d0f50ae5`, SHA `71f24b88aab2d9ae569936494d3392ad9a5e4db7`.
+- HTTPS, root, `/login`, `/subscription`, onboarding API, missing-asset 404 and referenced asset availability passed at rollback and restore. Post-restore Login and `/me` returned HTTP 200.
+
+**Observability:**
+
+- Runtime Public errors include a privacy-safe request ID in the error envelope. Aureole `ApiError` preserves status, code, safe message and requestId.
+- Login, mutation and read error components can display `请求编号` without raw upstream payloads or credentials.
+- The Solution request ID uses Cloudflare request metadata where available, providing a support correlation key for Worker/provider investigation. Continuous synthetic uptime monitoring remains an operational recommendation, not an application blocker.
+
+**Accepted non-blocking residual risks:**
+
+- exact provider callback payload/trace was not directly captured by Codex; functional real payment is Owner manual PASS
+- mobile EPayQrcode provider behavior was not exercised
+- actual Safari, Firefox and physical-mobile device spot checks remain for the deployment owner
+- Rotate Access and Advance Period were not forced because the authoritative account was ineligible
+- real reCAPTCHA remains unexercised while the natural staging configuration is disabled
+- recurring uptime synthetic checks, an automated bundle-budget gate and favicon are post-closure operational/maintenance items
+
+**Final blocker review:** NO OPEN LAUNCH BLOCKER.
+
+This closure authorizes a production deployment recommendation only. It does not deploy production, change DNS, modify Solution/V2Board, perform a new financial transaction or start Post-v1 work.

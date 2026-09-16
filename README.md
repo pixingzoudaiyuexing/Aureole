@@ -49,4 +49,4 @@ npm run format:check # verify formatting
 - [Roadmap](docs/ROADMAP.md)
 - [Status](docs/STATUS.md)
 
-Production hosting must serve `index.html` for unknown application routes so direct navigation and refresh work for paths such as `/orders/123`. No hosting provider is selected yet.
+Cloudflare Pages staging is verified for the documented explicit SPA routes, static assets, `/api/v1` Functions boundary, cache/security headers and rollback. Production deployment remains a separate owner-authorized operation; Aureole v1 launch readiness does not mean production has been deployed.

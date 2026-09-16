@@ -180,3 +180,13 @@ The following aspects are currently NOT VERIFIED and must be resolved before a f
 - Actual production host and CDN configuration.
 - Production HTTPS and edge routing behavior.
 - Production Auth, Payment, and Financial mutations (require the production backend environment to validate).
+
+## 18. Verified Staging Rollback Drill
+
+On 2026-09-16 the existing Cloudflare Pages staging project `aureole-cc-staging-3dc609` completed a provider-supported rollback drill:
+
+- starting deployment: `4a17f147-192e-45c2-a23f-bc84d0f50ae5`, release `71f24b88aab2d9ae569936494d3392ad9a5e4db7`
+- rollback target: `dd7ff78c-efbd-4503-957e-619a9bb45433`, release `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef`
+- restored deployment: `4a17f147-192e-45c2-a23f-bc84d0f50ae5`, release `71f24b88aab2d9ae569936494d3392ad9a5e4db7`
+
+Both rollback and restore verified HTTPS, root/index, `/login`, `/subscription`, same-origin onboarding API, missing-asset 404 and every asset referenced by the deployed `index.html`. A post-restore Login plus `/me` smoke returned HTTP 200. Staging was not left on the rollback release. This evidence does not authorize or prove a production rollback.

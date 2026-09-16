@@ -4,13 +4,14 @@
 
 - Task: `AUR-M10-001`
 - Status: `COMPLETE / PASS`
-- Milestone 10: `IN PROGRESS`
+- Milestone 10: `COMPLETE / PASS`
 - AUR-M10-001R1: `COMPLETE`
 - AUR-M10-002: `COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT REVIEW PASS / FROZEN` (Code/config freeze SHA: `8890ba0e8325828e27d2234a3f8b242561fbe801`. Pre-independent-review code checkpoint: `bdaf39f4bbf462ab6729d86b83ea9afbf8421233` remains only as historical evidence.)
 - AUR-M10-003: `COMPLETE / PASS`
 - AUR-M10-004: `COMPLETE / PASS`
 - AUR-M10-005: `COMPLETE / PASS`
-- AUR-M10-006: `AUTHORIZED / IN PROGRESS`
+- AUR-M10-006: `COMPLETE / PASS`
+- Aureole v1: `LAUNCH READY / NOT PRODUCTION DEPLOYED`
 - Current evidence update: `2026-09-16`
 - Independent targeted review: `PASS`
 - Audit date: 2026-09-14
@@ -57,21 +58,20 @@ release checklist.
 - security-header/CSP baseline contract is established.
 - artifact verification and deterministic source SHA release identity exist.
 - Tailwind docs scanning isolation is rigorously proven.
-- verified Cloudflare Pages staging application SHA: `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef`.
-- verified active deployment ID: `dd7ff78c-efbd-4503-957e-619a9bb45433`.
+- verified Cloudflare Pages staging application SHA: `71f24b88aab2d9ae569936494d3392ad9a5e4db7`.
+- verified active deployment ID: `4a17f147-192e-45c2-a23f-bc84d0f50ae5`.
 - staging project: `aureole-cc-staging-3dc609`.
 - staging URL: `https://aureole-cc-staging-3dc609.pages.dev`.
 
-### Residual State After AUR-M10-005:
+### Accepted Residual State After AUR-M10-006:
 
 - active-subscription and accessUrl-present states were not available on the disposable account
 - conditional detail reads were not forced without a naturally safe ID
 - remaining state-constrained non-financial flows outside the completed AUR-M10-004 minimum
 - exact provider callback payload/trace was not directly captured by Codex, although functional real payment is Owner manual PASS
 - mobile EPayQrcode provider behavior remains unverified unless covered by an actual owner-device run
-- rollback execution/drill
-- broader browser/device and final launch evidence
-- production uptime monitoring and request-ID correlation procedure
+- actual Safari, Firefox and physical-mobile device spot checks
+- continuous uptime synthetic monitoring and automated bundle-budget enforcement
 
 The production Auth/Session and read-only gate is closed by AUR-M10-003. A
 complete v1 launch must still make explicit validation decisions for exposed
@@ -405,25 +405,25 @@ RESOLVED BY AUR-M10-002R1: automatic candidate detection is disabled with `sourc
 
 ## Browser and Accessibility Evidence
 
-| Area                  | Current evidence                                                       | Gap                                                                     |
-| --------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Desktop               | VERIFIED historically and by deployed headless Chrome Auth/read smoke  | Full M10-006 deployed desktop matrix is not complete                    |
-| Mobile                | VERIFIED at 390 x 844 across documented milestones                     | No smaller general matrix and no production device evidence             |
-| Light/Dark            | VERIFIED broadly                                                       | Full deployed theme matrix was not repeated in AUR-M10-003              |
-| System theme          | VERIFIED for later feature flows and theme infrastructure              | Not every historical flow explicitly repeated in System                 |
-| Keyboard/focus        | VERIFIED for navigation, Retry, dialogs, Escape and key mutation flows | No committed browser E2E suite                                          |
-| Loading/empty/error   | Valid deployed empty states verified in AUR-M10-003                    | Production API latency/outage behavior not verified                     |
-| Auth refresh          | VERIFIED in deployed staging with `/me` restoration                    | Invalid-session production path was not deliberately induced            |
-| SPA navigation        | VERIFIED for canonical deep links and authenticated page navigation    | Trailing-slash public routes are a documented non-blocking 404          |
-| Financial full reload | VERIFIED for Commission Transfer and Withdrawal against local mocks    | Real network/provider continuation not verified                         |
-| Reduced motion        | CSS baseline and code evidence VERIFIED                                | Dedicated controlled-browser reduced-motion behavior is NOT VERIFIED    |
-| Cross-browser         | NOT VERIFIED                                                           | Evidence names Chrome/controlled browser; Safari and Firefox are absent |
-| Long text/overflow    | VERIFIED extensively at desktop/mobile                                 | Production localized/provider values may differ                         |
+| Area                  | Current evidence                                                       | Gap                                                                    |
+| --------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Desktop               | VERIFIED by final deployed Chrome matrix across every protected route  | Actual Safari/Firefox remain owner-device spot checks                  |
+| Mobile                | VERIFIED by deployed Chrome at 390 x 844 across every protected route  | Physical mobile device evidence remains an owner-device spot check     |
+| Light/Dark            | VERIFIED in final deployed Chrome launch smoke                         | None for the defined v1 gate                                           |
+| System theme          | VERIFIED for later feature flows and theme infrastructure              | Not every historical flow explicitly repeated in System                |
+| Keyboard/focus        | VERIFIED for navigation, Retry, dialogs, Escape and key mutation flows | No committed browser E2E suite                                         |
+| Loading/empty/error   | Valid deployed empty states verified in AUR-M10-003                    | Production API latency/outage behavior not verified                    |
+| Auth refresh          | VERIFIED in deployed staging with `/me` restoration                    | Invalid-session production path was not deliberately induced           |
+| SPA navigation        | VERIFIED for canonical deep links and authenticated page navigation    | Trailing-slash public routes are a documented non-blocking 404         |
+| Financial full reload | VERIFIED for Commission Transfer and Withdrawal against local mocks    | Real network/provider continuation not verified                        |
+| Reduced motion        | CSS baseline and code evidence VERIFIED                                | Dedicated controlled-browser reduced-motion behavior is NOT VERIFIED   |
+| Cross-browser         | ACCEPTED RESIDUAL                                                      | Actual Safari/Firefox were unavailable in the instrumented environment |
+| Long text/overflow    | VERIFIED extensively at desktop/mobile                                 | Production localized/provider values may differ                        |
 
-There is no Playwright, Cypress, WebDriver or other committed browser automation
-configuration. AUR-M10-003 added real deployed Chrome runtime evidence, but it is
-not a reproducible repository command and does not provide Safari/Firefox or the
-full M10-006 browser matrix. This remains a MEDIUM launch-evidence gap.
+There is no committed browser E2E runner. M10-006 nevertheless completed a real deployed Desktop Chrome and responsive
+390 x 844 Chrome matrix across the ten protected routes, session restoration, themes, navigation, logout and payment-free
+network boundaries. Actual Safari/Firefox/physical-mobile checks remain explicit owner-device residuals and are not
+misrepresented as Chromium evidence.
 
 ## CI maintenance
 
@@ -453,12 +453,13 @@ Gaps:
 - No client error-reporting integration or documented privacy-safe console policy
   exists beyond absence of application logging.
 - ARTIFACT SOURCE IDENTITY: IMPLEMENTED via `dist/release.json`.
-- ACTUAL STAGING DEPLOYED SHA: VERIFIED as `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef`.
-- ACTIVE CLOUDFLARE PAGES DEPLOYMENT: `dd7ff78c-efbd-4503-957e-619a9bb45433`.
-- No production request-ID correlation procedure is documented.
+- ACTUAL STAGING DEPLOYED SHA: VERIFIED as `71f24b88aab2d9ae569936494d3392ad9a5e4db7`.
+- ACTIVE CLOUDFLARE PAGES DEPLOYMENT: `4a17f147-192e-45c2-a23f-bc84d0f50ae5`.
+- Runtime public errors expose a request ID; `ApiError`, read errors, Login and mutation feedback preserve/display it as a
+  privacy-safe support correlation key. The Solution derives it from Cloudflare request metadata where available.
 
-Classification: monitoring and SHA correlation are `MEDIUM` recommended before or
-immediately after launch. They do not justify adding analytics in this audit.
+Classification: request-ID correlation is resolved for v1. Continuous synthetic monitoring remains an accepted
+post-launch operational recommendation and does not justify adding analytics or a new monitoring stack in this gate.
 
 ## Rollback and recovery readiness
 
@@ -474,10 +475,13 @@ At AUR-M10-001 audit time, rollback readiness was entirely unverified.
 
 - vendor-neutral rollback contract: DEFINED in `DEPLOYMENT.md`.
 - known provider rollback targets: RECORDED from Cloudflare Pages deployment history.
-- production rollback drill: NOT VERIFIED.
+- staging rollback drill: VERIFIED on 2026-09-16.
 - artifact registry/provider release history: VERIFIED for the three recorded Gate 3 deployments.
 
-Status: `TARGETS RECORDED / ROLLBACK DRILL NOT VERIFIED`. The drill remains in AUR-M10-006 scope.
+The drill promoted `dd7ff78c-efbd-4503-957e-619a9bb45433` / `cd6bf73...`, verified release identity, HTTPS,
+root/application routes, same-origin onboarding API, missing-asset 404 and referenced assets, then restored
+`4a17f147-192e-45c2-a23f-bc84d0f50ae5` / `71f24b8...`. Post-restore Login and `/me` passed. Status:
+`STAGING ROLLBACK / RESTORE PASS`.
 
 ## Production read-only verification plan
 
@@ -556,7 +560,8 @@ must remain `UNKNOWN` until the deployment owner supplies evidence.
 
 ### BLOCKER
 
-1. RESOLVED BY AUR-M10-003 GATE 3: Cloudflare Pages staging host, HTTPS/TLS, SPA routing, `/api/v1` confinement, cache/security headers, deployment identity, and rollback targets are verified. The rollback drill remains in AUR-M10-006.
+1. RESOLVED BY AUR-M10-003/AUR-M10-006: Cloudflare Pages staging host, HTTPS/TLS, SPA routing, `/api/v1` confinement,
+   cache/security headers, deployment identity and provider rollback/restore drill are verified.
 2. RESOLVED BY AUR-M10-002: Same-origin `/api/v1` default implemented. Artifact verification command implemented.
 3. RESOLVED BY AUR-M10-003 GATE 4: deployed browser login, `/me`, refresh
    restoration, protected navigation, credential confinement, and logout passed.
@@ -593,11 +598,11 @@ must remain `UNKNOWN` until the deployment owner supplies evidence.
    - controlled documentation-isolation proof passed
    - documentation-only changes no longer participate in Tailwind candidate scanning.
 
-2. AUR-M10-003 adds deployed Chrome evidence, but no committed/reproducible browser
-   E2E suite exists and Safari/Firefox evidence remains absent.
+2. RESOLVED FOR THE V1 GATE by the final deployed Desktop/responsive Chrome matrix. Safari/Firefox/physical-mobile remain
+   documented owner-device residual checks because the instrumented environment did not provide them.
 3. There is no real initial-route analyzer or automated bundle budget gate.
-4. Deployed SHA visibility is verified through `release.json`; production uptime,
-   recurring synthetic checks, and request-ID correlation procedure remain absent.
+4. Deployed SHA visibility and request-ID support correlation are verified. Recurring synthetic uptime checks remain an
+   accepted operational recommendation.
 5. Real reCAPTCHA remains unverified; it is non-blocking only while production
    onboarding does not enable that capability.
 
@@ -643,13 +648,15 @@ before a deployment contract exists:
    - Owner manual verification dated 2026-09-16 passed real payment, Gift Card, Commission Transfer and Withdrawal accepted paths.
    - exact callback payload/trace was not directly captured by Codex.
 5. `AUR-M10-006 - Final Browser, Rollback and Launch Gate`
-   - AUTHORIZED / IN PROGRESS, staging only.
-   - deployed desktop/mobile/browser matrix;
-   - cache/rollback drill and observability check;
-   - final BLOCKER closure and release checklist.
+   - COMPLETE / PASS, staging only.
+   - deployed Desktop/responsive Chrome matrix: PASS.
+   - cache/artifact/history fallback/API confinement: PASS.
+   - Cloudflare Pages staging rollback and restore drill: PASS.
+   - request-ID observability and final blocker review: PASS.
+   - Aureole v1: LAUNCH READY / NOT PRODUCTION DEPLOYED.
 
-No follow-up task is authorized by this document. Primary must review and approve
-scope, accounts, environment and mutation permissions separately.
+Production deployment, DNS changes and Post-v1 work remain separately authorized operations. The named Post-v1 scope is
+Public Resource / Node Status.
 
 ## AUR-M10-001 scope confirmation
 
@@ -661,3 +668,25 @@ scope, accounts, environment and mutation permissions separately.
 - solution remained READ ONLY
 
 Status: `COMPLETE / PASS`.
+
+## Final v1 Release Checklist (AUR-M10-006)
+
+- Aureole application ancestor reviewed: `9294fc6baea1dca6483c17f20086b2258a53b1de`
+- active staging release: `71f24b88aab2d9ae569936494d3392ad9a5e4db7`
+- active staging deployment: `4a17f147-192e-45c2-a23f-bc84d0f50ae5`
+- solution frozen baseline: `1530acf1903d28480c66d85562392f63db5298d4`
+- exact-SHA CI, format, typecheck, lint, 1154 tests and production build: PASS
+- deployed Desktop Chrome and 390 x 844 responsive matrix: PASS
+- session restoration, themes, responsive navigation, logout and protected redirect: PASS
+- cache contract, release identity, route fallback, real 404 and `/api/v1` confinement: PASS
+- CSP, HSTS, Permissions-Policy, Referrer-Policy and nosniff: PASS
+- same-origin Bearer confinement, no Cookie dependency and no backend-origin leakage: PASS
+- M10-005 payment/financial evidence: COMPLETE / PASS with explicit Owner manual evidence classification
+- staging rollback target: `dd7ff78c-efbd-4503-957e-619a9bb45433` / `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef`
+- staging rollback and restoration to intended release: PASS
+- support correlation: request ID from Public error envelope, preserved by `ApiError` and shown by error UI
+- accepted manual residuals: actual Safari/Firefox/physical-mobile spot checks, mobile provider behavior and exact callback trace
+- production deployment and DNS: NOT PERFORMED / REQUIRE SEPARATE AUTHORIZATION
+- Post-v1 exclusion: Public Resource / Node Status
+
+**Final state:** `AUREOLE V1 LAUNCH READY / NOT PRODUCTION DEPLOYED`.

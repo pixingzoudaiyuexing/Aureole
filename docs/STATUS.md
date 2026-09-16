@@ -2,7 +2,9 @@
 
 ## Current milestone
 
-Milestone 10 - Launch Readiness (`IN PROGRESS`)
+Milestone 10 - Launch Readiness (`COMPLETE / PASS`)
+
+Aureole v1: `LAUNCH READY / NOT PRODUCTION DEPLOYED`
 
 ## Contract baseline
 
@@ -133,7 +135,7 @@ Status: `COMPLETE / PASS`.
 Audit SHA: `5b2b994d50e8c2ac599681e1523a4a855054db3c`.
 
 The AUR-M10-001R1 commit is a Documentation SSOT Reconciliation checkpoint only;
-it does not replace the original Audit SHA. Milestone 10 remains `IN PROGRESS`.
+it does not replace the original Audit SHA. At that checkpoint Milestone 10 remained `IN PROGRESS`; it is now `COMPLETE / PASS`.
 
 The Launch Readiness evidence SSOT is
 [`docs/LAUNCH-READINESS.md`](LAUNCH-READINESS.md). It inventories the complete v1
@@ -515,28 +517,29 @@ financial operation. No business source code or solution file was changed.
 - Production Referral Overview, Commission History, Withdrawal Options and Referral Code Create were verified in the
   authorized M10 runtime phases. Commission Transfer and Withdrawal accepted positive paths are
   `OWNER-REPORTED MANUAL RUNTIME EVIDENCE` dated 2026-09-16; Codex did not execute them or capture their private payloads.
-- Production solution/V2Board Ticket List, Detail, Create, Reply and Close behavior is
-  NOT TESTED; controlled mock browser and automated contract/privacy tests are the
-  current evidence.
+- Production Ticket List, Detail, Create, Reply and Close runtime passed AUR-M10-004, including the V2Board
+  user/support alternation rule and the greatest-message-ID Reply authority correction.
 - Production Order Create/Cancel, Payment Methods, internal-balance Checkout, redirect handoff, Alipay/WxPay in-page QR,
   polling and authoritative cleanup passed Codex-observed staging runtime. Real external payment completed successfully
   according to Owner manual verification dated 2026-09-16. Exact provider callback payload/trace was not directly captured
   by Codex and remains a support/observability residual rather than fabricated evidence.
 - Gift Card positive redemption is `OWNER-REPORTED MANUAL RUNTIME EVIDENCE` dated 2026-09-16. Code value, effect details,
   account values and request identifiers were not supplied or recorded.
-- Production solution/V2Board Subscription Access Rotation behavior is NOT
-  TESTED; controlled mock browser and automated Contract/privacy/recovery tests
-  are the current evidence.
-- Production solution/V2Board Advance Subscription Period behavior is NOT TESTED;
-  controlled mock browser and automated Contract/mutation/recovery tests are the
-  current evidence.
-- Production solution/V2Board Notice behavior is NOT TESTED; controlled mock
-  browser and automated contract/security tests are the current evidence.
-- Cloudflare Pages staging routing, headers, cache, API confinement, and Auth/read-only runtime are verified through AUR-M10-003. Final launch and later mutation/financial phases remain separate decisions.
+- Subscription Access Rotation and Advance Period remain state-constrained runtime residuals because the authorized
+  account was ineligible. Automated and controlled-browser authority/UNKNOWN safety evidence is accepted for launch;
+  these operations were not forced against server authority.
+- Representative production Notice HTML detail was not deliberately manufactured. The deployed route/list passed and
+  the DOMPurify boundary has automated/controlled security evidence; this is accepted as non-blocking.
+- Actual Safari, Firefox and physical-mobile runs remain owner-device spot checks. Deployed desktop and responsive-width
+  Chrome passed every protected route without overflow, route-chunk failure, auth loop or sensitive URL state.
+- Exact provider callback payload/trace was not captured by Codex. Functional real payment is Owner manual PASS and the
+  callback implementation/authority boundary remains V2Board-owned.
+- Continuous uptime synthetic monitoring and an automated bundle-budget gate are recommended operational follow-ups,
+  not v1 launch blockers.
 
-## Next milestone
+## Final milestone state
 
-Milestone 10 is IN PROGRESS.
+Milestone 10 is COMPLETE / PASS.
 
 - AUR-M10-002 is COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT REVIEW PASS / FROZEN.
 - AUR-M10-002 CODE/CONFIG FREEZE: `8890ba0e8325828e27d2234a3f8b242561fbe801`
@@ -570,8 +573,15 @@ Milestone 10 is IN PROGRESS.
   - C3 exact-SHA staging deployment and no-payment desktop Alipay/WxPay EPayQrcode runtime: PASS
   - Real external payment, Gift Card, Commission Transfer and Withdrawal accepted paths: OWNER MANUAL PASS (2026-09-16)
   - Exact provider callback payload/trace: NOT DIRECTLY CAPTURED BY CODEX
-- AUR-M10-006: AUTHORIZED / IN PROGRESS
+- AUR-M10-006: COMPLETE / PASS
+  - Deployed Desktop Chrome and 390 x 844 responsive Chrome matrix: PASS
+  - Actual Safari / physical mobile: NOT RUN / OWNER DEVICE SPOT-CHECK
+  - Cache/artifact/history fallback/API confinement: PASS
+  - Staging rollback `71f24b8 -> cd6bf73 -> 71f24b8`: PASS
+  - Request-ID preservation and support-facing display path: PASS
+  - Final blocker review: NO OPEN BLOCKER
 
 The active verified staging application is `71f24b88aab2d9ae569936494d3392ad9a5e4db7` in deployment
 `4a17f147-192e-45c2-a23f-bc84d0f50ae5`. AUR-M10-005 is closed by combined Codex-observed runtime,
-automated safety coverage and explicitly classified Owner manual evidence. AUR-M10-006 is staging-only and does not authorize production deployment.
+automated safety coverage and explicitly classified Owner manual evidence. Aureole v1 is LAUNCH READY. Production remains
+NOT DEPLOYED and requires separate Primary/Owner authorization. The only named Post-v1 scope is Public Resource / Node Status.
