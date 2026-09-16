@@ -9,12 +9,42 @@ Aureole v1: `LAUNCH READY / NOT PRODUCTION DEPLOYED`
 ## Contract baseline
 
 Active solution baseline:
-`1530acf1903d28480c66d85562392f63db5298d4` (`refactor: simplify public API
-CORS`). The re-frozen Contract uses wildcard non-credentialed Public CORS,
+`3cc0de610b8e748b5d88d2ab3444e08461ab91ef` (CF-02 Multiple Subscription
+Entries freeze). The re-frozen Contract uses wildcard non-credentialed Public CORS,
 keeps Bearer authentication explicit, and treats exact HTTPS Origin only as
 Checkout return-URL protocol metadata. P-09 continues to freeze `recaptcha` + `v2-checkbox`, provider-neutral
 `challengeToken`, V2Board authoritative verification and unsupported capability
 fail-closed behavior.
+
+## AUR-CF02 Multiple Subscription Entry Consumer
+
+Status: `IMPLEMENTATION COMPLETE / INDEPENDENT REVIEW PENDING`.
+
+Aureole now uses `GET /api/v1/subscription/entries` for ordered entry discovery and
+`POST /api/v1/subscription/entry-access` as the only selected-entry credential source.
+`selectedBaseUrl` is the single selection authority and the only Subscription selection
+value allowed in sessionStorage; all `accessUrl`, QR and client-import values remain
+memory-only. Zero entries have no fallback. Valid selection persists across refresh;
+stale persisted/current selections and `422 SUBSCRIPTION_ENTRY_UNAVAILABLE` require
+explicit reselection and never silently select the first remaining entry.
+
+Selection-scoped, versioned Query keys plus cancellation and old-key removal prevent
+late A/B responses from replacing C. Entry-access disables retry, retry-on-mount and
+mount/reconnect refetch so every POST is tied to an explicit selection, Retry or Rotate
+recovery. Display, Copy, local QR, Clash, Shadowrocket, Quantumult X and SingBox all consume
+the same current selected access URL. Rotate keeps its existing confirmation, synchronous
+lock and UNKNOWN/recovery blocking, but discards its legacy response URL and re-resolves the
+current selected entry before credential actions return.
+
+This implementation is local/mock evidence only. Production Solution/V2Board CF-02 runtime
+and real client deep-link acceptance are `NOT TESTED`; no deployment was performed.
+
+Local evidence on 2026-09-16: format check, typecheck, lint, 52 test files / 1195 tests,
+production build and diff check passed. Controlled browser verification passed on desktop and
+390 x 844 responsive Chrome in Light/Dark/System with multiple same-host entries, long pathname
+and credential text, local QR, all import actions, selection reset and no horizontal overflow or
+application console warning/error. This browser run used local mock Public API responses and is
+not production runtime evidence.
 
 ## Foundation status
 

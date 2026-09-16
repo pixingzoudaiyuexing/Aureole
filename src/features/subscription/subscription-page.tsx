@@ -4,17 +4,14 @@ import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invali
 import { TrafficHistory } from '@/features/traffic/traffic-history'
 import { useTrafficLogs } from '@/features/traffic/traffic-queries'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
-import { SubscriptionAccessPanel } from './subscription-access-panel'
+import { SubscriptionEntryAccess } from './subscription-entry-access'
 import { SubscriptionPeriodAdvancePanel } from './subscription-period-advance-panel'
 import {
   CurrentSubscriptionDetails,
   DeviceAndPeriodDetails,
   TrafficDetails,
 } from './subscription-overview'
-import {
-  useSubscriptionAccess,
-  useSubscriptionOverview,
-} from './subscription-queries'
+import { useSubscriptionOverview } from './subscription-queries'
 import { useSubscriptionMutationCoordinator } from './subscription-mutation-coordinator'
 import { SubscriptionSection } from './subscription-state'
 
@@ -26,16 +23,13 @@ export function SubscriptionPage() {
 
 function SubscriptionContent({ accessToken }: { accessToken: string }) {
   const overview = useSubscriptionOverview(accessToken)
-  const access = useSubscriptionAccess(accessToken)
   const traffic = useTrafficLogs(accessToken)
   const mutationCoordinator = useSubscriptionMutationCoordinator()
   const invalidSessionError = isInvalidSessionError(overview.error)
     ? overview.error
-    : isInvalidSessionError(access.error)
-      ? access.error
-      : isInvalidSessionError(traffic.error)
-        ? traffic.error
-        : null
+    : isInvalidSessionError(traffic.error)
+      ? traffic.error
+      : null
   useExitOnInvalidSessionError(invalidSessionError)
 
   if (invalidSessionError) return null
@@ -104,23 +98,10 @@ function SubscriptionContent({ accessToken }: { accessToken: string }) {
         title="订阅地址"
         description="此地址包含访问凭据，请仅复制到可信客户端。"
       >
-        {access.data ? (
-          <SubscriptionAccessPanel
-            access={access.data}
-            accessToken={accessToken}
-            mutationCoordinator={mutationCoordinator}
-          />
-        ) : access.isPending ? (
-          <p className="text-sm text-muted-foreground" role="status">
-            正在读取订阅地址…
-          </p>
-        ) : (
-          <ReadError
-            message="暂时无法读取订阅地址。"
-            error={access.error}
-            retry={() => void access.refetch()}
-          />
-        )}
+        <SubscriptionEntryAccess
+          accessToken={accessToken}
+          mutationCoordinator={mutationCoordinator}
+        />
       </SubscriptionSection>
 
       <SubscriptionSection

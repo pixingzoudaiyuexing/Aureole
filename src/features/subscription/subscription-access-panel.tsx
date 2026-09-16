@@ -1,7 +1,8 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { LoaderCircle, RotateCcw } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { ReadError } from '@/components/shared/read-error'
 import {
   Dialog,
   DialogContent,
@@ -13,14 +14,9 @@ import { isInvalidSessionError } from '@/features/auth/auth-errors'
 import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invalid-session-error'
 import { ApiError } from '@/lib/api/errors'
 import { SubscriptionCredential } from './subscription-access'
-import type { SubscriptionAccess } from './subscription-api'
 import { isAmbiguousSubscriptionRotationError } from './subscription-errors'
 import type { SubscriptionMutationCoordinator } from './subscription-mutation-coordinator'
-import {
-  rotateSubscriptionAccessMutationOptions,
-  subscriptionAccessQueryOptions,
-  subscriptionQueryKeys,
-} from './subscription-queries'
+import { rotateSubscriptionAccessMutationOptions } from './subscription-queries'
 
 type RotationFeedback =
   | { kind: 'success'; reconciled: boolean }
@@ -29,15 +25,22 @@ type RotationFeedback =
   | { kind: 'unknown'; reconciled: boolean }
 
 export function SubscriptionAccessPanel({
-  access,
+  accessUrl,
+  accessPending,
+  accessUnavailable,
+  accessError,
   accessToken,
   mutationCoordinator,
+  refreshAccess,
 }: {
-  access: SubscriptionAccess
+  accessUrl: string | null
+  accessPending: boolean
+  accessUnavailable: boolean
+  accessError: unknown
   accessToken: string
   mutationCoordinator: SubscriptionMutationCoordinator
+  refreshAccess: () => Promise<void>
 }) {
-  const queryClient = useQueryClient()
   const [confirmationOpen, setConfirmationOpen] = useState(false)
   const [acknowledged, setAcknowledged] = useState(false)
   const [requiresResubmitAcknowledgement, setRequiresResubmitAcknowledgement] =
@@ -65,17 +68,9 @@ export function SubscriptionAccessPanel({
     setAcknowledged(false)
   }
 
-  const refreshAccess = async () => {
-    await queryClient.invalidateQueries({
-      queryKey: subscriptionQueryKeys.access,
-      refetchType: 'none',
-    })
+  const reconcileSelectedAccess = async () => {
     try {
-      await queryClient.fetchQuery({
-        ...subscriptionAccessQueryOptions(accessToken),
-        retry: false,
-        staleTime: 0,
-      })
+      await refreshAccess()
       return true
     } catch (error) {
       if (isInvalidSessionError(error)) {
@@ -90,7 +85,7 @@ export function SubscriptionAccessPanel({
     const feedbackKind = feedback?.kind
     if (!feedbackKind) return
     setRecovering(true)
-    const reconciled = await refreshAccess()
+    const reconciled = await reconcileSelectedAccess()
     setRecovering(false)
     if (!reconciled) return
     mutationCoordinator.setRecoveryBlocked(false)
@@ -105,12 +100,8 @@ export function SubscriptionAccessPanel({
     mutation.reset()
     setFeedback(null)
     try {
-      const result = await mutation.mutateAsync()
-      queryClient.setQueryData(subscriptionQueryKeys.access, {
-        eligible: true,
-        accessUrl: result.accessUrl,
-      } satisfies SubscriptionAccess)
-      const reconciled = await refreshAccess()
+      await mutation.mutateAsync()
+      const reconciled = await reconcileSelectedAccess()
       if (!reconciled && !sessionInvalidatedRef.current) {
         mutationCoordinator.setRecoveryBlocked(true)
       }
@@ -123,7 +114,7 @@ export function SubscriptionAccessPanel({
         return
       }
 
-      const reconciled = await refreshAccess()
+      const reconciled = await reconcileSelectedAccess()
       if (!reconciled && !sessionInvalidatedRef.current) {
         mutationCoordinator.setRecoveryBlocked(true)
       }
@@ -158,20 +149,27 @@ export function SubscriptionAccessPanel({
   }
 
   const recoveryFailed = feedback !== null && !feedback.reconciled
-  const canStartRotation = access.eligible && !recoveryFailed
+  const canStartRotation = accessUrl !== null && !recoveryFailed
 
   return (
     <div className="space-y-5">
-      {access.eligible ? (
-        <SubscriptionCredential
-          key={access.accessUrl}
-          accessUrl={access.accessUrl}
-        />
-      ) : (
+      {accessUrl ? (
+        <SubscriptionCredential key={accessUrl} accessUrl={accessUrl} />
+      ) : accessPending ? (
+        <p className="text-sm text-muted-foreground" role="status">
+          正在读取订阅地址…
+        </p>
+      ) : accessUnavailable ? (
         <p className="text-sm text-muted-foreground">
           当前没有可展示的订阅地址。
         </p>
-      )}
+      ) : accessError && feedback === null ? (
+        <ReadError
+          message="暂时无法读取订阅地址。"
+          error={accessError}
+          retry={() => void reconcileSelectedAccess()}
+        />
+      ) : null}
 
       {feedback ? <RotationFeedbackMessage feedback={feedback} /> : null}
 
@@ -291,7 +289,7 @@ function RotationFeedbackMessage({ feedback }: { feedback: RotationFeedback }) {
         </p>
         {!feedback.reconciled ? (
           <p className="mt-1 text-sm text-muted-foreground">
-            当前地址暂时无法重新核对，请先保存页面显示的地址，再重新读取。
+            新订阅地址暂时无法重新读取，请恢复读取后再使用订阅功能。
           </p>
         ) : null}
       </div>

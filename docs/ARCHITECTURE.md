@@ -65,7 +65,7 @@ Auth response parser 对 solution 的 additive unknown fields 保持兼容，同
 ## Public onboarding and challenge
 
 Active Public Contract baseline 是 re-frozen solution
-`1530acf1903d28480c66d85562392f63db5298d4`。Solution Public API 使用 wildcard
+`3cc0de610b8e748b5d88d2ab3444e08461ab91ef`。Solution Public API 使用 wildcard
 non-credentialed CORS；Bearer 仍是显式认证机制，Origin 不参与身份或授权。Onboarding config 属于 TanStack
 Query server state，不进入 Zustand 或持久化缓存；requirements 未知时 Registration
 与 Recovery fail closed，不猜测 registration availability。
@@ -115,36 +115,46 @@ form-local synchronous lock 防止 same-tick 重复提交。成功意味着上�
 
 ## Subscription read model and mutations
 
-`features/subscription` 持有 Subscription Access 与 Overview 的 Public API parser、canonical
-query keys 和 read-only presentation。Dashboard 与 Subscription Page 复用同一个 Overview
-query；Access eligibility 与当前 product 相互独立，前端不得从任一 read 推断另一个 read 的
-业务状态。普通 read failure 只影响对应 section，AUTH_REQUIRED/AUTH_FAILED 则复用 Auth
-logout 清除 credential 与完整 Query cache。
+`features/subscription` 持有 CF-02 Entry Discovery、selected entry credential、Overview 与既有
+mutation 的 Public API parser、canonical query keys 和 presentation。Dashboard 与 Subscription Page
+复用同一个 Overview query；entry eligibility 与当前 product 相互独立，前端不得从任一 read 推断
+另一个 read 的业务状态。普通 read failure 只影响对应 section，AUTH_REQUIRED/AUTH_FAILED 则复用
+Auth logout 清除 credential 与完整 Query cache。
 
-Subscription `accessUrl` 是 solution-owned sensitive credential，只允许存在于 TanStack Query
-memory state 和 API request result。它不进入 Zustand、storage、URL state、analytics、日志或
-query key，也不成为 `href` 或 prefetch target。页面默认掩码，只有明确 Reveal 才显示完整值；
-Copy 直接写入 clipboard，反馈不得包含 credential。Aureole 不请求
-`/api/v1/access/subscription`，不下载或解析 subscription content。
+`GET /api/v1/subscription/entries` 是入口集合唯一权威，保持 server order 与原始 `baseUrl`。
+React local state 的 `selectedBaseUrl` 是当前 selection 单一来源；sessionStorage 只 fail-safe 保存该
+non-sensitive identity。有效 selection 可在刷新后恢复；stale persisted/current selection 会清除并进入
+requires-reselection，绝不自动 fallback。`POST /api/v1/subscription/entry-access` 是 Display、Copy、QR
+和四种 client import 的唯一 credential source；legacy `GET /api/v1/subscription` 不参与 CF-02 UI。
+
+Selected-entry `accessUrl` 是 V2Board-generated sensitive opaque credential，只允许存在于 TanStack
+Query memory state、API result 与当前 React render。它不进入 Zustand、storage、URL state、analytics、
+日志或 query key，也不成为长期 DOM `href` 或 prefetch target。页面默认掩码；Copy、local QR 与
+Clash/Shadowrocket/Quantumult X/SingBox user-gesture URI builder 都只消费同一个 current
+`selectedAccessUrl`。Aureole 不请求 `/api/v1/access/subscription`，不下载或解析 subscription content。
+
+Entry-access query key 包含 selected `baseUrl` 与 request version，不包含 credential。Selection change
+先卸载旧 credential action，再开始新 POST；previous key 被精确删除，AbortSignal/cancel 与 key isolation
+共同保证晚到 response 不覆盖当前 selection。该 POST 显式关闭 retry、retryOnMount、mount/reconnect
+refetch；失败 key 不交给 observer 触发隐式重读。`422 SUBSCRIPTION_ENTRY_UNAVAILABLE` 清除 credential
+与 persisted selection、刷新 entries，并要求用户显式重新选择。
 
 Overview 只展示 Public Contract 原始字段。Byte formatting 与 absolute date formatting 仅是
 presentation；不得生成 remaining traffic、usage percentage、remaining days、expiry flag 或
 next reset date。`renewalAllowed` 只显示为“新周期功能已启用/未启用”，不表示当前用户可以执行
 Advance Period。
 
-AUR-M6-001 在同一 feature boundary 增加 `POST /api/v1/subscription/rotate-access`。该 mutation
-没有 request body、显式 `retry: false`，并使用 Subscription Page 共享 synchronous lock 防止
-same-tick 重复提交。入口只依据 canonical Access read 的 `eligible=true` 与合法 `accessUrl`
-显示，但最终 eligibility 始终由 solution/V2Board 判断；用户必须阅读 credential 失效后果并勾选
-确认后才允许提交。
+AUR-M6-001 的 `POST /api/v1/subscription/rotate-access` 继续没有 request body、显式 `retry:false`，
+并使用 Subscription Page 共享 synchronous lock 防止 same-tick 重复提交。入口只依据当前 selected
+entry credential 是否可用显示，最终 eligibility 始终由 solution/V2Board 判断；用户必须阅读
+credential 失效后果并勾选确认后才允许提交。
 
-成功 DTO 会先替换 canonical `['subscription', 'access']` credential，再立即重新读取
-`GET /api/v1/subscription` 对账，因此 credential component 通过新 URL key 清除旧 reveal/copy
-状态。409 与明确 rotation failure 同样执行权威读取。network、timeout、upstream 与 malformed
-response 均属于结果未知：不自动重提 POST，不根据 URL 是否变化判断因果；读取恢复成功后仍要求
-新的明确确认，读取失败则 fail closed，只提供重新读取。Mutation 或任何 recovery read 的
-AUTH_REQUIRED/AUTH_FAILED 都复用 sealed Auth Session Core 清除 credential、Query cache 并退出
-protected UI。AUR-M6-001 不请求 subscription content。
+CF-02 下 rotate response 的 solution legacy gateway `accessUrl` 不再是 UI authority，也绝不写入
+selected-entry query。Success、409、明确 failure 与 UNKNOWN 都先 suppress 当前 credential，再只对当前
+`selectedBaseUrl` 重新执行 entry-access。成功 re-resolution 通过新 request version 重置 reveal/copy/QR/
+import transient state；恢复失败时旧 credential 不能重新启用，并继续 fail closed 阻断 Rotate 与 Advance。
+UNKNOWN 不根据 URL 变化推断因果，恢复成功后仍要求新的明确确认。Mutation 或 recovery 的 Auth failure
+继续复用 sealed Auth Session Core。AUR-M6-001 不请求 subscription content。
 
 AUR-M6-002 增加 bodyless `POST /api/v1/subscription/advance-period`，成功只接受
 `advanced=true`，additive fields 在 API boundary 被 strip。Advance 与 Rotate 共用同一个同步锁，
@@ -288,8 +298,8 @@ Public effect。Signed INT 原样展示，不 abs、clamp、round 或转换为�
 同一 canonical currency fraction digits 的 `formatSignedMinorMoney`，Config 不可用时只显示 signed
 minor-unit fallback。Aureole 不计算新余额、到期时间、流量、reset day 或套餐。
 
-成功后重新读取 canonical Wallet、Me 与 Subscription Overview，并只 invalidate Subscription Access
-而不主动读取 accessUrl。必要 read 任一失败时仍保留“礼品卡已兑换”，但 fail closed 到三项全部读取
+成功后重新读取 canonical Wallet、Me 与 Subscription Overview，并以 `refetchType:none` invalidate
+legacy Access、删除 CF-02 entry-access root cache，而不主动读取 accessUrl。必要 read 任一失败时仍保留“礼品卡已兑换”，但 fail closed 到三项全部读取
 成功。UNKNOWN 同样读取三项 authority，但绝不根据字段变化推断本次兑换成败；全部成功后仍需专用
 acknowledgement 与新的标准确认才能再次 POST。Deposit 与 Gift Card 共用页面级同步 Wallet mutation
 coordinator，最多一个金融 POST 处于活动状态。Gift Card history/preview、ledger、pending balance、

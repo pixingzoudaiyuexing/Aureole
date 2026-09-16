@@ -3,6 +3,10 @@ import { subscriptionApi } from './subscription-api'
 
 export const subscriptionQueryKeys = {
   access: ['subscription', 'access'] as const,
+  entries: ['subscription', 'entries'] as const,
+  entryAccessRoot: ['subscription', 'entry-access'] as const,
+  entryAccess: (baseUrl: string, requestVersion: number) =>
+    ['subscription', 'entry-access', baseUrl, requestVersion] as const,
   overview: ['subscription', 'overview'] as const,
 }
 
@@ -11,10 +15,34 @@ export const subscriptionMutationKeys = {
   advancePeriod: ['subscription', 'advance-period'] as const,
 }
 
+export function subscriptionEntriesQueryOptions(accessToken: string) {
+  return queryOptions({
+    queryKey: subscriptionQueryKeys.entries,
+    queryFn: ({ signal }) => subscriptionApi.getEntries(accessToken, signal),
+  })
+}
+
 export function subscriptionAccessQueryOptions(accessToken: string) {
   return queryOptions({
     queryKey: subscriptionQueryKeys.access,
     queryFn: () => subscriptionApi.getAccess(accessToken),
+  })
+}
+
+export function subscriptionEntryAccessQueryOptions(
+  accessToken: string,
+  baseUrl: string,
+  requestVersion: number,
+) {
+  return queryOptions({
+    queryKey: subscriptionQueryKeys.entryAccess(baseUrl, requestVersion),
+    queryFn: ({ signal }) =>
+      subscriptionApi.getEntryAccess(accessToken, baseUrl, signal),
+    retry: false,
+    retryOnMount: false,
+    staleTime: Number.POSITIVE_INFINITY,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   })
 }
 
@@ -39,6 +67,10 @@ export function advanceSubscriptionPeriodMutationOptions(accessToken: string) {
     mutationFn: () => subscriptionApi.advancePeriod(accessToken),
     retry: false as const,
   }
+}
+
+export function useSubscriptionEntries(accessToken: string) {
+  return useQuery(subscriptionEntriesQueryOptions(accessToken))
 }
 
 export function useSubscriptionAccess(accessToken: string) {

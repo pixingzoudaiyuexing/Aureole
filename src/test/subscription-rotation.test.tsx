@@ -51,10 +51,12 @@ const overview: SubscriptionOverview = {
 }
 
 function installMocks() {
-  const getAccess = vi.spyOn(subscriptionApi, 'getAccess').mockResolvedValue({
-    eligible: true,
-    accessUrl: oldCredentialUrl,
+  vi.spyOn(subscriptionApi, 'getEntries').mockResolvedValue({
+    entries: [{ baseUrl: 'https://entry.example/subscriptions' }],
   })
+  const getAccess = vi
+    .spyOn(subscriptionApi, 'getEntryAccess')
+    .mockResolvedValue({ accessUrl: oldCredentialUrl })
   const rotateAccess = vi
     .spyOn(subscriptionApi, 'rotateAccess')
     .mockResolvedValue({ rotated: true, accessUrl: newCredentialUrl })
@@ -160,11 +162,8 @@ describe('Subscription access rotation', () => {
     const mocks = installMocks()
     const deferred = createDeferred<SubscriptionAccessRotation>()
     mocks.getAccess
-      .mockResolvedValueOnce({
-        eligible: true,
-        accessUrl: oldCredentialUrl,
-      })
-      .mockResolvedValue({ eligible: true, accessUrl: newCredentialUrl })
+      .mockResolvedValueOnce({ accessUrl: oldCredentialUrl })
+      .mockResolvedValue({ accessUrl: newCredentialUrl })
     mocks.rotateAccess.mockImplementation(() => deferred.promise)
     renderSubscription()
     const { dialog, user } = await openConfirmation()
@@ -191,14 +190,13 @@ describe('Subscription access rotation', () => {
   it('makes the reconciled URL canonical and resets reveal/copy state without fetching or copying it', async () => {
     const mocks = installMocks()
     mocks.getAccess
-      .mockResolvedValueOnce({
-        eligible: true,
-        accessUrl: oldCredentialUrl,
-      })
-      .mockResolvedValueOnce({
-        eligible: true,
-        accessUrl: newCredentialUrl,
-      })
+      .mockResolvedValueOnce({ accessUrl: oldCredentialUrl })
+      .mockResolvedValueOnce({ accessUrl: newCredentialUrl })
+    mocks.rotateAccess.mockResolvedValue({
+      rotated: true,
+      accessUrl:
+        'https://legacy-gateway.example/api/v1/access/subscription?token=legacy-rotate-token',
+    })
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     const { queryClient, router } = renderSubscription()
     const user = userEvent.setup()
@@ -221,10 +219,22 @@ describe('Subscription access rotation', () => {
     expect(screen.getByRole('button', { name: '复制' })).toBeInTheDocument()
     expect(writeText).toHaveBeenCalledOnce()
     expect(fetchSpy).not.toHaveBeenCalled()
-    expect(queryClient.getQueryData(subscriptionQueryKeys.access)).toEqual({
-      eligible: true,
-      accessUrl: newCredentialUrl,
-    })
+    expect(
+      queryClient.getQueryData(
+        subscriptionQueryKeys.entryAccess(
+          'https://entry.example/subscriptions',
+          1,
+        ),
+      ),
+    ).toEqual({ accessUrl: newCredentialUrl })
+    expect(
+      JSON.stringify(
+        queryClient
+          .getQueryCache()
+          .getAll()
+          .map((query) => query.state.data),
+      ),
+    ).not.toContain('legacy-rotate-token')
     expect(router.state.location.search).toEqual({})
     expect(Object.values(window.localStorage)).not.toContain(newCredentialUrl)
     expect(Object.values(window.sessionStorage)).not.toContain(newCredentialUrl)
@@ -243,11 +253,14 @@ describe('Subscription access rotation', () => {
       }),
     )
     mocks.getAccess
-      .mockResolvedValueOnce({
-        eligible: true,
-        accessUrl: oldCredentialUrl,
-      })
-      .mockResolvedValueOnce({ eligible: false, accessUrl: null })
+      .mockResolvedValueOnce({ accessUrl: oldCredentialUrl })
+      .mockRejectedValueOnce(
+        new ApiError({
+          status: 409,
+          code: 'SUBSCRIPTION_ACCESS_UNAVAILABLE',
+          message: 'unavailable',
+        }),
+      )
     const { queryClient } = renderSubscription()
     const { dialog, user } = await openConfirmation()
     await acknowledgeAndConfirm(dialog, user)
@@ -262,10 +275,14 @@ describe('Subscription access rotation', () => {
     expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
       'opaque-session-token',
     )
-    expect(queryClient.getQueryData(subscriptionQueryKeys.access)).toEqual({
-      eligible: false,
-      accessUrl: null,
-    })
+    expect(
+      queryClient.getQueryData(
+        subscriptionQueryKeys.entryAccess(
+          'https://entry.example/subscriptions',
+          1,
+        ),
+      ),
+    ).toBeUndefined()
   })
 
   it('handles a definitive rotation failure, reconciles, and requires a new confirmation', async () => {
@@ -277,10 +294,7 @@ describe('Subscription access rotation', () => {
         message: 'Reset failed',
       }),
     )
-    mocks.getAccess.mockResolvedValue({
-      eligible: true,
-      accessUrl: oldCredentialUrl,
-    })
+    mocks.getAccess.mockResolvedValue({ accessUrl: oldCredentialUrl })
     renderSubscription()
     const first = await openConfirmation()
     await acknowledgeAndConfirm(first.dialog, first.user)
@@ -316,14 +330,8 @@ describe('Subscription access rotation', () => {
         new ApiError({ status, code, message: 'unknown result' }),
       )
       mocks.getAccess
-        .mockResolvedValueOnce({
-          eligible: true,
-          accessUrl: oldCredentialUrl,
-        })
-        .mockResolvedValueOnce({
-          eligible: true,
-          accessUrl: newCredentialUrl,
-        })
+        .mockResolvedValueOnce({ accessUrl: oldCredentialUrl })
+        .mockResolvedValueOnce({ accessUrl: newCredentialUrl })
       const { queryClient } = renderSubscription()
       const { dialog, user } = await openConfirmation()
       await acknowledgeAndConfirm(dialog, user)
@@ -339,10 +347,14 @@ describe('Subscription access rotation', () => {
       expect(screen.queryByText('订阅地址重置未完成。')).toBeNull()
       expect(mocks.rotateAccess).toHaveBeenCalledOnce()
       expect(mocks.getAccess).toHaveBeenCalledTimes(2)
-      expect(queryClient.getQueryData(subscriptionQueryKeys.access)).toEqual({
-        eligible: true,
-        accessUrl: newCredentialUrl,
-      })
+      expect(
+        queryClient.getQueryData(
+          subscriptionQueryKeys.entryAccess(
+            'https://entry.example/subscriptions',
+            1,
+          ),
+        ),
+      ).toEqual({ accessUrl: newCredentialUrl })
 
       const second = await openConfirmation('再次重置订阅地址')
       expect(
@@ -369,18 +381,9 @@ describe('Subscription access rotation', () => {
       )
       .mockResolvedValueOnce({ rotated: true, accessUrl: laterCredentialUrl })
     mocks.getAccess
-      .mockResolvedValueOnce({
-        eligible: true,
-        accessUrl: oldCredentialUrl,
-      })
-      .mockResolvedValueOnce({
-        eligible: true,
-        accessUrl: newCredentialUrl,
-      })
-      .mockResolvedValueOnce({
-        eligible: true,
-        accessUrl: laterCredentialUrl,
-      })
+      .mockResolvedValueOnce({ accessUrl: oldCredentialUrl })
+      .mockResolvedValueOnce({ accessUrl: newCredentialUrl })
+      .mockResolvedValueOnce({ accessUrl: laterCredentialUrl })
     renderSubscription()
     const first = await openConfirmation()
     await acknowledgeAndConfirm(first.dialog, first.user)
@@ -402,17 +405,11 @@ describe('Subscription access rotation', () => {
       new ApiError({ status: 0, code: 'NETWORK_ERROR', message: 'unknown' }),
     )
     mocks.getAccess
-      .mockResolvedValueOnce({
-        eligible: true,
-        accessUrl: oldCredentialUrl,
-      })
+      .mockResolvedValueOnce({ accessUrl: oldCredentialUrl })
       .mockRejectedValueOnce(
         new ApiError({ status: 0, code: 'NETWORK_ERROR', message: 'offline' }),
       )
-      .mockResolvedValueOnce({
-        eligible: true,
-        accessUrl: newCredentialUrl,
-      })
+      .mockResolvedValueOnce({ accessUrl: newCredentialUrl })
     renderSubscription()
     const first = await openConfirmation()
     await acknowledgeAndConfirm(first.dialog, first.user)
@@ -454,10 +451,7 @@ describe('Subscription access rotation', () => {
       }),
     )
     mocks.getAccess
-      .mockResolvedValueOnce({
-        eligible: true,
-        accessUrl: oldCredentialUrl,
-      })
+      .mockResolvedValueOnce({ accessUrl: oldCredentialUrl })
       .mockRejectedValueOnce(
         new ApiError({ status: 0, code: 'NETWORK_ERROR', message: 'offline' }),
       )
@@ -476,24 +470,18 @@ describe('Subscription access rotation', () => {
   it('blocks Advance when confirmed rotation success cannot reconcile Access', async () => {
     const mocks = installMocks()
     mocks.getAccess
-      .mockResolvedValueOnce({
-        eligible: true,
-        accessUrl: oldCredentialUrl,
-      })
+      .mockResolvedValueOnce({ accessUrl: oldCredentialUrl })
       .mockRejectedValueOnce(
         new ApiError({ status: 0, code: 'NETWORK_ERROR', message: 'offline' }),
       )
-      .mockResolvedValueOnce({
-        eligible: true,
-        accessUrl: newCredentialUrl,
-      })
+      .mockResolvedValueOnce({ accessUrl: newCredentialUrl })
     renderSubscription()
     const first = await openConfirmation()
     await acknowledgeAndConfirm(first.dialog, first.user)
 
     expect(
       await screen.findByText(
-        '当前地址暂时无法重新核对，请先保存页面显示的地址，再重新读取。',
+        '新订阅地址暂时无法重新读取，请恢复读取后再使用订阅功能。',
       ),
     ).toBeInTheDocument()
     expect(
@@ -562,10 +550,7 @@ describe('Subscription access rotation', () => {
       if (mutationError) mocks.rotateAccess.mockRejectedValue(mutationError)
       if (recoveryError) {
         mocks.getAccess
-          .mockResolvedValueOnce({
-            eligible: true,
-            accessUrl: oldCredentialUrl,
-          })
+          .mockResolvedValueOnce({ accessUrl: oldCredentialUrl })
           .mockRejectedValueOnce(recoveryError)
       }
       const queryClient = createQueryClient()

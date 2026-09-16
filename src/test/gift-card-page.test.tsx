@@ -112,6 +112,13 @@ function renderWallet(
     accessUrl:
       'https://gateway.example/api/v1/access/subscription?token=fake-token',
   })
+  queryClient.setQueryData(
+    subscriptionQueryKeys.entryAccess('https://entry.example', 0),
+    {
+      accessUrl:
+        'https://entry.example/api/v1/client/subscribe?token=fake-entry-token',
+    },
+  )
   const authApi: AuthApi = {
     login: vi.fn(),
     getCurrentUser: mocks.getCurrentUser,
@@ -293,6 +300,11 @@ describe('Gift Card confirmed success', () => {
       expect(
         queryClient.getQueryState(subscriptionQueryKeys.access)?.isInvalidated,
       ).toBe(true)
+      expect(
+        queryClient.getQueriesData({
+          queryKey: subscriptionQueryKeys.entryAccessRoot,
+        }),
+      ).toEqual([])
       expect(JSON.stringify(giftCardMutationKeys.redeem)).not.toContain(
         'fake-card-code',
       )

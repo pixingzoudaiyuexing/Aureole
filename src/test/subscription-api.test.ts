@@ -3,6 +3,7 @@ import { subscriptionApi } from '@/features/subscription/subscription-api'
 import {
   advanceSubscriptionPeriodMutationOptions,
   rotateSubscriptionAccessMutationOptions,
+  subscriptionEntryAccessQueryOptions,
   subscriptionMutationKeys,
   subscriptionQueryKeys,
 } from '@/features/subscription/subscription-queries'
@@ -28,6 +29,90 @@ const validOverview = {
 }
 
 describe('Subscription API contract', () => {
+  it('reads entries in server order and strips additive fields', async () => {
+    const request = vi
+      .spyOn(apiClient, 'authenticatedRequest')
+      .mockResolvedValue({
+        entries: [
+          { baseUrl: 'https://a.example.com', label: 'ignored' },
+          { baseUrl: 'https://b.example.com/path', future: true },
+        ],
+        futureField: 'ignored',
+      })
+
+    await expect(subscriptionApi.getEntries(accessToken)).resolves.toEqual({
+      entries: [
+        { baseUrl: 'https://a.example.com' },
+        { baseUrl: 'https://b.example.com/path' },
+      ],
+    })
+    expect(request).toHaveBeenCalledWith('/api/v1/subscription/entries', {
+      method: 'GET',
+      accessToken,
+      signal: undefined,
+    })
+  })
+
+  it('posts the exact selected baseUrl and keeps the access URL opaque', async () => {
+    const selectedBaseUrl = 'https://b.example.com/path/'
+    const selectedAccessUrl =
+      'https://b.example.com/path/api/v1/client/subscribe?token=dummy-token'
+    const request = vi
+      .spyOn(apiClient, 'authenticatedRequest')
+      .mockResolvedValue({ accessUrl: selectedAccessUrl, token: 'stripped' })
+
+    await expect(
+      subscriptionApi.getEntryAccess(accessToken, selectedBaseUrl),
+    ).resolves.toEqual({ accessUrl: selectedAccessUrl })
+    expect(request).toHaveBeenCalledWith('/api/v1/subscription/entry-access', {
+      method: 'POST',
+      accessToken,
+      body: { baseUrl: selectedBaseUrl },
+      signal: undefined,
+    })
+  })
+
+  it.each([
+    { entries: [{ baseUrl: '' }] },
+    { entries: [{ baseUrl: ' '.repeat(2) }] },
+    { entries: [{ baseUrl: 'x'.repeat(2049) }] },
+    { entries: [{ baseUrl: null }] },
+    { entries: 'not-an-array' },
+  ])('rejects malformed entries data', async (payload) => {
+    vi.spyOn(apiClient, 'authenticatedRequest').mockResolvedValue(payload)
+    await expect(subscriptionApi.getEntries(accessToken)).rejects.toMatchObject(
+      {
+        code: 'MALFORMED_RESPONSE',
+      } satisfies Partial<ApiError>,
+    )
+  })
+
+  it.each([
+    {},
+    { accessUrl: null },
+    { accessUrl: 'http://entry.example/subscription' },
+    { accessUrl: 'https://user:password@entry.example/subscription' },
+    { accessUrl: 'not-a-url' },
+  ])('rejects malformed entry-access data', async (payload) => {
+    vi.spyOn(apiClient, 'authenticatedRequest').mockResolvedValue(payload)
+    await expect(
+      subscriptionApi.getEntryAccess(accessToken, 'https://entry.example'),
+    ).rejects.toMatchObject({
+      code: 'MALFORMED_RESPONSE',
+    } satisfies Partial<ApiError>)
+  })
+
+  it.each(['', '   ', 'x'.repeat(2049)])(
+    'rejects invalid entry-access input before the request',
+    async (baseUrl) => {
+      const request = vi.spyOn(apiClient, 'authenticatedRequest')
+      await expect(
+        subscriptionApi.getEntryAccess(accessToken, baseUrl),
+      ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' })
+      expect(request).not.toHaveBeenCalled()
+    },
+  )
+
   it('reads an unavailable access state and strips additive fields', async () => {
     const request = vi
       .spyOn(apiClient, 'authenticatedRequest')
@@ -139,6 +224,11 @@ describe('Subscription API contract', () => {
       rotateSubscriptionAccessMutationOptions(accessToken)
     const advanceMutation =
       advanceSubscriptionPeriodMutationOptions(accessToken)
+    const entryAccessQuery = subscriptionEntryAccessQueryOptions(
+      accessToken,
+      'https://entry.example/path',
+      2,
+    )
 
     expect(subscriptionQueryKeys.access).toEqual(['subscription', 'access'])
     expect(subscriptionMutationKeys.rotateAccess).toEqual([
@@ -153,6 +243,17 @@ describe('Subscription API contract', () => {
     expect(advanceMutation.mutationKey).not.toContain(accessToken)
     expect(rotationMutation.retry).toBe(false)
     expect(advanceMutation.retry).toBe(false)
+    expect(entryAccessQuery.queryKey).toEqual([
+      'subscription',
+      'entry-access',
+      'https://entry.example/path',
+      2,
+    ])
+    expect(entryAccessQuery.queryKey).not.toContain(accessToken)
+    expect(entryAccessQuery.retry).toBe(false)
+    expect(entryAccessQuery.retryOnMount).toBe(false)
+    expect(entryAccessQuery.refetchOnMount).toBe(false)
+    expect(entryAccessQuery.refetchOnReconnect).toBe(false)
   })
 
   it.each([

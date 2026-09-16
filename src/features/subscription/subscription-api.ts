@@ -21,6 +21,36 @@ const httpsCredentialUrlSchema = z.string().refine((value) => {
   }
 })
 
+const subscriptionEntryBaseUrlSchema = z
+  .string()
+  .min(1)
+  .max(2048)
+  .refine((value) => value.trim().length > 0)
+
+const subscriptionEntriesSchema = z
+  .object({
+    entries: z.array(
+      z
+        .object({
+          baseUrl: subscriptionEntryBaseUrlSchema,
+        })
+        .strip(),
+    ),
+  })
+  .strip()
+
+const subscriptionEntryAccessRequestSchema = z
+  .object({
+    baseUrl: subscriptionEntryBaseUrlSchema,
+  })
+  .strict()
+
+const subscriptionEntryAccessSchema = z
+  .object({
+    accessUrl: httpsCredentialUrlSchema,
+  })
+  .strip()
+
 const subscriptionAccessSchema = z.union([
   z.object({ eligible: z.literal(false), accessUrl: z.null() }).strip(),
   z
@@ -76,6 +106,13 @@ const subscriptionOverviewSchema = z
   })
   .strip()
 
+export type SubscriptionEntry = z.infer<
+  typeof subscriptionEntriesSchema
+>['entries'][number]
+export type SubscriptionEntries = z.infer<typeof subscriptionEntriesSchema>
+export type SubscriptionEntryAccess = z.infer<
+  typeof subscriptionEntryAccessSchema
+>
 export type SubscriptionAccess = z.infer<typeof subscriptionAccessSchema>
 export type SubscriptionAccessRotation = z.infer<
   typeof subscriptionAccessRotationSchema
@@ -97,6 +134,18 @@ function parseSubscriptionData<T>(schema: z.ZodType<T>, data: unknown) {
   return parsed.data
 }
 
+function parseSubscriptionRequest<T>(schema: z.ZodType<T>, data: unknown) {
+  const parsed = schema.safeParse(data)
+  if (!parsed.success) {
+    throw new ApiError({
+      status: 0,
+      code: 'VALIDATION_ERROR',
+      message: 'The subscription request is invalid',
+    })
+  }
+  return parsed.data
+}
+
 export const subscriptionApi = {
   async getAccess(accessToken: string) {
     const data = await apiClient.authenticatedRequest<unknown>(
@@ -104,6 +153,30 @@ export const subscriptionApi = {
       { method: 'GET', accessToken },
     )
     return parseSubscriptionData(subscriptionAccessSchema, data)
+  },
+
+  async getEntries(accessToken: string, signal?: AbortSignal) {
+    const data = await apiClient.authenticatedRequest<unknown>(
+      '/api/v1/subscription/entries',
+      { method: 'GET', accessToken, signal },
+    )
+    return parseSubscriptionData(subscriptionEntriesSchema, data)
+  },
+
+  async getEntryAccess(
+    accessToken: string,
+    baseUrl: string,
+    signal?: AbortSignal,
+  ) {
+    const body = parseSubscriptionRequest(
+      subscriptionEntryAccessRequestSchema,
+      { baseUrl },
+    )
+    const data = await apiClient.authenticatedRequest<unknown>(
+      '/api/v1/subscription/entry-access',
+      { method: 'POST', accessToken, body, signal },
+    )
+    return parseSubscriptionData(subscriptionEntryAccessSchema, data)
   },
 
   async getOverview(accessToken: string) {

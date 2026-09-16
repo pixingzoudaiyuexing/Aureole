@@ -43,11 +43,17 @@ function installSubscriptionMocks() {
     eligible: true,
     accessUrl: credentialUrl,
   })
+  const getEntries = vi.spyOn(subscriptionApi, 'getEntries').mockResolvedValue({
+    entries: [{ baseUrl: 'https://entry.example/subscriptions' }],
+  })
+  const getEntryAccess = vi
+    .spyOn(subscriptionApi, 'getEntryAccess')
+    .mockResolvedValue({ accessUrl: credentialUrl })
   const getOverview = vi
     .spyOn(subscriptionApi, 'getOverview')
     .mockResolvedValue(overview)
   const getTraffic = vi.spyOn(trafficApi, 'getLogs').mockResolvedValue([])
-  return { getAccess, getOverview, getTraffic }
+  return { getAccess, getEntries, getEntryAccess, getOverview, getTraffic }
 }
 
 function renderProtectedRoute(
@@ -91,10 +97,15 @@ function createDeferred<T>() {
 
 describe('Subscription page', () => {
   it('uses stable credential-free canonical query keys', () => {
-    expect(subscriptionQueryKeys).toEqual({
-      access: ['subscription', 'access'],
-      overview: ['subscription', 'overview'],
-    })
+    expect(subscriptionQueryKeys.entries).toEqual(['subscription', 'entries'])
+    expect(subscriptionQueryKeys.entryAccessRoot).toEqual([
+      'subscription',
+      'entry-access',
+    ])
+    expect(
+      subscriptionQueryKeys.entryAccess('https://entry.example', 3),
+    ).toEqual(['subscription', 'entry-access', 'https://entry.example', 3])
+    expect(subscriptionQueryKeys.overview).toEqual(['subscription', 'overview'])
   })
 
   it('renders authoritative overview fields without derived business state', async () => {
@@ -191,7 +202,13 @@ describe('Subscription page', () => {
 
   it('renders an unavailable access state without inventing a cause', async () => {
     const mocks = installSubscriptionMocks()
-    mocks.getAccess.mockResolvedValue({ eligible: false, accessUrl: null })
+    mocks.getEntries.mockRejectedValue(
+      new ApiError({
+        status: 409,
+        code: 'SUBSCRIPTION_ACCESS_UNAVAILABLE',
+        message: 'private upstream detail',
+      }),
+    )
     renderProtectedRoute('/subscription')
 
     expect(
@@ -213,7 +230,7 @@ describe('Subscription page', () => {
 
   it('keeps overview available when access fails and retries only access', async () => {
     const mocks = installSubscriptionMocks()
-    mocks.getAccess
+    mocks.getEntryAccess
       .mockRejectedValueOnce(
         new ApiError({
           status: 200,
@@ -221,7 +238,7 @@ describe('Subscription page', () => {
           message: 'Invalid response',
         }),
       )
-      .mockResolvedValueOnce({ eligible: true, accessUrl: credentialUrl })
+      .mockResolvedValueOnce({ accessUrl: credentialUrl })
     renderProtectedRoute('/subscription')
     const user = userEvent.setup()
 
@@ -230,7 +247,7 @@ describe('Subscription page', () => {
     await user.click(screen.getByRole('button', { name: '重试' }))
 
     expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
-    expect(mocks.getAccess).toHaveBeenCalledTimes(2)
+    expect(mocks.getEntryAccess).toHaveBeenCalledTimes(2)
     expect(mocks.getOverview).toHaveBeenCalledOnce()
   })
 
@@ -254,7 +271,7 @@ describe('Subscription page', () => {
 
     expect(await screen.findByText('Pro Plan')).toBeInTheDocument()
     expect(mocks.getOverview).toHaveBeenCalledTimes(2)
-    expect(mocks.getAccess).toHaveBeenCalledOnce()
+    expect(mocks.getEntryAccess).toHaveBeenCalledOnce()
   })
 
   it('renders traffic entries in server order with canonical byte formatting', async () => {
@@ -320,7 +337,7 @@ describe('Subscription page', () => {
     expect(await screen.findByText('暂无流量记录。')).toBeInTheDocument()
     expect(mocks.getTraffic).toHaveBeenCalledTimes(2)
     expect(mocks.getOverview).toHaveBeenCalledOnce()
-    expect(mocks.getAccess).toHaveBeenCalledOnce()
+    expect(mocks.getEntryAccess).toHaveBeenCalledOnce()
   })
 
   it.each(['AUTH_REQUIRED', 'AUTH_FAILED'])(
@@ -331,10 +348,10 @@ describe('Subscription page', () => {
         new ApiError({ status: 401, code, message: 'Authentication failed' }),
       )
       const queryClient = createQueryClient()
-      queryClient.setQueryData(subscriptionQueryKeys.access, {
-        eligible: true,
-        accessUrl: credentialUrl,
-      })
+      queryClient.setQueryData(
+        subscriptionQueryKeys.entryAccess('https://entry.example', 0),
+        { accessUrl: credentialUrl },
+      )
       const { router } = renderProtectedRoute('/subscription', queryClient)
 
       expect(
@@ -343,32 +360,37 @@ describe('Subscription page', () => {
       expect(router.state.location.pathname).toBe('/login')
       expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
       expect(
-        queryClient.getQueryData(subscriptionQueryKeys.access),
+        queryClient.getQueryData(
+          subscriptionQueryKeys.entryAccess('https://entry.example', 0),
+        ),
       ).toBeUndefined()
     },
   )
 
   it.each([
-    ['access', 'AUTH_REQUIRED'],
-    ['access', 'AUTH_FAILED'],
+    ['entries', 'AUTH_REQUIRED'],
+    ['entries', 'AUTH_FAILED'],
+    ['entry-access', 'AUTH_REQUIRED'],
+    ['entry-access', 'AUTH_FAILED'],
     ['overview', 'AUTH_REQUIRED'],
     ['overview', 'AUTH_FAILED'],
   ] as const)(
     'exits authenticated UI when %s returns %s and clears the credential cache',
     async (source, code) => {
       const mocks = installSubscriptionMocks()
-      mocks[
-        source === 'access' ? 'getAccess' : 'getOverview'
-      ].mockRejectedValue(
-        new ApiError({ status: 401, code, message: 'Authentication failed' }),
-      )
+      const error = new ApiError({
+        status: 401,
+        code,
+        message: 'Authentication failed',
+      })
+      if (source === 'entries') mocks.getEntries.mockRejectedValue(error)
+      else if (source === 'entry-access') {
+        mocks.getEntryAccess.mockRejectedValue(error)
+      } else mocks.getOverview.mockRejectedValue(error)
       const queryClient = createQueryClient()
       queryClient.setQueryData(
-        subscriptionQueryKeys.access,
-        {
-          eligible: true,
-          accessUrl: credentialUrl,
-        },
+        subscriptionQueryKeys.entryAccess('https://entry.example', 0),
+        { accessUrl: credentialUrl },
         { updatedAt: 0 },
       )
       const { router } = renderProtectedRoute('/subscription', queryClient)
@@ -379,7 +401,9 @@ describe('Subscription page', () => {
       expect(router.state.location.pathname).toBe('/login')
       expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
       expect(
-        queryClient.getQueryData(subscriptionQueryKeys.access),
+        queryClient.getQueryData(
+          subscriptionQueryKeys.entryAccess('https://entry.example', 0),
+        ),
       ).toBeUndefined()
     },
   )
@@ -482,7 +506,9 @@ describe('Dashboard subscription core', () => {
     )
     expect(await screen.findByText('当前订阅')).toBeInTheDocument()
     expect(mocks.getOverview).toHaveBeenCalledOnce()
-    expect(mocks.getAccess).toHaveBeenCalledOnce()
+    expect(mocks.getEntries).toHaveBeenCalledOnce()
+    expect(mocks.getEntryAccess).toHaveBeenCalledOnce()
+    expect(mocks.getAccess).not.toHaveBeenCalled()
     expect(mocks.getTraffic).toHaveBeenCalledOnce()
   })
 })

@@ -53,23 +53,40 @@
 
 ## Subscription read mapping
 
-- `GET /api/v1/subscription` 只读取 previous-purchaser access eligibility 和 solution-owned
-  `accessUrl`。Aureole 不调用、prefetch 或 probe `/api/v1/access/subscription`，不把 credential
-  作为链接，也不下载或解析 subscription content。
+- AUR-CF02 的冻结 Contract SSOT 是 solution
+  `3cc0de610b8e748b5d88d2ab3444e08461ab91ef`。`GET /api/v1/subscription/entries`
+  是入口发现的唯一来源；Aureole 保持 server order，以原始 `baseUrl` 作为 selection identity，
+  不排序、不生成 ID、不创建 fallback domain。
+- `POST /api/v1/subscription/entry-access` 是当前 selected entry credential 的唯一来源。Request
+  只发送 strict `{ baseUrl }`；response `accessUrl` 作为完整 opaque HTTPS credential 使用，前端
+  不解析 token/OTP/path、不拼接 subscribe URL，也不经过 legacy `GET /api/v1/subscription` 或
+  `/api/v1/access/subscription`。
+- `selectedBaseUrl` 是 Display、Copy、QR、Clash、Shadowrocket、Quantumult X 与 SingBox 的单一
+  selection source。只有 `baseUrl` 可 fail-safe 保存到 sessionStorage；`accessUrl` 与所有派生 import
+  URI 只存在于 TanStack Query memory / 当前 React render，不进入 storage、URL、日志或 analytics。
+- 首次无已存 selection 时使用 server 第一项；有效已存 selection 可恢复。若已存/current entry 已从
+  authoritative entries 消失，或 entry-access 返回 `422 SUBSCRIPTION_ENTRY_UNAVAILABLE`，立即隐藏并
+  丢弃 credential、刷新 entries、清除 selection persistence，并要求用户显式重新选择；即使只剩一个
+  entry 也不静默 fallback。
+- Entry change 使用 selection/version-scoped query key，并在新 request pending 时立即卸载旧 credential
+  actions。旧 key 会被精确删除，取消或晚到的 B response 不能覆盖当前 C。Entry-access 明确关闭 retry、
+  retry-on-mount、mount/reconnect refetch；再次 POST 只来自用户选择、明确重试或 Rotate recovery。
 - `GET /api/v1/subscription/overview` 是 current product、expiry、traffic、device 和 cycle
   config 的权威 read。Dashboard 与 Subscription Page 复用 canonical Overview query；Dashboard
   不创建独立 fetcher。
-- Access eligibility 与 Overview current product 是独立语义。`product=null` 不改变
-  `eligible/accessUrl`，previous purchaser eligibility 也不证明当前 product 存在。
+- Entry eligibility 与 Overview current product 是独立语义。`product=null` 不改变 CF-02
+  previous-purchaser access eligibility，也不证明当前 product 存在。
 - Traffic 只做 human-readable byte formatting，不计算 remaining/percentage/over-quota；expiry
   只显示 absolute timestamp 或 neutral null state；device/reset nullable value 不转换为 0 或
   unlimited。
 - `renewalAllowed` 只翻译为“新周期功能已启用/未启用”，不作为 mutation eligibility。
-- `POST /api/v1/subscription/rotate-access` 是无 body 的非幂等 credential mutation，仅在已有
-  Access read 为 eligible 时显示入口，仍由 server 最终判断资格。Mutation 不 retry，并在 success、
-  409、明确失败或 UNKNOWN 后重新读取 canonical Access；UNKNOWN recovery 未成功时禁止再次 POST，
-  成功后也要求用户确认并保存当前地址再重新确认。
-- Rotate success 只接受 `rotated=true` 与安全 HTTPS `accessUrl`，additive fields 会被 strip。
+- `POST /api/v1/subscription/rotate-access` 是无 body 的非幂等 credential mutation，仅在当前 selected
+  entry access 可用时显示入口，仍由 server 最终判断资格。Mutation 不 retry；success、409、明确失败
+  或 UNKNOWN 后都丢弃当前 selected credential，并重新 POST 当前 `baseUrl` 的 entry-access。Rotate
+  response 中 legacy gateway `accessUrl` 只做 strict response validation，不进入 UI 或 query cache。
+  UNKNOWN recovery 未成功时禁止再次 POST，成功后也要求新的明确确认。
+- Rotate success 只接受 `rotated=true` 与安全 HTTPS legacy `accessUrl`，additive fields 会被 strip；
+  当前显示 credential 仍只认 selected entry-access re-resolution。
   `accessUrl` 不进入 query key、storage、URL、Zustand、console 或 analytics；Aureole 不 probe、
   fetch 或解析 credential URL。
 - `POST /api/v1/subscription/advance-period` 是无 body 的非幂等周期 mutation。入口仅依据
@@ -209,8 +226,8 @@
   后才能 POST。成功清空 code/reveal，并原样展示 server effect；不计算新余额、expiresAt、traffic、
   reset day、plan name 或 plan ID。
 - Confirmed success 与 UNKNOWN 都重新读取 canonical Wallet、Me、Subscription Overview，并以
-  `refetchType: none` invalidate Subscription Access。Wallet 页面不主动读取 accessUrl，也不 fetch
-  subscription content。成功 recovery 失败仍声明兑换成功但禁止再次兑换；UNKNOWN recovery 不根据
+  `refetchType: none` invalidate legacy Access、删除 CF-02 entry-access root cache。Wallet 页面不主动读取
+  accessUrl，也不 fetch subscription content。成功 recovery 失败仍声明兑换成功但禁止再次兑换；UNKNOWN recovery 不根据
   账户变化推断因果，全部 authority 恢复后仍需专用 acknowledgement 与新的标准确认。
 - GIFT_CARD_NOT_FOUND、NOT_ACTIVE、EXPIRED、USAGE_LIMIT_REACHED、ALREADY_REDEEMED、NOT_APPLICABLE、
   REDEEM_FAILED 与 VALIDATION_ERROR 使用本地安全文案，不自动 retry、不 logout、不暴露 upstream raw
