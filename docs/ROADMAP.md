@@ -138,10 +138,10 @@ Gate 4: COMPLETE / PASS
 AUR-M10-004: COMPLETE / PASS
 Verified deployed AUR-M10-004 application SHA: `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef`
 Verified Cloudflare Pages deployment: `dd7ff78c-efbd-4503-957e-619a9bb45433`
-AUR-M10-005: IN PROGRESS
+AUR-M10-005: COMPLETE / PASS
 AUR-M10-005C1: PRIMARY / INDEPENDENT REVIEW PASS
-AUR-M10-005C3: AUTHORIZED FOR STAGING DEPLOYMENT AND NO-PAYMENT QR RUNTIME VERIFICATION
-AUR-M10-006: NOT STARTED / NOT AUTHORIZED
+AUR-M10-005C3: RUNTIME PASS
+AUR-M10-006: AUTHORIZED / IN PROGRESS
 
 Milestone 9：COMPLETE / PASS / FROZEN。其代码冻结 SHA 为
 `e408f83311c3557706ac9fc09ac06fe754ea71b8`；后续 documentation closure commit 不改变该 code freeze SHA。
@@ -154,5 +154,6 @@ Milestone 10：IN PROGRESS。AUR-M10-001 Launch Readiness Evidence Inventory 为
 审计建议后续按实际依赖顺序拆分：AUR-M10-002 Production Deployment Contract and Artifact Readiness、
 AUR-M10-003 Production Auth/Session and Read-Only Verification、AUR-M10-004 Controlled Non-Financial Mutation
 Verification、AUR-M10-005 Payment/Wallet/Financial Runtime Verification、AUR-M10-006 Final Browser/Rollback/Launch
-Gate。AUR-M10-003 与 AUR-M10-004 已完成并通过；AUR-M10-005 正在按 Primary 明确授权的分阶段边界执行，
-整体闭环仍保持 open；AUR-M10-006 未启动且未授权。
+Gate。AUR-M10-003、AUR-M10-004 与 AUR-M10-005 已完成并通过；M10-005 的真实付款、Gift Card、
+Commission Transfer 与 Withdrawal accepted 正向路径由 Owner 于 2026-09-16 手工确认，内部 callback payload/trace
+未由 Codex 直接捕获。AUR-M10-006 已获 staging-only 授权并进入最终浏览器、rollback 与 launch gate。

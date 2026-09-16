@@ -457,8 +457,8 @@ The disposable account reported `status = expired`, subscription eligibility was
 The only authorized mutation during Gate 4 was `POST /api/v1/auth/login`. Logout was client-side and produced no network mutation. No business mutation or financial operation was performed.
 
 - **AUR-M10-004:** COMPLETE / PASS
-- **AUR-M10-005:** IN PROGRESS
-- **AUR-M10-006:** NOT STARTED / NOT AUTHORIZED
+- **AUR-M10-005:** COMPLETE / PASS
+- **AUR-M10-006:** AUTHORIZED / IN PROGRESS
 
 At the M10-004 closure checkpoint, the repository documentation HEAD was newer than the verified deployed application SHA because that closure commit was documentation-only. Later application commits require their own exact-SHA deployment evidence and must not be described as deployed until verified.
 
@@ -513,7 +513,38 @@ All Aureole browser API traffic remained same-origin. Bearer credentials were co
 
 These state/environment constraints do not block the defined AUR-M10-004 acceptance and are not claimed as runtime-verified.
 
-- **AUR-M10-005:** IN PROGRESS
-- **AUR-M10-006:** NOT STARTED / NOT AUTHORIZED
+- **AUR-M10-005:** COMPLETE / PASS
+- **AUR-M10-006:** AUTHORIZED / IN PROGRESS
 
 The M10-004 R5 closure commit after `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef` was documentation-only. Later C1 application code and any docs-only descendants must each be distinguished from the deployed application SHA until an exact runtime release identity is verified.
+
+## 21. Final AUR-M10-005 Payment and Financial Closure
+
+- **AUR-M10-005:** COMPLETE / PASS
+- **Verified Staging Application SHA:** `71f24b88aab2d9ae569936494d3392ad9a5e4db7`
+- **Reviewed Application Ancestor:** `9294fc6baea1dca6483c17f20086b2258a53b1de`
+- **Cloudflare Pages Deployment ID:** `4a17f147-192e-45c2-a23f-bc84d0f50ae5`
+- **Solution Frozen Baseline:** `1530acf1903d28480c66d85562392f63db5298d4`
+
+**Codex-observed deployed runtime evidence:**
+
+- Order Create and Cancel, internal-balance Checkout, Wallet Deposit Create and Withdrawal definitive rejection passed.
+- Fresh zero-balance redirect handoff passed without external navigation or payment.
+- Alipay and WxPay EPayQrcode desktop Checkout each returned `qrcode`, rendered locally in Aureole, polled authoritative Order Status and stopped after flow close.
+- Same-origin Bearer confinement, zero Cookie dependency, no direct browser Solution/V2Board API calls, no QR/payment payload persistence, no duplicate POST and no blind retry passed.
+- The two unpaid QR test Orders were authoritatively cancelled and Wallet remained unchanged.
+
+**Owner-reported manual runtime evidence — 2026-09-16:**
+
+- Real external payment: MANUAL PASS.
+- Gift Card redemption positive path: MANUAL PASS.
+- Commission Transfer positive path: MANUAL PASS.
+- Withdrawal accepted path: MANUAL PASS.
+
+These manual results are confirmed by the Owner and are not represented as Codex-observed browser automation, automated tests or CI evidence. No transaction identifiers, amounts, Gift Card values, withdrawal accounts, screenshots, provider callback payloads or request IDs were supplied or invented. Functional real-payment completion is confirmed; the exact provider callback payload/trace and detailed post-payment Wallet/Subscription snapshots were not directly captured by Codex.
+
+**Closure rationale:**
+
+The combined evidence covers the exposed v1 payment/financial operations, authoritative reads, duplicate prevention, non-idempotent uncertainty handling and functional real-payment completion. Missing callback telemetry and mobile-provider behavior are retained as explicit residual evidence gaps for final launch review rather than fabricated closure evidence.
+
+- **AUR-M10-006:** AUTHORIZED / IN PROGRESS (staging only)

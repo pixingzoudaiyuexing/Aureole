@@ -512,19 +512,18 @@ financial operation. No business source code or solution file was changed.
   Commission Transfer has previous review approval plus cross-session continuation hardening; Withdrawal Request
   has its independent review required fixes applied plus the same cross-session hardening. Both are complete and
   frozen at `e408f83311c3557706ac9fc09ac06fe754ea71b8`.
-- Production solution/V2Board Referral Overview, Commission History, Withdrawal Options,
-  Referral Code Create, Commission Transfer and Withdrawal Request behavior is NOT TESTED;
-  controlled mock browser and automated contract/privacy/recovery tests are the current evidence.
+- Production Referral Overview, Commission History, Withdrawal Options and Referral Code Create were verified in the
+  authorized M10 runtime phases. Commission Transfer and Withdrawal accepted positive paths are
+  `OWNER-REPORTED MANUAL RUNTIME EVIDENCE` dated 2026-09-16; Codex did not execute them or capture their private payloads.
 - Production solution/V2Board Ticket List, Detail, Create, Reply and Close behavior is
   NOT TESTED; controlled mock browser and automated contract/privacy tests are the
   current evidence.
-- Production solution/V2Board Order Create, Promotion and Cancel behavior is NOT
-  TESTED; controlled mock browser and automated contract/privacy tests are the
-  current evidence.
-- Production solution/V2Board Payment Methods, Checkout, provider QR/redirect,
-  callback processing and final Order Status behavior are NOT TESTED; controlled
-  mock browser and automated Contract/privacy/recovery tests are the current
-  evidence.
+- Production Order Create/Cancel, Payment Methods, internal-balance Checkout, redirect handoff, Alipay/WxPay in-page QR,
+  polling and authoritative cleanup passed Codex-observed staging runtime. Real external payment completed successfully
+  according to Owner manual verification dated 2026-09-16. Exact provider callback payload/trace was not directly captured
+  by Codex and remains a support/observability residual rather than fabricated evidence.
+- Gift Card positive redemption is `OWNER-REPORTED MANUAL RUNTIME EVIDENCE` dated 2026-09-16. Code value, effect details,
+  account values and request identifiers were not supplied or recorded.
 - Production solution/V2Board Subscription Access Rotation behavior is NOT
   TESTED; controlled mock browser and automated Contract/privacy/recovery tests
   are the current evidence.
@@ -566,9 +565,13 @@ Milestone 10 is IN PROGRESS.
     (`dd7ff78c-efbd-4503-957e-619a9bb45433`)
   - Duplicate/retry, same-origin/Bearer, authoritative reconciliation, and Ticket cleanup: PASS
   - Email-code/Password Recovery/Rotate/Advance remain non-blocking state-constrained evidence
-- AUR-M10-005: IN PROGRESS
+- AUR-M10-005: COMPLETE / PASS
   - C1 payment browser-context propagation: PRIMARY / INDEPENDENT REVIEW PASS
-  - C3 staging deployment and no-payment EPayQrcode runtime verification: AUTHORIZED
-- AUR-M10-006: NOT STARTED / NOT AUTHORIZED
+  - C3 exact-SHA staging deployment and no-payment desktop Alipay/WxPay EPayQrcode runtime: PASS
+  - Real external payment, Gift Card, Commission Transfer and Withdrawal accepted paths: OWNER MANUAL PASS (2026-09-16)
+  - Exact provider callback payload/trace: NOT DIRECTLY CAPTURED BY CODEX
+- AUR-M10-006: AUTHORIZED / IN PROGRESS
 
-The verified deployed application remains `cd6bf73b1f0c76c50d81971c1c0dc88408b5bbef` until an exact later C3 deployment is verified. Financial runtime verification is in progress only within explicit per-task boundaries; overall AUR-M10-005 closure remains open.
+The active verified staging application is `71f24b88aab2d9ae569936494d3392ad9a5e4db7` in deployment
+`4a17f147-192e-45c2-a23f-bc84d0f50ae5`. AUR-M10-005 is closed by combined Codex-observed runtime,
+automated safety coverage and explicitly classified Owner manual evidence. AUR-M10-006 is staging-only and does not authorize production deployment.

@@ -9,9 +9,9 @@
 - AUR-M10-002: `COMPLETE / PRIMARY REVIEW PASS / INDEPENDENT REVIEW PASS / FROZEN` (Code/config freeze SHA: `8890ba0e8325828e27d2234a3f8b242561fbe801`. Pre-independent-review code checkpoint: `bdaf39f4bbf462ab6729d86b83ea9afbf8421233` remains only as historical evidence.)
 - AUR-M10-003: `COMPLETE / PASS`
 - AUR-M10-004: `COMPLETE / PASS`
-- AUR-M10-005: `IN PROGRESS`
-- AUR-M10-006: `NOT STARTED / NOT AUTHORIZED`
-- Current evidence update: `2026-09-15`
+- AUR-M10-005: `COMPLETE / PASS`
+- AUR-M10-006: `AUTHORIZED / IN PROGRESS`
+- Current evidence update: `2026-09-16`
 - Independent targeted review: `PASS`
 - Audit date: 2026-09-14
 - Aureole audit base: `a2366ea08bc579e1368d52aaf8b5b5ee72aac195`
@@ -38,14 +38,14 @@ parsers, local recovery UX and 47 automated test files. The AUR-M10-001 SAFE-A
 baseline passes with 1074 tests and a production build within the documented
 bundle budgets.
 
-The highest Aureole runtime evidence is now L4 for the exact controlled
-non-financial mutations completed by AUR-M10-004. AUR-M10-003 provides L3
-deployment, Auth/Session, and page-driven read-only evidence. Payment and financial
-mutations remain at L2 unless separately noted.
+The highest Aureole runtime evidence now includes L5 functional payment completion through Owner manual verification,
+plus Codex-observed deployed Order/Checkout/QR/redirect/polling evidence and Owner-confirmed positive Gift Card,
+Commission Transfer and Withdrawal accepted paths. Evidence provenance remains explicit: Owner manual evidence is not
+represented as Codex browser automation, CI or callback telemetry.
 
-The principal remaining launch blockers are payment/financial verification,
-state-constrained residual coverage, the broader browser matrix, rollback drill,
-and final launch decisions.
+Payment/financial verification is closed by AUR-M10-005. The remaining launch-gate work is the broader deployed browser
+matrix, cache/artifact verification, staging rollback drill, observability/request-ID procedure, final blocker review and
+release checklist.
 
 ### Current Application/Artifact Contract (AUR-M10-002):
 
@@ -62,12 +62,13 @@ and final launch decisions.
 - staging project: `aureole-cc-staging-3dc609`.
 - staging URL: `https://aureole-cc-staging-3dc609.pages.dev`.
 
-### Unresolved State Beyond AUR-M10-004:
+### Residual State After AUR-M10-005:
 
 - active-subscription and accessUrl-present states were not available on the disposable account
 - conditional detail reads were not forced without a naturally safe ID
 - remaining state-constrained non-financial flows outside the completed AUR-M10-004 minimum
-- payment, wallet mutation, and financial runtime verification
+- exact provider callback payload/trace was not directly captured by Codex, although functional real payment is Owner manual PASS
+- mobile EPayQrcode provider behavior remains unverified unless covered by an actual owner-device run
 - rollback execution/drill
 - broader browser/device and final launch evidence
 - production uptime monitoring and request-ID correlation procedure
@@ -559,18 +560,15 @@ must remain `UNKNOWN` until the deployment owner supplies evidence.
 2. RESOLVED BY AUR-M10-002: Same-origin `/api/v1` default implemented. Artifact verification command implemented.
 3. RESOLVED BY AUR-M10-003 GATE 4: deployed browser login, `/me`, refresh
    restoration, protected navigation, credential confinement, and logout passed.
-4. Full v1 exposes payment and financial mutations, but none has deployed Aureole
-   runtime evidence. Payment callback/final Order Status and each exposed
-   irreversible financial path must be validated in an approved environment or
-   explicitly withheld from launch.
+4. RESOLVED BY AUR-M10-005: deployed Order/Create/Cancel, Checkout, QR/redirect, polling and financial safety evidence passed;
+   Owner manually confirmed real payment, Gift Card redemption, Commission Transfer and Withdrawal accepted paths on
+   2026-09-16. Exact callback payload/trace was not directly captured and remains an accepted observability residual.
 
 ### HIGH
 
 1. RESOLVED BY AUR-M10-002: Same-origin `/api/v1` is the DEFAULT. Cross-origin is an explicit exception.
-2. AUR-M10-003 verified the baseline Orders, Wallet, Subscription, Ticket List,
-   Referrals, Commission History, and Withdrawal Options GET authorities. Populated
-   mutation-recovery semantics remain unverified until their separately authorized
-   mutation phases.
+2. RESOLVED BY AUR-M10-004/AUR-M10-005: baseline authorities, controlled mutation recovery and the exposed financial
+   positive paths now have combined automated, Codex runtime and Owner manual evidence.
 3. Non-financial destructive flows such as password change, Rotate Access and
    Advance Period have no production runtime evidence and limited/no rollback.
 4. Notice HTML has strong local sanitizer evidence but no representative production
@@ -639,14 +637,13 @@ before a deployment contract exists:
    - Ticket Reply greatest-ID authority passed Primary/Independent review and R4
      staging runtime re-verification.
 4. `AUR-M10-005 - Payment, Wallet and Financial Runtime Verification`
-   - IN PROGRESS under explicit per-task authorization.
+   - COMPLETE / PASS.
    - C1 payment browser-context propagation passed Primary and Independent Review.
-   - C3 exact-SHA staging deployment and no-payment Alipay/WxPay EPayQrcode
-     verification are authorized against re-frozen solution `1530acf...`.
-   - provider callback/real paid status and remaining positive financial paths
-     remain subject to separate Primary decisions.
+   - C3 exact-SHA staging deployment and no-payment Alipay/WxPay EPayQrcode verification passed.
+   - Owner manual verification dated 2026-09-16 passed real payment, Gift Card, Commission Transfer and Withdrawal accepted paths.
+   - exact callback payload/trace was not directly captured by Codex.
 5. `AUR-M10-006 - Final Browser, Rollback and Launch Gate`
-   - NOT STARTED / NOT AUTHORIZED.
+   - AUTHORIZED / IN PROGRESS, staging only.
    - deployed desktop/mobile/browser matrix;
    - cache/rollback drill and observability check;
    - final BLOCKER closure and release checklist.
