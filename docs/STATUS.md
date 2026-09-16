@@ -18,7 +18,7 @@ fail-closed behavior.
 
 ## AUR-CF02 Multiple Subscription Entry Consumer
 
-Status: `IMPLEMENTATION COMPLETE / INDEPENDENT REVIEW PENDING`.
+Status: `ENGINEERING REVIEW HIGH FIX APPLIED / RE-REVIEW PENDING`.
 
 Aureole now uses `GET /api/v1/subscription/entries` for ordered entry discovery and
 `POST /api/v1/subscription/entry-access` as the only selected-entry credential source.
@@ -36,10 +36,18 @@ the same current selected access URL. Rotate keeps its existing confirmation, sy
 lock and UNKNOWN/recovery blocking, but discards its legacy response URL and re-resolves the
 current selected entry before credential actions return.
 
+Engineering Review HIGH-01 修复将 Rotate feedback、manual recovery owner 与 UNKNOWN
+acknowledgement 保持在 selected-entry remount boundary 之上。普通 entry switch 与 422 explicit
+reselection 都不会丢失 recovery UI，也不会自动清除 shared recovery block；当前 selected entry
+完成专用 authoritative recovery 后才重新开放 Rotate/Advance。UNKNOWN recovery 完成后仍要求
+“再次重置订阅地址”的 fresh acknowledgement。Credential Reveal/Copy/QR/Import 继续按新的
+`accessUrl` 独立重置。Destructive mutation 或其 recovery request 进行中临时锁定 selector，settle
+后才允许切换，防止旧 selection 的异步 continuation 被当成当前 recovery。
+
 This implementation is local/mock evidence only. Production Solution/V2Board CF-02 runtime
 and real client deep-link acceptance are `NOT TESTED`; no deployment was performed.
 
-Local evidence on 2026-09-16: format check, typecheck, lint, 52 test files / 1195 tests,
+Current local evidence: format check, typecheck, lint, 52 test files / 1200 tests,
 production build and diff check passed. Controlled browser verification passed on desktop and
 390 x 844 responsive Chrome in Light/Dark/System with multiple same-host entries, long pathname
 and credential text, local QR, all import actions, selection reset and no horizontal overflow or

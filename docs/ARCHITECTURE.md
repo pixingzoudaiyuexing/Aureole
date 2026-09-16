@@ -156,6 +156,14 @@ import transient state；恢复失败时旧 credential 不能重新启用，并�
 UNKNOWN 不根据 URL 变化推断因果，恢复成功后仍要求新的明确确认。Mutation 或 recovery 的 Auth failure
 继续复用 sealed Auth Session Core。AUR-M6-001 不请求 subscription content。
 
+Rotate feedback、recovery owner 与 UNKNOWN acknowledgement 的生命周期高于 selected entry；入口切换或
+`422 SUBSCRIPTION_ENTRY_UNAVAILABLE` 进入 explicit reselection 时不能卸载该 owner。Credential
+Reveal/Copy/QR/Import 仍由 `accessUrl` keyed child 独立重置。Recovery block 期间，普通 entry switch 不会
+自动解除 block；用户完成 explicit selection 后，必须通过仍可见的 manual recovery 对当前 selected entry
+再次进行 authoritative read，成功后才能解除 Rotate/Advance block。若原 outcome 为 UNKNOWN，恢复后仍
+保留“再次重置订阅地址”及专用 acknowledgement。Destructive mutation 与其 entry-access recovery request
+进行中会临时锁定 selector，避免异步 continuation 对旧 selection 完成恢复；请求 settle 后才重新允许切换。
+
 AUR-M6-002 增加 bodyless `POST /api/v1/subscription/advance-period`，成功只接受
 `advanced=true`，additive fields 在 API boundary 被 strip。Advance 与 Rotate 共用同一个同步锁，
 因此任一 mutation pending 时另一个不能提交，same-tick 跨操作确认也最多产生一个 destructive

@@ -32,6 +32,7 @@ export function SubscriptionAccessPanel({
   accessToken,
   mutationCoordinator,
   refreshAccess,
+  canRecoverAccess,
 }: {
   accessUrl: string | null
   accessPending: boolean
@@ -40,6 +41,7 @@ export function SubscriptionAccessPanel({
   accessToken: string
   mutationCoordinator: SubscriptionMutationCoordinator
   refreshAccess: () => Promise<void>
+  canRecoverAccess: boolean
 }) {
   const [confirmationOpen, setConfirmationOpen] = useState(false)
   const [acknowledged, setAcknowledged] = useState(false)
@@ -174,17 +176,26 @@ export function SubscriptionAccessPanel({
       {feedback ? <RotationFeedbackMessage feedback={feedback} /> : null}
 
       {recoveryFailed ? (
-        <Button
-          type="button"
-          variant="outline"
-          disabled={recovering}
-          onClick={() => void recoverCurrentAccess()}
-        >
-          {recovering ? (
-            <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-          ) : null}
-          {recovering ? '正在重新读取…' : '重新读取订阅地址'}
-        </Button>
+        canRecoverAccess ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={recovering}
+            onClick={() => void recoverCurrentAccess()}
+          >
+            {recovering ? (
+              <LoaderCircle
+                className="size-4 animate-spin"
+                aria-hidden="true"
+              />
+            ) : null}
+            {recovering ? '正在重新读取…' : '重新读取订阅地址'}
+          </Button>
+        ) : (
+          <p className="text-sm text-muted-foreground" role="status">
+            请先重新选择可用的订阅入口，再重新读取订阅地址。
+          </p>
+        )
       ) : null}
 
       <Dialog

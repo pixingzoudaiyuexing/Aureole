@@ -279,12 +279,11 @@ function SubscriptionEntryAccessReady({
 
   if (invalidSessionError) return null
   const availableEntries = entries
-  if (availableEntries.length === 0) {
-    return <p className="text-sm text-muted-foreground">暂无可用订阅入口</p>
-  }
-
+  const selectionLocked =
+    mutationCoordinator.activeAction !== null || refreshingAccess
+  let selectionControl = null
   if (selection.requiresReselection) {
-    return (
+    selectionControl = (
       <div className="space-y-4" role="alert">
         <p className="text-sm font-semibold">原订阅入口已不可用，请重新选择</p>
         {reselectionRefreshing ? (
@@ -297,14 +296,42 @@ function SubscriptionEntryAccessReady({
             error={reselectionRefreshError}
             retry={() => void refreshEntriesForReselection()}
           />
+        ) : availableEntries.length === 0 ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              暂无可重新选择的订阅入口。
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void refreshEntriesForReselection()}
+            >
+              重新读取订阅入口
+            </Button>
+          </div>
         ) : (
-          <EntryChoices entries={availableEntries} onSelect={selectEntry} />
+          <EntryChoices
+            entries={availableEntries}
+            disabled={selectionLocked}
+            onSelect={selectEntry}
+          />
         )}
       </div>
     )
+  } else if (availableEntries.length === 0) {
+    selectionControl = (
+      <p className="text-sm text-muted-foreground">暂无可用订阅入口</p>
+    )
+  } else if (selectedBaseUrl) {
+    selectionControl = (
+      <EntrySelector
+        entries={availableEntries}
+        selectedBaseUrl={selectedBaseUrl}
+        disabled={selectionLocked}
+        onSelect={selectEntry}
+      />
+    )
   }
-
-  if (!selectedBaseUrl) return null
 
   const accessUnavailable = isApiCode(
     refreshAccessError ?? accessQuery.error,
@@ -316,25 +343,22 @@ function SubscriptionEntryAccessReady({
   const visibleAccessUrl = credentialSuppressed
     ? null
     : (accessQuery.data?.accessUrl ?? null)
+  const accessPending =
+    selectedBaseUrl !== null &&
+    (refreshingAccess || accessQuery.isPending || accessQuery.isFetching)
 
   return (
     <div className="space-y-5">
-      <EntrySelector
-        entries={availableEntries}
-        selectedBaseUrl={selectedBaseUrl}
-        onSelect={selectEntry}
-      />
+      {selectionControl}
       <SubscriptionAccessPanel
-        key={selectedBaseUrl}
         accessUrl={visibleAccessUrl}
-        accessPending={
-          refreshingAccess || accessQuery.isPending || accessQuery.isFetching
-        }
+        accessPending={accessPending}
         accessUnavailable={accessUnavailable}
         accessError={accessError}
         accessToken={accessToken}
         mutationCoordinator={mutationCoordinator}
         refreshAccess={refreshSelectedAccess}
+        canRecoverAccess={selectedBaseUrl !== null && !accessPending}
       />
     </div>
   )
@@ -343,10 +367,12 @@ function SubscriptionEntryAccessReady({
 function EntrySelector({
   entries,
   selectedBaseUrl,
+  disabled,
   onSelect,
 }: {
   entries: SubscriptionEntry[]
   selectedBaseUrl: string
+  disabled: boolean
   onSelect: (baseUrl: string) => void
 }) {
   const selectedIndex = entries.findIndex(
@@ -375,6 +401,7 @@ function EntrySelector({
         aria-label="订阅入口"
         className="mt-2 h-11 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         value={selectedBaseUrl}
+        disabled={disabled}
         onChange={(event) => onSelect(event.target.value)}
       >
         {entries.map((entry, index) => {
@@ -397,9 +424,11 @@ function EntrySelector({
 
 function EntryChoices({
   entries,
+  disabled,
   onSelect,
 }: {
   entries: SubscriptionEntry[]
+  disabled: boolean
   onSelect: (baseUrl: string) => void
 }) {
   return (
@@ -411,6 +440,7 @@ function EntryChoices({
             <Button
               type="button"
               variant="outline"
+              disabled={disabled}
               onClick={() => onSelect(entry.baseUrl)}
             >
               使用入口 {index + 1}

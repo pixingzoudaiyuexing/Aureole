@@ -18,10 +18,25 @@ import {
   type SubscriptionAccessRotation,
   type SubscriptionOverview,
 } from '@/features/subscription/subscription-api'
+import {
+  buildSubscriptionImportUri,
+  subscriptionImportNavigation,
+} from '@/features/subscription/subscription-imports'
 import { subscriptionQueryKeys } from '@/features/subscription/subscription-queries'
+import { SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY } from '@/features/subscription/subscription-selection-storage'
 import { trafficApi } from '@/features/traffic/traffic-api'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
+
+vi.mock('qrcode.react', () => ({
+  QRCodeSVG: ({ value }: { value: string }) => (
+    <svg data-testid="subscription-qr" data-value={value} />
+  ),
+}))
+
+const entryA = 'https://a.example.com'
+const entryB = 'https://b.example.com/path'
+const entryC = 'https://c.example.com/path'
 
 const oldCredentialUrl =
   'https://gateway.example/api/v1/access/subscription?token=fake-old-token'
@@ -29,6 +44,8 @@ const newCredentialUrl =
   'https://gateway.example/api/v1/access/subscription?token=fake-new-token'
 const laterCredentialUrl =
   'https://gateway.example/api/v1/access/subscription?token=fake-later-token'
+const entryBCredentialUrl = `${entryB}/api/v1/client/subscribe?token=fake-entry-b`
+const entryCCredentialUrl = `${entryC}/api/v1/client/subscribe?token=fake-entry-c`
 
 const currentUser: CurrentUser = {
   email: 'member@example.com',
@@ -51,7 +68,7 @@ const overview: SubscriptionOverview = {
 }
 
 function installMocks() {
-  vi.spyOn(subscriptionApi, 'getEntries').mockResolvedValue({
+  const getEntries = vi.spyOn(subscriptionApi, 'getEntries').mockResolvedValue({
     entries: [{ baseUrl: 'https://entry.example/subscriptions' }],
   })
   const getAccess = vi
@@ -65,7 +82,7 @@ function installMocks() {
     .mockResolvedValue({ advanced: true })
   vi.spyOn(subscriptionApi, 'getOverview').mockResolvedValue(overview)
   vi.spyOn(trafficApi, 'getLogs').mockResolvedValue([])
-  return { advancePeriod, getAccess, rotateAccess }
+  return { advancePeriod, getAccess, getEntries, rotateAccess }
 }
 
 function renderSubscription(queryClient: QueryClient = createQueryClient()) {
@@ -500,6 +517,337 @@ describe('Subscription access rotation', () => {
     expect(mocks.getAccess).toHaveBeenCalledTimes(3)
     expect(mocks.rotateAccess).toHaveBeenCalledOnce()
     expect(mocks.advancePeriod).not.toHaveBeenCalled()
+  })
+
+  it('keeps a valid recovery owner after reconciliation failure and an entry switch', async () => {
+    const mocks = installMocks()
+    window.sessionStorage.setItem(
+      SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY,
+      entryB,
+    )
+    mocks.getEntries.mockResolvedValue({
+      entries: [entryA, entryB, entryC].map((baseUrl) => ({ baseUrl })),
+    })
+    let bReads = 0
+    let cReads = 0
+    mocks.getAccess.mockImplementation(async (_token, baseUrl) => {
+      if (baseUrl === entryB) {
+        bReads += 1
+        if (bReads === 1) return { accessUrl: entryBCredentialUrl }
+        throw new ApiError({
+          status: 0,
+          code: 'NETWORK_ERROR',
+          message: 'offline',
+        })
+      }
+      if (baseUrl === entryC) {
+        cReads += 1
+        return { accessUrl: entryCCredentialUrl }
+      }
+      return { accessUrl: oldCredentialUrl }
+    })
+    renderSubscription()
+    const first = await openConfirmation()
+    await acknowledgeAndConfirm(first.dialog, first.user)
+
+    expect(
+      await screen.findByRole('button', { name: '重新读取订阅地址' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: '提前进入下一周期' }),
+    ).toBeNull()
+
+    await first.user.selectOptions(
+      screen.getByRole('combobox', { name: '订阅入口' }),
+      entryC,
+    )
+    expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: '重新读取订阅地址' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: '提前进入下一周期' }),
+    ).toBeNull()
+
+    await first.user.click(
+      screen.getByRole('button', { name: '重新读取订阅地址' }),
+    )
+
+    expect(
+      await screen.findByRole('button', { name: '重置订阅地址' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: '提前进入下一周期' }),
+    ).toBeEnabled()
+    expect(cReads).toBe(2)
+    expect(mocks.rotateAccess).toHaveBeenCalledOnce()
+  })
+
+  it('preserves UNKNOWN acknowledgement after switching to a recovered entry', async () => {
+    const mocks = installMocks()
+    window.sessionStorage.setItem(
+      SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY,
+      entryB,
+    )
+    mocks.getEntries.mockResolvedValue({
+      entries: [entryA, entryB, entryC].map((baseUrl) => ({ baseUrl })),
+    })
+    mocks.rotateAccess.mockRejectedValue(
+      new ApiError({
+        status: 0,
+        code: 'NETWORK_ERROR',
+        message: 'unknown',
+      }),
+    )
+    let bReads = 0
+    mocks.getAccess.mockImplementation(async (_token, baseUrl) => {
+      if (baseUrl === entryB) {
+        bReads += 1
+        if (bReads === 1) return { accessUrl: entryBCredentialUrl }
+        throw new ApiError({
+          status: 0,
+          code: 'NETWORK_ERROR',
+          message: 'offline',
+        })
+      }
+      if (baseUrl === entryC) return { accessUrl: entryCCredentialUrl }
+      return { accessUrl: oldCredentialUrl }
+    })
+    renderSubscription()
+    const first = await openConfirmation()
+    await acknowledgeAndConfirm(first.dialog, first.user)
+    await screen.findByText('重置请求结果暂时无法确认。')
+
+    await first.user.selectOptions(
+      screen.getByRole('combobox', { name: '订阅入口' }),
+      entryC,
+    )
+    await screen.findByLabelText('订阅地址已隐藏')
+    await first.user.click(
+      screen.getByRole('button', { name: '重新读取订阅地址' }),
+    )
+
+    const second = await openConfirmation('再次重置订阅地址', first.user)
+    expect(
+      within(second.dialog).getByLabelText(
+        '我已确认并保存当前订阅地址，仍要再次重置',
+      ),
+    ).not.toBeChecked()
+    expect(mocks.rotateAccess).toHaveBeenCalledOnce()
+  })
+
+  it('keeps Rotate and Advance recoverable after reconciliation returns 422', async () => {
+    const mocks = installMocks()
+    window.sessionStorage.setItem(
+      SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY,
+      entryB,
+    )
+    mocks.getEntries
+      .mockResolvedValueOnce({
+        entries: [entryA, entryB, entryC].map((baseUrl) => ({ baseUrl })),
+      })
+      .mockResolvedValue({
+        entries: [entryA, entryC].map((baseUrl) => ({ baseUrl })),
+      })
+    let bReads = 0
+    let cReads = 0
+    mocks.getAccess.mockImplementation(async (_token, baseUrl) => {
+      if (baseUrl === entryB) {
+        bReads += 1
+        if (bReads === 1) return { accessUrl: entryBCredentialUrl }
+        throw new ApiError({
+          status: 422,
+          code: 'SUBSCRIPTION_ENTRY_UNAVAILABLE',
+          message: 'stale',
+        })
+      }
+      if (baseUrl === entryC) {
+        cReads += 1
+        return { accessUrl: entryCCredentialUrl }
+      }
+      return { accessUrl: oldCredentialUrl }
+    })
+    renderSubscription()
+    const first = await openConfirmation()
+    await acknowledgeAndConfirm(first.dialog, first.user)
+
+    expect(
+      await screen.findByText('原订阅入口已不可用，请重新选择'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('请先重新选择可用的订阅入口，再重新读取订阅地址。'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(entryBCredentialUrl)).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: '提前进入下一周期' }),
+    ).toBeNull()
+
+    await first.user.click(
+      await screen.findByRole('button', { name: '使用入口 2' }),
+    )
+    await screen.findByLabelText('订阅地址已隐藏')
+    expect(
+      screen.getByRole('button', { name: '重新读取订阅地址' }),
+    ).toBeInTheDocument()
+    await first.user.click(
+      screen.getByRole('button', { name: '重新读取订阅地址' }),
+    )
+
+    expect(
+      await screen.findByRole('button', { name: '重置订阅地址' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: '提前进入下一周期' }),
+    ).toBeEnabled()
+    expect(cReads).toBe(2)
+    expect(mocks.getEntries).toHaveBeenCalledTimes(2)
+  })
+
+  it('preserves UNKNOWN duplicate protection across 422 and explicit reselection', async () => {
+    const mocks = installMocks()
+    window.sessionStorage.setItem(
+      SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY,
+      entryB,
+    )
+    mocks.getEntries
+      .mockResolvedValueOnce({
+        entries: [entryA, entryB, entryC].map((baseUrl) => ({ baseUrl })),
+      })
+      .mockResolvedValue({
+        entries: [entryA, entryC].map((baseUrl) => ({ baseUrl })),
+      })
+    mocks.rotateAccess.mockRejectedValue(
+      new ApiError({
+        status: 0,
+        code: 'NETWORK_ERROR',
+        message: 'unknown',
+      }),
+    )
+    let bReads = 0
+    mocks.getAccess.mockImplementation(async (_token, baseUrl) => {
+      if (baseUrl === entryB) {
+        bReads += 1
+        if (bReads === 1) return { accessUrl: entryBCredentialUrl }
+        throw new ApiError({
+          status: 422,
+          code: 'SUBSCRIPTION_ENTRY_UNAVAILABLE',
+          message: 'stale',
+        })
+      }
+      if (baseUrl === entryC) return { accessUrl: entryCCredentialUrl }
+      return { accessUrl: oldCredentialUrl }
+    })
+    renderSubscription()
+    const first = await openConfirmation()
+    await acknowledgeAndConfirm(first.dialog, first.user)
+
+    expect(
+      await screen.findByText('原订阅入口已不可用，请重新选择'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(entryBCredentialUrl)).toBeNull()
+    await first.user.click(
+      await screen.findByRole('button', { name: '使用入口 2' }),
+    )
+    await screen.findByLabelText('订阅地址已隐藏')
+    await first.user.click(
+      screen.getByRole('button', { name: '重新读取订阅地址' }),
+    )
+
+    const second = await openConfirmation('再次重置订阅地址', first.user)
+    expect(
+      within(second.dialog).getByLabelText(
+        '我已确认并保存当前订阅地址，仍要再次重置',
+      ),
+    ).not.toBeChecked()
+    expect(mocks.rotateAccess).toHaveBeenCalledOnce()
+    await second.user.click(
+      within(second.dialog).getByRole('button', { name: '返回' }),
+    )
+    expect(
+      screen.getByRole('button', { name: '提前进入下一周期' }),
+    ).toBeEnabled()
+  })
+
+  it('keeps all credential actions bound to C after UNKNOWN plus 422 recovery', async () => {
+    const mocks = installMocks()
+    window.sessionStorage.setItem(
+      SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY,
+      entryB,
+    )
+    mocks.getEntries
+      .mockResolvedValueOnce({
+        entries: [entryA, entryB, entryC].map((baseUrl) => ({ baseUrl })),
+      })
+      .mockResolvedValue({
+        entries: [entryA, entryC].map((baseUrl) => ({ baseUrl })),
+      })
+    mocks.rotateAccess.mockRejectedValue(
+      new ApiError({
+        status: 0,
+        code: 'NETWORK_ERROR',
+        message: 'unknown',
+      }),
+    )
+    let bReads = 0
+    mocks.getAccess.mockImplementation(async (_token, baseUrl) => {
+      if (baseUrl === entryB) {
+        bReads += 1
+        if (bReads === 1) return { accessUrl: entryBCredentialUrl }
+        throw new ApiError({
+          status: 422,
+          code: 'SUBSCRIPTION_ENTRY_UNAVAILABLE',
+          message: 'stale',
+        })
+      }
+      if (baseUrl === entryC) return { accessUrl: entryCCredentialUrl }
+      return { accessUrl: oldCredentialUrl }
+    })
+    const navigation = vi
+      .spyOn(subscriptionImportNavigation, 'goTo')
+      .mockImplementation(() => undefined)
+    renderSubscription()
+    const first = await openConfirmation()
+    const writeText = installClipboard()
+    await acknowledgeAndConfirm(first.dialog, first.user)
+    await screen.findByText('原订阅入口已不可用，请重新选择')
+    await first.user.click(
+      await screen.findByRole('button', { name: '使用入口 2' }),
+    )
+    await screen.findByLabelText('订阅地址已隐藏')
+    await first.user.click(
+      screen.getByRole('button', { name: '重新读取订阅地址' }),
+    )
+    await screen.findByRole('button', { name: '再次重置订阅地址' })
+
+    await first.user.click(screen.getByRole('button', { name: '显示' }))
+    expect(screen.getByText(entryCCredentialUrl)).toBeInTheDocument()
+    expect(screen.queryByText(entryBCredentialUrl)).toBeNull()
+    await first.user.click(screen.getByRole('button', { name: '复制' }))
+    expect(writeText).toHaveBeenCalledWith(entryCCredentialUrl)
+    await first.user.click(screen.getByRole('button', { name: '显示二维码' }))
+    expect(screen.getByTestId('subscription-qr')).toHaveAttribute(
+      'data-value',
+      entryCCredentialUrl,
+    )
+
+    for (const [label, client] of [
+      ['Clash', 'clash'],
+      ['Shadowrocket', 'shadowrocket'],
+      ['Quantumult X', 'quantumult-x'],
+      ['SingBox', 'sing-box'],
+    ] as const) {
+      await first.user.click(screen.getByRole('button', { name: label }))
+      expect(navigation).toHaveBeenLastCalledWith(
+        buildSubscriptionImportUri(client, entryCCredentialUrl),
+      )
+    }
+
+    const durableState = JSON.stringify({
+      local: { ...window.localStorage },
+      session: { ...window.sessionStorage },
+    })
+    expect(durableState).not.toContain(entryBCredentialUrl)
+    expect(durableState).not.toContain(entryCCredentialUrl)
   })
 
   it.each([
