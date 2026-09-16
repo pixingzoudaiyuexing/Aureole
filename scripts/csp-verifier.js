@@ -1,5 +1,67 @@
 import crypto from 'node:crypto'
 
+function getCsp(headersContent) {
+  const cspMatch = headersContent.match(/Content-Security-Policy:\s*(.*)/i)
+  if (!cspMatch)
+    throw new Error('Content-Security-Policy not found in _headers')
+  return cspMatch[1]
+}
+
+function getDirectiveSources(csp, name) {
+  const directive = csp
+    .split(';')
+    .map((entry) => entry.trim())
+    .find((entry) => entry.toLowerCase().startsWith(`${name.toLowerCase()} `))
+  if (!directive) throw new Error(`${name} directive not found in CSP`)
+  return directive.split(/\s+/).slice(1)
+}
+
+function requireExactDirective(csp, name, expectedSources) {
+  const sources = getDirectiveSources(csp, name)
+  if (
+    sources.length !== expectedSources.length ||
+    expectedSources.some((source) => !sources.includes(source))
+  ) {
+    throw new Error(
+      `${name} must be exactly ${expectedSources.join(' ')}, received ${sources.join(' ')}`,
+    )
+  }
+}
+
+export function verifyCspPolicy(headersContent) {
+  const csp = getCsp(headersContent)
+  requireExactDirective(csp, 'default-src', ["'self'"])
+  requireExactDirective(csp, 'base-uri', ["'self'"])
+  requireExactDirective(csp, 'object-src', ["'none'"])
+  requireExactDirective(csp, 'frame-ancestors', ["'none'"])
+  requireExactDirective(csp, 'form-action', ["'self'"])
+  requireExactDirective(csp, 'connect-src', ["'self'"])
+
+  const frameSources = getDirectiveSources(csp, 'frame-src')
+  if (!frameSources.includes('https:')) {
+    throw new Error('frame-src must allow https:')
+  }
+  for (const unsafeSource of ["'none'", '*', 'http:', 'data:', 'blob:']) {
+    if (frameSources.includes(unsafeSource)) {
+      throw new Error(`frame-src must not allow ${unsafeSource}`)
+    }
+  }
+  if (frameSources.length !== 1) {
+    throw new Error('frame-src must be exactly https:')
+  }
+
+  const scriptSources = getDirectiveSources(csp, 'script-src')
+  if (!scriptSources.includes("'self'")) {
+    throw new Error("script-src must include 'self'")
+  }
+  for (const unsafeSource of ['*', "'unsafe-inline'", "'unsafe-eval'"]) {
+    if (scriptSources.includes(unsafeSource)) {
+      throw new Error(`script-src must not allow ${unsafeSource}`)
+    }
+  }
+  return csp
+}
+
 function hasGenuineSrcAttribute(attrsString) {
   let i = 0
   const n = attrsString.length
@@ -51,10 +113,7 @@ function hasGenuineSrcAttribute(attrsString) {
 }
 
 export function verifyCspHashes(indexHtml, headersContent) {
-  const cspMatch = headersContent.match(/Content-Security-Policy:\s*(.*)/i)
-  if (!cspMatch)
-    throw new Error('Content-Security-Policy not found in _headers')
-  const csp = cspMatch[1]
+  const csp = verifyCspPolicy(headersContent)
   const scriptSrcMatch = csp.match(/script-src\s+([^;]*)/i)
   if (!scriptSrcMatch) throw new Error('script-src directive not found in CSP')
   const scriptSrc = scriptSrcMatch[1]

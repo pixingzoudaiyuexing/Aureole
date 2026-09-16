@@ -137,6 +137,16 @@ Other recommended headers:
 - `Permissions-Policy` (configured as strictly as possible)
 - Frame control (e.g., `frame-ancestors 'none'`)
 
+CF-03 Custom Pages 将 `frame-src` 固定为 `https:`，允许 Aureole 嵌入源码配置中的 HTTPS iframe。
+这不改变 `frame-ancestors 'none'`：前者控制 Aureole 可以嵌入什么，后者继续禁止其他页面嵌入 Aureole。
+不得为 Custom Pages 放宽 `connect-src`、`script-src`、`object-src` 或其他 directive，也不维护第二份
+iframe host allowlist。目标页面仍可通过自己的 X-Frame-Options/CSP 拒绝 framing；Aureole 不代理、重写
+或剥离这些 header，受影响页面使用新窗口 fallback。
+
+Custom Page 配置属于 source/build/redeploy 输入，不是 runtime env、Secret 或远程配置。正常 build 会执行
+同一 validator 并拒绝非 HTTPS、credential-bearing URL、重复/非法 ID 和无效 mode/icon/order。生产 artifact
+默认不包含任何虚构 Custom Page。
+
 **reCAPTCHA Conditional CSP:**
 If Google reCAPTCHA is enabled, document conditional additional Google origins required for script/frame/connect sources.
 

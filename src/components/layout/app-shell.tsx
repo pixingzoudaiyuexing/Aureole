@@ -6,18 +6,25 @@ import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { navigationItems } from '@/config/navigation'
+import { isCustomPageRoutePath } from '@/config/custom-pages'
+import { getNavigationPageTitle } from '@/config/navigation'
 import { AccountSummary } from '@/features/auth/account-summary'
+import { cn } from '@/lib/utils'
 
 export function AppShell() {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
-  const pageTitle =
-    navigationItems.find((item) => item.to === pathname)?.label ?? 'Aureole'
+  const pageTitle = getNavigationPageTitle(pathname)
+  const customPageLayout = isCustomPageRoutePath(pathname)
 
   return (
-    <div className="min-h-screen bg-background lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)]">
+    <div
+      className={cn(
+        'min-h-screen bg-background lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)]',
+        customPageLayout && 'h-[100dvh] min-h-0 overflow-hidden',
+      )}
+    >
       <aside className="hidden border-r border-border bg-card lg:flex lg:h-screen lg:flex-col lg:sticky lg:top-0">
         <div className="flex h-16 items-center px-5">
           <Brand />
@@ -27,8 +34,13 @@ export function AppShell() {
         <AccountSummary />
       </aside>
 
-      <div className="min-w-0">
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur-sm sm:px-6">
+      <div
+        className={cn(
+          'min-w-0',
+          customPageLayout && 'flex h-full min-h-0 flex-col',
+        )}
+      >
+        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur-sm sm:px-6">
           <div className="lg:hidden">
             <Sheet>
               <SheetTrigger asChild>
@@ -57,7 +69,14 @@ export function AppShell() {
           <ThemeToggle />
         </header>
 
-        <main className="mx-auto w-full max-w-[82rem] px-4 py-8 sm:px-6 sm:py-10 lg:px-10">
+        <main
+          data-layout={customPageLayout ? 'custom-page' : 'standard'}
+          className={
+            customPageLayout
+              ? 'flex min-h-0 w-full flex-1 overflow-hidden'
+              : 'mx-auto w-full max-w-[82rem] px-4 py-8 sm:px-6 sm:py-10 lg:px-10'
+          }
+        >
           <Outlet />
         </main>
       </div>

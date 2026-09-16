@@ -48,6 +48,32 @@ src/
 
 TanStack Router 插件启用 route-level auto code splitting；生成的 `src/routeTree.gen.ts` 提交到 Git，业务 route 产出独立 lazy chunk。
 
+## Custom Pages
+
+CF-03 使用 `src/config/custom-pages.ts` 作为唯一 Custom Page SSOT。配置由 Aureole source/deployment
+持有，修改后必须重新 build/redeploy；生产默认配置为空。相同 validator 同时在应用模块与
+`vite.config.ts` build boundary 执行，严格检查 stable lowercase slug ID、唯一性、trimmed bounded title、
+HTTPS-only URL、无 URL credentials、mode、enabled、safe-integer order 与本地 icon identifier。无效配置
+使普通 `npm run build` 和 release build fail closed。
+
+启用页按 explicit order 升序排列，同 order 保持 source order，无 order 项置后并保持 source order。
+导航沿用现有 Sidebar/Sheet，位置固定在 core application items 与 Account 之间。External mode 使用
+`target="_blank" rel="noopener noreferrer"` 的语义 anchor；iframe mode 使用 authenticated
+`/custom/$customPageId`，只按 stable ID 解析 enabled iframe entries。unknown、disabled 或 external-mode
+direct route 都只显示本地 unavailable state，不 iframe、不 redirect。
+
+iframe 使用 validated configured URL 原值作为 `src` 和新窗口 fallback，不附加 token、user/account、
+subscription 或 Aureole state。V1 无 Auth bridge、cookie bridge、postMessage、raw HTML、remote icon 或
+Solution/V2Board dependency。AppShell 只对 `/custom/*` 使用 `100dvh`/flex/min-h-0 full-content layout；普通
+业务路由继续使用既有 max-width/padding。
+
+V1 为兼容 VitePress 与独立静态工具而不设置 iframe `sandbox`。任意 sandbox 若需要支持 scripts、
+same-origin、forms、downloads 或 popups，既可能破坏目标工具，也不能替代目标信任判断。补偿边界是：配置仅
+来自受审源码、HTTPS-only build validation、CSP `frame-src https:`、浏览器 same-origin isolation、
+`referrerPolicy="no-referrer"`、无 Auth bridge/postMessage/script injection，以及始终可用的精确 URL 新窗口
+fallback。跨域 iframe 的 X-Frame-Options、frame-ancestors、DNS 和 remote failure 无法被 Aureole 可靠
+分类；UI 只显示中性 loading/help，不声称具体故障原因。
+
 ## API client
 
 `src/lib/api` 使用 native `fetch` typed wrapper，集中处理 base URL、JSON、public envelope、HTTP status、requestId、network error 与 malformed response。路径必须以 `/api/v1/` 开头。业务分类只能依据 `ApiError.code`，禁止 `message.includes(...)`。

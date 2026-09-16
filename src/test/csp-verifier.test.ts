@@ -3,6 +3,8 @@ import { describe, it, expect } from 'vitest'
 import crypto from 'node:crypto'
 // @ts-expect-error missing typings for scripts
 import { verifyCspHashes } from '../../scripts/csp-verifier.js'
+// @ts-expect-error missing typings for scripts
+import { verifyCspPolicy } from '../../scripts/csp-verifier.js'
 
 describe('CSP Hash Drift Verification', () => {
   const getHash = (content: string) => {
@@ -13,7 +15,7 @@ describe('CSP Hash Drift Verification', () => {
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' ${hashes.join(' ')}
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; connect-src 'self'; script-src 'self' ${hashes.join(' ')}; frame-src https:
 `
 
   it('CASE A: current one inline theme script + correct hash → PASS', () => {
@@ -226,5 +228,40 @@ describe('CSP Hash Drift Verification', () => {
     const headersContent = buildHeaders([getHash(inlineScript)])
 
     expect(() => verifyCspHashes(indexHtml, headersContent)).not.toThrow()
+  })
+
+  it('CASE T: CF-03 frame-src https: with frozen security directives → PASS', () => {
+    const script = `console.log('theme script');`
+    expect(() => verifyCspPolicy(buildHeaders([getHash(script)]))).not.toThrow()
+  })
+
+  it.each(['*', 'http:', 'data:', 'blob:', "'none'"])(
+    'CASE U: unsafe frame-src %s → FAIL',
+    (source) => {
+      const script = `console.log('theme script');`
+      const headers = buildHeaders([getHash(script)]).replace(
+        'frame-src https:',
+        `frame-src ${source}`,
+      )
+      expect(() => verifyCspPolicy(headers)).toThrowError('frame-src')
+    },
+  )
+
+  it('CASE V: frame-ancestors broadening → FAIL', () => {
+    const script = `console.log('theme script');`
+    const headers = buildHeaders([getHash(script)]).replace(
+      "frame-ancestors 'none'",
+      'frame-ancestors https:',
+    )
+    expect(() => verifyCspPolicy(headers)).toThrowError('frame-ancestors')
+  })
+
+  it('CASE W: connect-src broadening → FAIL', () => {
+    const script = `console.log('theme script');`
+    const headers = buildHeaders([getHash(script)]).replace(
+      "connect-src 'self'",
+      'connect-src *',
+    )
+    expect(() => verifyCspPolicy(headers)).toThrowError('connect-src')
   })
 })

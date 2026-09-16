@@ -25,6 +25,7 @@ import { Route as AppWalletRouteImport } from './routes/_app.wallet'
 import { Route as PublicForgotPasswordRouteImport } from './routes/_public.forgot-password'
 import { Route as PublicLoginRouteImport } from './routes/_public.login'
 import { Route as PublicRegisterRouteImport } from './routes/_public.register'
+import { Route as AppCustomCustomPageIdRouteImport } from './routes/_app.custom.$customPageId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -104,6 +105,11 @@ const PublicRegisterRoute = PublicRegisterRouteImport.update({
   path: '/register',
   getParentRoute: () => PublicRoute,
 } as any)
+const AppCustomCustomPageIdRoute = AppCustomCustomPageIdRouteImport.update({
+  id: '/custom/$customPageId',
+  path: '/custom/$customPageId',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -120,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof PublicForgotPasswordRoute
   '/login': typeof PublicLoginRoute
   '/register': typeof PublicRegisterRoute
+  '/custom/$customPageId': typeof AppCustomCustomPageIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -136,6 +143,7 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof PublicForgotPasswordRoute
   '/login': typeof PublicLoginRoute
   '/register': typeof PublicRegisterRoute
+  '/custom/$customPageId': typeof AppCustomCustomPageIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -155,6 +163,7 @@ export interface FileRoutesById {
   '/_public/forgot-password': typeof PublicForgotPasswordRoute
   '/_public/login': typeof PublicLoginRoute
   '/_public/register': typeof PublicRegisterRoute
+  '/_app/custom/$customPageId': typeof AppCustomCustomPageIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -173,6 +182,7 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/register'
+    | '/custom/$customPageId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -189,6 +199,7 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/register'
+    | '/custom/$customPageId'
   id:
     | '__root__'
     | '/'
@@ -207,6 +218,7 @@ export interface FileRouteTypes {
     | '/_public/forgot-password'
     | '/_public/login'
     | '/_public/register'
+    | '/_app/custom/$customPageId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -329,6 +341,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicRegisterRouteImport
       parentRoute: typeof PublicRoute
     }
+    '/_app/custom/$customPageId': {
+      id: '/_app/custom/$customPageId'
+      path: '/custom/$customPageId'
+      fullPath: '/custom/$customPageId'
+      preLoaderRoute: typeof AppCustomCustomPageIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -343,6 +362,7 @@ interface AppRouteChildren {
   AppSubscriptionRoute: typeof AppSubscriptionRoute
   AppSupportRoute: typeof AppSupportRoute
   AppWalletRoute: typeof AppWalletRoute
+  AppCustomCustomPageIdRoute: typeof AppCustomCustomPageIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -356,6 +376,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSubscriptionRoute: AppSubscriptionRoute,
   AppSupportRoute: AppSupportRoute,
   AppWalletRoute: AppWalletRoute,
+  AppCustomCustomPageIdRoute: AppCustomCustomPageIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

@@ -30,6 +30,7 @@ describe('Cloudflare Pages Routing Artifacts', () => {
       '/subscription',
       '/support',
       '/wallet',
+      '/custom/*',
       '/forgot-password',
       '/login',
       '/register',
@@ -60,7 +61,9 @@ describe('Cloudflare Pages Routing Artifacts', () => {
     expect(rules.some(({ destination }) => destination === '/index.html')).toBe(
       false,
     )
-    expect(rules.some(({ source }) => source.includes('*'))).toBe(false)
+    expect(rules.filter(({ source }) => source.includes('*'))).toEqual([
+      { source: '/custom/*', destination: '/', status: '200' },
+    ])
 
     expect(rules).toHaveLength(expectedRoutes.length)
   })
@@ -176,12 +179,16 @@ describe('Cloudflare Pages Routing Artifacts', () => {
     expect(csp).toContain("style-src 'self' 'unsafe-inline'")
     expect(csp).toContain("img-src 'self' data: https:")
     expect(csp).toContain("font-src 'self' data:")
-    expect(csp).toContain("frame-src 'none'")
+    expect(csp).toContain('frame-src https:')
 
     // Should NOT contain unsafe things
     expect(csp).not.toContain("script-src 'unsafe-inline'")
     expect(csp).not.toContain('script-src *')
     expect(csp).not.toContain('connect-src *')
+    expect(csp).not.toContain('frame-src *')
+    expect(csp).not.toContain('frame-src http:')
+    expect(csp).not.toContain('frame-src data:')
+    expect(csp).not.toContain('frame-src blob:')
     expect(csp).not.toContain('unsafe-eval')
   })
 })

@@ -19,6 +19,10 @@
 | Support                             | Tickets                                 | message 视为敏感用户内容，不记录 raw payload                            |
 | Referrals / Commission / Withdrawal | Referrals and guarded financial actions | 佣金、资格、minimum 与工单状态以上游为权威                              |
 
+Custom Pages 是 Aureole source/build configuration，不属于 solution Public API domain。External/iframe
+navigation 不创建 `/api/v1` 请求、不通过 V2Board/Solution redirect/proxy，也不向目标 URL 附加 Aureole
+credential 或 state。
+
 ## Public onboarding and challenge mapping
 
 - Onboarding requirements 是 TanStack Query server state；Contract 未提供

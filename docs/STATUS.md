@@ -47,7 +47,7 @@ reselection 都不会丢失 recovery UI，也不会自动清除 shared recovery 
 This implementation is local/mock evidence only. Production Solution/V2Board CF-02 runtime
 and real client deep-link acceptance are `NOT TESTED`; no deployment was performed.
 
-Current local evidence: format check, typecheck, lint, 52 test files / 1200 tests,
+Current local evidence: format check, typecheck, lint, 54 test files / 1241 tests,
 production build and diff check passed. Controlled browser verification passed on desktop and
 390 x 844 responsive Chrome in Light/Dark/System with multiple same-host entries, long pathname
 and credential text, local QR, all import actions, selection reset and no horizontal overflow or
@@ -73,6 +73,33 @@ shared recovery block visibility/disabled state and manual recovery re-enablemen
 Advance POSTs were observed across accepted, rejected and recovery-failure scenarios; raw upstream
 text was not rendered and the browser console had no application warning/error. This is local mock
 evidence, not production Solution/V2Board runtime evidence.
+
+## AUR-CF03 Custom Pages / External URL + iframe
+
+Status: `IMPLEMENTATION COMPLETE / INDEPENDENT REVIEW PENDING`.
+
+CF-03 adds one validated source-owned Custom Page SSOT with empty production defaults, deterministic
+enabled ordering, trusted local icon identifiers, external new-window navigation and authenticated
+stable-ID iframe routes. Invalid config fails normal build; URLs are HTTPS-only with no credentials.
+Custom iframe routes preserve AppShell and use dedicated full-content layout, exact configured `src`,
+`no-referrer`, honest loading/help and an exact-URL new-window fallback. Unknown, disabled and external
+IDs cannot render an iframe.
+
+CSP changes only `frame-src 'none'` to `frame-src https:`. `frame-ancestors 'none'`, `connect-src 'self'`,
+`object-src 'none'` and script hash verification remain frozen by artifact checks. V1 intentionally omits
+iframe sandbox for static-tool compatibility and adds no Auth bridge, postMessage, proxy, remote config,
+Solution/V2Board API, raw HTML/SVG, token decoration or production page. Production is `NOT DEPLOYED` and
+target-site framing compatibility remains environment-specific.
+
+CF-03 local evidence includes 64 focused config/router/CSP/artifact tests and the full 54-file / 1241-test
+suite. A temporary HTTP page definition made `npm run build` exit 1 in Vite config loading with the exact
+HTTPS validation error, after which the committed empty production config was restored. Controlled browser
+verification used temporary local HTTPS-configured fixtures: desktop iframe space measured 1032 x 591 and
+390 x 844 mobile measured 390 x 667, with no document horizontal overflow. Desktop Sidebar, mobile Sheet,
+header title, active state, exact iframe/fallback URL, `no-referrer`, external `_blank`/noopener/noreferrer and
+console-clean behavior passed. The self-signed local HTTPS document was rejected by Chromium and no security
+interstitial was bypassed, so embedded target content execution was not verified; the neutral fallback remained
+available. This is local evidence only, not production target compatibility.
 
 ## Foundation status
 
