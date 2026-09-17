@@ -4,7 +4,7 @@
 
 Desktop 使用 persistent sidebar、header 和 main content。Mobile 使用 hamburger 打开 focus-managed Sheet；不压窄 Desktop Sidebar、不提供横向挤压导航或 bottom tab bar。基础 icon button 和导航 touch target 接近 44 x 44 px。
 
-一级导航顺序：Overview、Subscription、Plans、Resources、Orders、Wallet、Notices、Support、Referrals、启用的 Custom Pages、Account。Custom Pages 在 Desktop Sidebar 与 Mobile Sheet 使用同一配置和顺序；external mode 新窗口打开，iframe mode 留在 Auth Shell 内。Gift Card 归属 Wallet 流程，不作为一级导航。
+一级导航顺序：Overview、Subscription、Plans、Resources、Orders、Wallet、Notices、Support、Referrals、服务端 Custom Pages、Account。Custom Pages 在 Desktop Sidebar 与 Mobile Sheet 使用同一 Query 和服务端顺序；external mode 新窗口打开，iframe mode 留在 Auth Shell 内。Gift Card 归属 Wallet 流程，不作为一级导航。
 
 ## Route map
 

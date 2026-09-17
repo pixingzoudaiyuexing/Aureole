@@ -16,12 +16,20 @@
 | Resources / Traffic                 | Resources, traffic logs                 | 只显示白名单字段；Traffic 使用 compact list                             |
 | Wallet / Gift Card                  | Wallet, deposits, gift card redeem      | 余额只认 Wallet；Deposit/Gift Card 保持显式确认与权威恢复               |
 | Notices                             | Notices                                 | 不发明 unread 或 important 状态                                         |
+| Custom Pages                        | Custom Pages                            | 保持 server order；同一 Query 驱动导航、标题与 iframe route             |
 | Support                             | Tickets                                 | message 视为敏感用户内容，不记录 raw payload                            |
 | Referrals / Commission / Withdrawal | Referrals and guarded financial actions | 佣金、资格、minimum 与工单状态以上游为权威                              |
 
-Custom Pages 是 Aureole source/build configuration，不属于 solution Public API domain。External/iframe
-navigation 不创建 `/api/v1` 请求、不通过 V2Board/Solution redirect/proxy，也不向目标 URL 附加 Aureole
-credential 或 state。
+Custom Pages 的 Production runtime SSOT 是 authenticated
+`GET /api/v1/custom-pages`。数据链路固定为：V2Board Notice -> Solution
+classifier/validator/normalizer -> Public Custom Pages DTO -> Aureole Query consumer。Aureole 只认识
+`id/title/url/mode`，不读取或复制 Notice 的分类字段、正文或时间戳，也不实现 V2Board-specific
+classification。
+
+`['custom-pages']` 是 Desktop Sidebar、Mobile Sheet、AppShell title 与 direct iframe route 的共享
+memory-only Query。Aureole 保持 server item order，不与 source/build static data merge；empty、network、
+server 或 malformed response 均不会恢复静态页面。External/iframe navigation 不通过 Solution
+redirect/proxy，不向目标 URL 附加 Aureole credential 或 state。
 
 ## Public onboarding and challenge mapping
 

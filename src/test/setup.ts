@@ -1,9 +1,14 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach } from 'vitest'
+import { afterEach, beforeEach, vi } from 'vitest'
+import { customPagesApi } from '@/features/custom-pages/custom-pages-api'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
 import { resetSessionSafetyRuntimeForTests } from '@/lib/auth/session-safety-storage'
 import { resetFinancialMutationRuntimeForTests } from '@/features/referrals/financial-mutation-runtime'
+
+beforeEach(() => {
+  vi.spyOn(customPagesApi, 'getList').mockResolvedValue({ items: [] })
+})
 
 afterEach(() => {
   cleanup()

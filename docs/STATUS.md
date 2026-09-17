@@ -9,8 +9,8 @@ Aureole v1: `LAUNCH READY / NOT PRODUCTION DEPLOYED`
 ## Contract baseline
 
 Active solution baseline:
-`3cc0de610b8e748b5d88d2ab3444e08461ab91ef` (CF-02 Multiple Subscription
-Entries freeze). The re-frozen Contract uses wildcard non-credentialed Public CORS,
+`939239859abaa68f155fbe6b32f9e628cbec3698` (CF-03B Dynamic Custom Pages
+freeze, including the prior CF-02 contract). The re-frozen Contract uses wildcard non-credentialed Public CORS,
 keeps Bearer authentication explicit, and treats exact HTTPS Origin only as
 Checkout return-URL protocol metadata. P-09 continues to freeze `recaptcha` + `v2-checkbox`, provider-neutral
 `challengeToken`, V2Board authoritative verification and unsupported capability
@@ -74,32 +74,34 @@ Advance POSTs were observed across accepted, rejected and recovery-failure scena
 text was not rendered and the browser console had no application warning/error. This is local mock
 evidence, not production Solution/V2Board runtime evidence.
 
-## AUR-CF03 Custom Pages / External URL + iframe
+## AUR-CF03B Dynamic Custom Pages Consumer
 
 Status: `IMPLEMENTATION COMPLETE / INDEPENDENT REVIEW PENDING`.
 
-CF-03 adds one validated source-owned Custom Page SSOT with empty production defaults, deterministic
-enabled ordering, trusted local icon identifiers, external new-window navigation and authenticated
-stable-ID iframe routes. Invalid config fails normal build; URLs are HTTPS-only with no credentials.
-Custom iframe routes preserve AppShell and use dedicated full-content layout, exact configured `src`,
-`no-referrer`, honest loading/help and an exact-URL new-window fallback. Unknown, disabled and external
-IDs cannot render an iframe.
+`GET /api/v1/custom-pages` is now the only Production runtime Custom Page SSOT. The former
+`src/config/custom-pages.ts` static definitions and Vite build validator are removed. Aureole consumes only
+the strict Public `id/title/url/mode` DTO through authenticated API client and shared credential-free
+`['custom-pages']` Query; there is no static merge or empty/error/network/malformed fallback.
+
+Desktop Sidebar, Mobile Sheet, AppShell title and `/custom/$customPageId` share the same memory-only cache
+and preserve server order. All dynamic entries use the existing trusted local default icon. Ordinary pages
+remain available while this Query is pending or failed. Direct routes distinguish loading, found iframe,
+missing/removed ID, external ID and safe read error with Retry. Refetch add/edit/remove updates navigation,
+title, exact iframe URL and fallback without rebuild; removal unloads the current iframe.
 
 CSP changes only `frame-src 'none'` to `frame-src https:`. `frame-ancestors 'none'`, `connect-src 'self'`,
 `object-src 'none'` and script hash verification remain frozen by artifact checks. V1 intentionally omits
-iframe sandbox for static-tool compatibility and adds no Auth bridge, postMessage, proxy, remote config,
-Solution/V2Board API, raw HTML/SVG, token decoration or production page. Production is `NOT DEPLOYED` and
+iframe sandbox for static-tool compatibility and adds no Auth bridge, postMessage, proxy, target fetch,
+raw HTML/SVG, token decoration or production page. Production is `NOT DEPLOYED` and
 target-site framing compatibility remains environment-specific.
 
-CF-03 local evidence includes 64 focused config/router/CSP/artifact tests and the full 54-file / 1241-test
-suite. A temporary HTTP page definition made `npm run build` exit 1 in Vite config loading with the exact
-HTTPS validation error, after which the committed empty production config was restored. Controlled browser
-verification used temporary local HTTPS-configured fixtures: desktop iframe space measured 1032 x 591 and
-390 x 844 mobile measured 390 x 667, with no document horizontal overflow. Desktop Sidebar, mobile Sheet,
-header title, active state, exact iframe/fallback URL, `no-referrer`, external `_blank`/noopener/noreferrer and
-console-clean behavior passed. The self-signed local HTTPS document was rejected by Chromium and no security
-interstitial was bypassed, so embedded target content execution was not verified; the neutral fallback remained
-available. This is local evidence only, not production target compatibility.
+The upstream pipeline is documented only as V2Board Notice -> Solution classifier/validator/normalizer ->
+`/api/v1/custom-pages` -> Aureole consumer; Notice classification semantics are not an Aureole contract.
+Current local evidence: format check, typecheck, lint, 54 test files / 1262 tests and production build passed.
+Controlled browser verification passed on desktop and 390 x 844 Chrome for shared Desktop/Mobile navigation,
+long titles, exact iframe URL/title/fallback, unavailable return entry and Light/Dark/System. Both viewports had
+no horizontal overflow and the application console had no warning/error. This is local/mock evidence only.
+Production Aureole deployment and production target compatibility are `NOT TESTED`; no deployment was performed.
 
 ## Foundation status
 

@@ -1,7 +1,5 @@
 import {
-  Activity,
   Bell,
-  BookOpen,
   Boxes,
   CircleUserRound,
   CreditCard,
@@ -14,13 +12,8 @@ import {
   WalletCards,
   type LucideIcon,
 } from 'lucide-react'
-import {
-  customPages,
-  getCustomPagePath,
-  getEnabledCustomPages,
-  type CustomPage,
-  type SupportedCustomPageIcon,
-} from './custom-pages'
+import type { CustomPage } from '@/features/custom-pages/custom-pages-api'
+import { getCustomPagePath } from '@/features/custom-pages/custom-pages-routing'
 
 export type AppPath =
   | '/dashboard'
@@ -64,12 +57,6 @@ export type NavigationItem =
   | CustomIframeNavigationItem
   | CustomExternalNavigationItem
 
-const customPageIconMap: Record<SupportedCustomPageIcon, LucideIcon> = {
-  book: BookOpen,
-  activity: Activity,
-  panel: PanelsTopLeft,
-}
-
 const coreNavigationItems: InternalNavigationItem[] = [
   { kind: 'internal', label: 'Overview', to: '/dashboard', icon: Gauge },
   {
@@ -94,21 +81,15 @@ const accountNavigationItem: InternalNavigationItem = {
   icon: CircleUserRound,
 }
 
-function customPageIcon(page: CustomPage) {
-  return page.icon ? customPageIconMap[page.icon] : PanelsTopLeft
-}
-
 export function buildNavigationItems(pages: readonly CustomPage[]) {
-  const customNavigationItems: NavigationItem[] = getEnabledCustomPages(
-    pages,
-  ).map((page) =>
+  const customNavigationItems: NavigationItem[] = pages.map((page) =>
     page.mode === 'external'
       ? {
           kind: 'custom-external',
           id: page.id,
           label: page.title,
           href: page.url,
-          icon: customPageIcon(page),
+          icon: PanelsTopLeft,
         }
       : {
           kind: 'custom-iframe',
@@ -117,7 +98,7 @@ export function buildNavigationItems(pages: readonly CustomPage[]) {
           to: '/custom/$customPageId',
           params: { customPageId: page.id },
           path: getCustomPagePath(page.id),
-          icon: customPageIcon(page),
+          icon: PanelsTopLeft,
         },
   )
 
@@ -128,10 +109,11 @@ export function buildNavigationItems(pages: readonly CustomPage[]) {
   ]
 }
 
-export const navigationItems = buildNavigationItems(customPages)
-
-export function getNavigationPageTitle(pathname: string) {
-  const item = navigationItems.find((candidate) => {
+export function getNavigationPageTitle(
+  pathname: string,
+  pages: readonly CustomPage[],
+) {
+  const item = buildNavigationItems(pages).find((candidate) => {
     if (candidate.kind === 'internal') return candidate.to === pathname
     if (candidate.kind === 'custom-iframe') return candidate.path === pathname
     return false

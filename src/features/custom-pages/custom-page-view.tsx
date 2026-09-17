@@ -1,7 +1,8 @@
 import { ExternalLink } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import { Button } from '@/components/ui/button'
-import type { CustomPage } from '@/config/custom-pages'
+import type { CustomPage } from './custom-pages-api'
 
 export function CustomPageView({ page }: { page: CustomPage | null }) {
   if (!page) return <CustomPageUnavailable />
@@ -64,8 +65,11 @@ function CustomPageUnavailable() {
       >
         <h2 className="text-base font-semibold">页面不可用</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          此页面不存在、未启用，或不支持在 Aureole 内打开。
+          此页面不存在、已不可用，或不支持在 Aureole 内打开。
         </p>
+        <Button asChild variant="outline" size="sm" className="mt-4">
+          <Link to="/dashboard">返回概览</Link>
+        </Button>
       </div>
     </section>
   )

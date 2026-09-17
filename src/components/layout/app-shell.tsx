@@ -6,16 +6,26 @@ import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { isCustomPageRoutePath } from '@/config/custom-pages'
 import { getNavigationPageTitle } from '@/config/navigation'
 import { AccountSummary } from '@/features/auth/account-summary'
+import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invalid-session-error'
+import { useCustomPages } from '@/features/custom-pages/custom-pages-queries'
+import { isCustomPageRoutePath } from '@/features/custom-pages/custom-pages-routing'
+import { useAuthSessionStore } from '@/lib/auth/session-store'
 import { cn } from '@/lib/utils'
 
 export function AppShell() {
+  const accessToken = useAuthSessionStore((state) => state.accessToken)
+  const customPagesQuery = useCustomPages(accessToken)
+  useExitOnInvalidSessionError(customPagesQuery.error)
+
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
-  const pageTitle = getNavigationPageTitle(pathname)
+  const customPages = customPagesQuery.isError
+    ? []
+    : (customPagesQuery.data?.items ?? [])
+  const pageTitle = getNavigationPageTitle(pathname, customPages)
   const customPageLayout = isCustomPageRoutePath(pathname)
 
   return (
@@ -30,7 +40,7 @@ export function AppShell() {
           <Brand />
         </div>
         <Separator />
-        <SidebarNavigation />
+        <SidebarNavigation customPages={customPages} />
         <AccountSummary />
       </aside>
 
@@ -57,7 +67,7 @@ export function AppShell() {
                   <Brand />
                 </div>
                 <Separator />
-                <SidebarNavigation closeOnNavigate />
+                <SidebarNavigation customPages={customPages} closeOnNavigate />
                 <AccountSummary />
               </SheetContent>
             </Sheet>

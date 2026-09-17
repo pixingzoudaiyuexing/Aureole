@@ -50,26 +50,30 @@ TanStack Router 插件启用 route-level auto code splitting；生成的 `src/ro
 
 ## Custom Pages
 
-CF-03 使用 `src/config/custom-pages.ts` 作为唯一 Custom Page SSOT。配置由 Aureole source/deployment
-持有，修改后必须重新 build/redeploy；生产默认配置为空。相同 validator 同时在应用模块与
-`vite.config.ts` build boundary 执行，严格检查 stable lowercase slug ID、唯一性、trimmed bounded title、
-HTTPS-only URL、无 URL credentials、mode、enabled、safe-integer order 与本地 icon identifier。无效配置
-使普通 `npm run build` 和 release build fail closed。
+CF-03B 使用 authenticated `GET /api/v1/custom-pages` 作为唯一 Production runtime Custom Page SSOT。
+`src/config/custom-pages.ts`、`customPageDefinitions`、`customPages` 与 Vite static build validation 已移除；
+不存在 dynamic + static merge、empty fallback 或 error fallback。Aureole 只消费 Public
+`{id,title,url,mode}` DTO，不复制 Solution 的 Notice classifier 或 V2Board 语义。
 
-启用页按 explicit order 升序排列，同 order 保持 source order，无 order 项置后并保持 source order。
-导航沿用现有 Sidebar/Sheet，位置固定在 core application items 与 Account 之间。External mode 使用
-`target="_blank" rel="noopener noreferrer"` 的语义 anchor；iframe mode 使用 authenticated
-`/custom/$customPageId`，只按 stable ID 解析 enabled iframe entries。unknown、disabled 或 external-mode
-direct route 都只显示本地 unavailable state，不 iframe、不 redirect。
+Custom Pages 使用 credential-free `['custom-pages']` TanStack Query key，并复用全局 stale、retry 与
+window-focus 配置。Query 只存在于 memory；Desktop Sidebar、Mobile Sheet、AppShell title 与 direct route
+共享同一 cache。pending/error 不阻塞普通业务路由；empty 或失败时导航中没有 Custom Page。Server order
+原样保留，所有 item 使用受信本地默认 icon，并固定放在 core application items 与 Account 之间。
 
-iframe 使用 validated configured URL 原值作为 `src` 和新窗口 fallback，不附加 token、user/account、
-subscription 或 Aureole state。V1 无 Auth bridge、cookie bridge、postMessage、raw HTML、remote icon 或
-Solution/V2Board dependency。AppShell 只对 `/custom/*` 使用 `100dvh`/flex/min-h-0 full-content layout；普通
-业务路由继续使用既有 max-width/padding。
+External mode 使用 exact authoritative URL 与
+`target="_blank" rel="noopener noreferrer"` 的语义 anchor。iframe mode 使用 authenticated
+`/custom/$customPageId`。直达页在 Query pending 时显示局部 loading；success 后只允许相同 ID 的 iframe
+item 渲染，missing 或 external ID 显示 unavailable，read error 提供安全 Retry。Refetch 后同 ID 的 title/URL
+即时更新；authoritative remove 会卸载当前 iframe。
+
+iframe 使用 validated authoritative URL 原值作为 `src` 和新窗口 fallback，不附加 token、user/account、
+subscription 或 Aureole state。V1 无 Auth bridge、cookie bridge、postMessage、raw HTML、remote icon、target
+probe 或 proxy。AppShell 只对 `/custom/*` 使用 `100dvh`/flex/min-h-0 full-content layout；普通业务路由继续
+使用既有 max-width/padding。
 
 V1 为兼容 VitePress 与独立静态工具而不设置 iframe `sandbox`。任意 sandbox 若需要支持 scripts、
 same-origin、forms、downloads 或 popups，既可能破坏目标工具，也不能替代目标信任判断。补偿边界是：配置仅
-来自受审源码、HTTPS-only build validation、CSP `frame-src https:`、浏览器 same-origin isolation、
+来自严格 API boundary HTTPS validation、CSP `frame-src https:`、浏览器 same-origin isolation、
 `referrerPolicy="no-referrer"`、无 Auth bridge/postMessage/script injection，以及始终可用的精确 URL 新窗口
 fallback。跨域 iframe 的 X-Frame-Options、frame-ancestors、DNS 和 remote failure 无法被 Aureole 可靠
 分类；UI 只显示中性 loading/help，不声称具体故障原因。
