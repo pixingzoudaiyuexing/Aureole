@@ -5,6 +5,7 @@ import type { AppRouter } from '@/app/router/router'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthProvider } from '@/features/auth/auth-provider'
 import type { AuthApi } from '@/features/auth/auth-api'
+import { RuntimeSettingsProvider } from '@/features/runtime-settings/runtime-settings-provider'
 import { createQueryClient } from './query-client'
 import { ThemeProvider } from './theme-provider'
 
@@ -23,11 +24,13 @@ export function AppProviders({
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider api={authApi}>
-          <TooltipProvider delayDuration={250}>
-            <RouterProvider router={router} />
-          </TooltipProvider>
-        </AuthProvider>
+        <RuntimeSettingsProvider>
+          <AuthProvider api={authApi}>
+            <TooltipProvider delayDuration={250}>
+              <RouterProvider router={router} />
+            </TooltipProvider>
+          </AuthProvider>
+        </RuntimeSettingsProvider>
       </QueryClientProvider>
     </ThemeProvider>
   )

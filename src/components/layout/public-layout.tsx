@@ -2,8 +2,11 @@ import { Link, Outlet } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { Brand } from '@/components/layout/brand'
 import { ThemeToggle } from '@/components/layout/theme-toggle'
+import { useRuntimeSettings } from '@/features/runtime-settings/runtime-settings-context'
 
 export function PublicLayout() {
+  const { footerText } = useRuntimeSettings()
+
   return (
     <div className="grid min-h-screen bg-background lg:grid-cols-[minmax(19rem,38%)_1fr]">
       <aside className="relative hidden overflow-hidden border-r border-border bg-foreground p-10 text-background lg:flex lg:flex-col lg:justify-between">
@@ -17,7 +20,7 @@ export function PublicLayout() {
             Manage access, billing, and support from a focused account portal.
           </p>
         </div>
-        <p className="text-xs text-background/50">Aureole</p>
+        <p className="text-xs text-background/50">{footerText}</p>
       </aside>
 
       <main className="flex min-h-screen flex-col">

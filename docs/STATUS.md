@@ -9,8 +9,8 @@ Aureole v1: `LAUNCH READY / NOT PRODUCTION DEPLOYED`
 ## Contract baseline
 
 Active solution baseline:
-`939239859abaa68f155fbe6b32f9e628cbec3698` (CF-03B Dynamic Custom Pages
-freeze, including the prior CF-02 contract). The re-frozen Contract uses wildcard non-credentialed Public CORS,
+`b9175217001c2146b3a2aa0a98066882b770f3e1` (REG-M01 / A3 re-freeze; reviewed
+feature anchor `1729943b57e71ad9726b03f47b7882180e51ce91`). The re-frozen Contract uses wildcard non-credentialed Public CORS,
 keeps Bearer authentication explicit, and treats exact HTTPS Origin only as
 Checkout return-URL protocol metadata. P-09 continues to freeze `recaptcha` + `v2-checkbox`, provider-neutral
 `challengeToken`, V2Board authoritative verification and unsupported capability
@@ -102,6 +102,22 @@ Controlled browser verification passed on desktop and 390 x 844 Chrome for share
 long titles, exact iframe URL/title/fallback, unavailable return entry and Light/Dark/System. Both viewports had
 no horizontal overflow and the application console had no warning/error. This is local/mock evidence only.
 Production Aureole deployment and production target compatibility are `NOT TESTED`; no deployment was performed.
+
+## AUR-REG-M01-01 Runtime Settings Consumer
+
+Status: `IMPLEMENTATION COMPLETE / ENGINEERING ACCEPTANCE PENDING`.
+
+The anonymous `GET /api/v1/config/runtime` consumer is presentation-only. A credential-free,
+memory-only `['runtime-settings']` Query starts without blocking React, Router, public routes, Auth bootstrap or
+AppShell. Valid runtime values can update Brand text/logo, document title/description, a Runtime Settings-owned
+favicon override and the existing PublicLayout lower-left footer; compiled defaults remain the initial and failure
+fallback. Runtime Settings does not own Auth, API origin, CSP, routes, navigation, entitlement or business state.
+
+The frontend validates the seven nullable Public fields and independently rejects unsafe logo/favicon URLs.
+Images are browser-loaded with no-referrer; no app-side target fetch/probe, persistent storage, raw Registry
+metadata or CSP expansion is used. Current evidence is local only: API, Query-driven presentation, Auth isolation,
+Brand/PublicLayout, all-null/error fallback, favicon ownership and existing regression tests passed. No deployment
+was performed; Solution/V2Board runtime behavior beyond the frozen Contract is `NOT TESTED`.
 
 ## Foundation status
 

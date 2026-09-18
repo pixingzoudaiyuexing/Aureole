@@ -38,7 +38,8 @@ src/
 
 ## Provider composition
 
-`AppProviders` 依次组合 Theme、QueryClient、Tooltip 和 Router。每个 Provider 职责单一。Query 最多对 transient error retry 一次，mutation 永不全局自动 retry。
+`AppProviders` 依次组合 Theme、QueryClient、Runtime Settings、Auth、Tooltip 和 Router。每个 Provider
+职责单一。Query 最多对 transient error retry 一次，mutation 永不全局自动 retry。
 
 ## Routing and code splitting
 
@@ -47,6 +48,20 @@ src/
 当前 guard 在 route component 边界阻止受保护 UI render。未来引入 protected TanStack Router loader 前必须重新评估 guard/loading 架构；Auth 未解析完成时，loader 不得提前发起 authenticated business fetch。
 
 TanStack Router 插件启用 route-level auto code splitting；生成的 `src/routeTree.gen.ts` 提交到 Git，业务 route 产出独立 lazy chunk。
+
+## Runtime Settings
+
+REG-M01 Runtime Settings 是 anonymous `GET /api/v1/config/runtime` 的低权威展示快照，不是 Registry
+Browser API，也不承担 Auth、API origin、CSP、路由、导航、entitlement 或业务 authority。它位于
+`features/runtime-settings`：API boundary 用 Zod 验证七个 nullable Public fields 与 HTTPS-only runtime
+logo/favicon URL，Query 使用 credential-free `['runtime-settings']` key，Provider 统一产生展示层有效值与
+document metadata/favicon 副作用。
+
+Runtime Settings 不阻塞 React、Router、public route、Auth bootstrap 或 AppShell。编译的 Aureole
+brand/title/description/footer、Orbit logo 与无 runtime favicon override 是 first paint、pending、read
+error、malformed response 和 all-null response 的回退。Query 只存在 memory，不进入 Zustand、storage、cookie
+或 URL。有效 logo/favicon 由浏览器以 no-referrer 加载；Aureole 不 fetch、probe、proxy 或注入远端内容。此功能
+不扩展 CSP。
 
 ## Custom Pages
 

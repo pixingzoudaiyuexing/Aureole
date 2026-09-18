@@ -17,6 +17,7 @@
 | Wallet / Gift Card                  | Wallet, deposits, gift card redeem      | 余额只认 Wallet；Deposit/Gift Card 保持显式确认与权威恢复               |
 | Notices                             | Notices                                 | 不发明 unread 或 important 状态                                         |
 | Custom Pages                        | Custom Pages                            | 保持 server order；同一 Query 驱动导航、标题与 iframe route             |
+| Runtime Settings                    | Runtime settings                        | 匿名展示快照；编译默认值仍是启动与失败回退                              |
 | Support                             | Tickets                                 | message 视为敏感用户内容，不记录 raw payload                            |
 | Referrals / Commission / Withdrawal | Referrals and guarded financial actions | 佣金、资格、minimum 与工单状态以上游为权威                              |
 
@@ -30,6 +31,13 @@ classification。
 memory-only Query。Aureole 保持 server item order，不与 source/build static data merge；empty、network、
 server 或 malformed response 均不会恢复静态页面。External/iframe navigation 不通过 Solution
 redirect/proxy，不向目标 URL 附加 Aureole credential 或 state。
+
+Runtime Settings 的 Production presentation source 是 anonymous
+`GET /api/v1/config/runtime`。Aureole 仅消费七字段 Public DTO，并以 `['runtime-settings']` 作为
+memory-only Query；它不读取 Auth、不会持久化，也不成为 Router 或首屏依赖。pending、network/API failure、
+malformed response 和 all-null response 都使用编译的 Aureole Brand、document metadata 与 PublicLayout
+footer defaults。Runtime Settings 不控制 API origin、Authorization、CSP、路由、导航、entitlement 或业务规则。
+有效 HTTPS logo/favicon 仅由浏览器资源加载，使用 no-referrer；Aureole 不 fetch、probe 或代理它们。
 
 ## Public onboarding and challenge mapping
 
