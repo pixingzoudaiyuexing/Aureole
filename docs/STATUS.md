@@ -105,7 +105,14 @@ Production Aureole deployment and production target compatibility are `NOT TESTE
 
 ## AUR-REG-M01-01 Runtime Settings Consumer
 
-Status: `IMPLEMENTATION COMPLETE / ENGINEERING ACCEPTANCE PENDING`.
+Status: `PASS / COMPLETE / CLOSED`.
+
+Implementation / reviewed anchor: `c8869bc338cde7b915272d75cf1dde2d545dc0ae`.
+Aureole Child Engineering Acceptance: `PASS`.
+Findings: `BLOCKER = 0`, `HIGH = 0`, `MEDIUM = 0`, `LOW = 0`.
+Required Fixes: `NONE`.
+Exact-SHA GitHub Actions: Run `35358511102` — `SUCCESS`.
+Knowledge Update Candidate: `ACCEPTED`; Knowledge Sync: `SYNCED`.
 
 The anonymous `GET /api/v1/config/runtime` consumer is presentation-only. A credential-free,
 memory-only `['runtime-settings']` Query starts without blocking React, Router, public routes, Auth bootstrap or
@@ -116,8 +123,10 @@ fallback. Runtime Settings does not own Auth, API origin, CSP, routes, navigatio
 The frontend validates the seven nullable Public fields and independently rejects unsafe logo/favicon URLs.
 Images are browser-loaded with no-referrer; no app-side target fetch/probe, persistent storage, raw Registry
 metadata or CSP expansion is used. Current evidence is local only: API, Query-driven presentation, Auth isolation,
-Brand/PublicLayout, all-null/error fallback, favicon ownership and existing regression tests passed. No deployment
-was performed; Solution/V2Board runtime behavior beyond the frozen Contract is `NOT TESTED`.
+Brand/PublicLayout, all-null/error fallback, favicon ownership and existing regression tests passed. Real deployed
+Solution `/api/v1/config/runtime` runtime was not verified by this task; real Registry snapshot/config values were
+not verified in deployment; external logo/favicon availability remains browser/runtime dependent; Production
+end-to-end Runtime Settings presentation was not verified. Production is `NOT AUTHORIZED / NOT DEPLOYED`.
 
 ## Foundation status
 
