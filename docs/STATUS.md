@@ -23,13 +23,16 @@ Status: `ENGINEERING REVIEW HIGH FIX APPLIED / RE-REVIEW PENDING`.
 The active consumer is superseded by AUR-REG-M04-M06-01 below. This section retains historical CF-02 evidence;
 legacy Solution routes remain compatible but are no longer used by the active Subscription UI.
 
-Aureole now uses `GET /api/v1/subscription/entries` for ordered entry discovery and
-`POST /api/v1/subscription/entry-access` as the only selected-entry credential source.
-`selectedBaseUrl` is the single selection authority and the only Subscription selection
-value allowed in sessionStorage; all `accessUrl`, QR and client-import values remain
-memory-only. Zero entries have no fallback. Valid selection persists across refresh;
-stale persisted/current selections and `422 SUBSCRIPTION_ENTRY_UNAVAILABLE` require
-explicit reselection and never silently select the first remaining entry.
+This was the former CF-02 consumer: it used `GET /api/v1/subscription/entries` for ordered
+entry discovery and `POST /api/v1/subscription/entry-access` as the selected-entry credential
+source. It used `selectedBaseUrl` as its selection authority and kept all `accessUrl`, QR and
+client-import values memory-only. It is superseded by AUR-REG-M04-M06-01 below; the active
+Aureole consumer uses delivery-options/access-link with stable `entryId`. Legacy server-side
+CF-02 routes remain for compatibility and are not claimed removed. Production cutover and
+client-launch evidence remain separate and unverified.
+
+Historical zero-entry, stale-selection and `422 SUBSCRIPTION_ENTRY_UNAVAILABLE` behavior is
+retained below as CF-02 evidence; it is not a claim about the current consumer.
 
 Selection-scoped, versioned Query keys plus cancellation and old-key removal prevent
 late A/B responses from replacing C. Entry-access disables retry, retry-on-mount and
@@ -59,7 +62,17 @@ not production runtime evidence.
 
 ## AUR-REG-M04-M06-01 Subscription Delivery Consumer Migration
 
-Status: `IMPLEMENTATION COMPLETE / GEMINI CODE REVIEW REQUIRED`.
+Status: `PASS / COMPLETE / CLOSED / RE-FROZEN`.
+
+Implementation anchor: `f610af08afcebfdf5eaa95e3ccfaa1caf1eebc3b`.
+Final reviewed/current implementation: `99f9d7ef3f8c96aa5b54c35cf142abf204039ebc`.
+Aureole Child Engineering Review: `PASS`.
+Gemini Independent Review: `PASS`.
+Findings: `BLOCKER 0 / HIGH 0 / MEDIUM 0 / LOW 0`.
+Required Fixes: `NONE`.
+CI run `35442507215`: `SUCCESS`.
+Knowledge Update Candidate: `ACCEPTED`.
+Knowledge Sync: `SYNCED`.
 
 The active Subscription Address consumer now uses authenticated
 `GET /api/v1/subscription/delivery-options` and `POST /api/v1/subscription/access-link`. Selection identity and

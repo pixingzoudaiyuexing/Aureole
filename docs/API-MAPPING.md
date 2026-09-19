@@ -249,9 +249,11 @@ footer defaults。Runtime Settings 不控制 API origin、Authorization、CSP、
   后才能 POST。成功清空 code/reveal，并原样展示 server effect；不计算新余额、expiresAt、traffic、
   reset day、plan name 或 plan ID。
 - Confirmed success 与 UNKNOWN 都重新读取 canonical Wallet、Me、Subscription Overview，并以
-  `refetchType: none` invalidate legacy Access、删除 CF-02 entry-access root cache。Wallet 页面不主动读取
-  accessUrl，也不 fetch subscription content。成功 recovery 失败仍声明兑换成功但禁止再次兑换；UNKNOWN recovery 不根据
-  账户变化推断因果，全部 authority 恢复后仍需专用 acknowledgement 与新的标准确认。
+  `refetchType: none` invalidate Wallet Query、Subscription Overview Query 与
+  `subscriptionQueryKeys.deliveryOptions`。Delivery-options 只包含 non-secret metadata；Gift Card 不请求、缓存或
+  持久化 `accessUrl`。Wallet 页面不主动读取 accessUrl，也不 fetch subscription content。成功 recovery 失败仍声明兑换
+  成功但禁止再次兑换；UNKNOWN recovery 不根据账户变化推断因果，全部 authority 恢复后仍需专用 acknowledgement 与新的
+  标准确认。
 - GIFT_CARD_NOT_FOUND、NOT_ACTIVE、EXPIRED、USAGE_LIMIT_REACHED、ALREADY_REDEEMED、NOT_APPLICABLE、
   REDEEM_FAILED 与 VALIDATION_ERROR 使用本地安全文案，不自动 retry、不 logout、不暴露 upstream raw
   message。UNKNOWN 后再次得到 ALREADY_REDEEMED 只陈述当前事实，不推断上一次请求成功。
