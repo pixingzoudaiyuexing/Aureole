@@ -74,10 +74,11 @@ function installMocks(initialOverview: SubscriptionOverview = overview) {
     eligible: true,
     accessUrl: credentialUrl,
   })
-  vi.spyOn(subscriptionApi, 'getEntries').mockResolvedValue({
-    entries: [{ baseUrl: 'https://entry.example/subscriptions' }],
+  vi.spyOn(subscriptionApi, 'getDeliveryOptions').mockResolvedValue({
+    defaultEntryId: 'primary',
+    entries: [{ id: 'primary', label: 'Subscription' }],
   })
-  vi.spyOn(subscriptionApi, 'getEntryAccess').mockResolvedValue({
+  vi.spyOn(subscriptionApi, 'getAccessLink').mockResolvedValue({
     accessUrl: credentialUrl,
   })
   const getTraffic = vi.spyOn(trafficApi, 'getLogs').mockResolvedValue([])

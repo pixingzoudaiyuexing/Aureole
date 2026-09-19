@@ -77,9 +77,6 @@ export function GiftCardPanel({
   if (invalidSessionError) return null
 
   const reconcileAccount = async () => {
-    queryClient.removeQueries({
-      queryKey: subscriptionQueryKeys.entryAccessRoot,
-    })
     await Promise.all([
       queryClient.invalidateQueries({
         queryKey: walletQueryKeys.wallet,
@@ -90,7 +87,7 @@ export function GiftCardPanel({
         refetchType: 'none',
       }),
       queryClient.invalidateQueries({
-        queryKey: subscriptionQueryKeys.access,
+        queryKey: subscriptionQueryKeys.deliveryOptions,
         refetchType: 'none',
       }),
     ])

@@ -2,11 +2,7 @@ import { queryOptions, useQuery } from '@tanstack/react-query'
 import { subscriptionApi } from './subscription-api'
 
 export const subscriptionQueryKeys = {
-  access: ['subscription', 'access'] as const,
-  entries: ['subscription', 'entries'] as const,
-  entryAccessRoot: ['subscription', 'entry-access'] as const,
-  entryAccess: (baseUrl: string, requestVersion: number) =>
-    ['subscription', 'entry-access', baseUrl, requestVersion] as const,
+  deliveryOptions: ['subscription', 'delivery-options'] as const,
   overview: ['subscription', 'overview'] as const,
 }
 
@@ -15,34 +11,11 @@ export const subscriptionMutationKeys = {
   advancePeriod: ['subscription', 'advance-period'] as const,
 }
 
-export function subscriptionEntriesQueryOptions(accessToken: string) {
+export function subscriptionDeliveryOptionsQueryOptions(accessToken: string) {
   return queryOptions({
-    queryKey: subscriptionQueryKeys.entries,
-    queryFn: ({ signal }) => subscriptionApi.getEntries(accessToken, signal),
-  })
-}
-
-export function subscriptionAccessQueryOptions(accessToken: string) {
-  return queryOptions({
-    queryKey: subscriptionQueryKeys.access,
-    queryFn: () => subscriptionApi.getAccess(accessToken),
-  })
-}
-
-export function subscriptionEntryAccessQueryOptions(
-  accessToken: string,
-  baseUrl: string,
-  requestVersion: number,
-) {
-  return queryOptions({
-    queryKey: subscriptionQueryKeys.entryAccess(baseUrl, requestVersion),
+    queryKey: subscriptionQueryKeys.deliveryOptions,
     queryFn: ({ signal }) =>
-      subscriptionApi.getEntryAccess(accessToken, baseUrl, signal),
-    retry: false,
-    retryOnMount: false,
-    staleTime: Number.POSITIVE_INFINITY,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
+      subscriptionApi.getDeliveryOptions(accessToken, signal),
   })
 }
 
@@ -56,7 +29,10 @@ export function subscriptionOverviewQueryOptions(accessToken: string) {
 export function rotateSubscriptionAccessMutationOptions(accessToken: string) {
   return {
     mutationKey: subscriptionMutationKeys.rotateAccess,
-    mutationFn: () => subscriptionApi.rotateAccess(accessToken),
+    mutationFn: async () => {
+      await subscriptionApi.rotateAccess(accessToken)
+      return { rotated: true as const }
+    },
     retry: false as const,
   }
 }
@@ -69,12 +45,8 @@ export function advanceSubscriptionPeriodMutationOptions(accessToken: string) {
   }
 }
 
-export function useSubscriptionEntries(accessToken: string) {
-  return useQuery(subscriptionEntriesQueryOptions(accessToken))
-}
-
-export function useSubscriptionAccess(accessToken: string) {
-  return useQuery(subscriptionAccessQueryOptions(accessToken))
+export function useSubscriptionDeliveryOptions(accessToken: string) {
+  return useQuery(subscriptionDeliveryOptionsQueryOptions(accessToken))
 }
 
 export function useSubscriptionOverview(accessToken: string) {

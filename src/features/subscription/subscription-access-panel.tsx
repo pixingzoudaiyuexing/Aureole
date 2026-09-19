@@ -1,8 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { LoaderCircle, RotateCcw } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
-import { ReadError } from '@/components/shared/read-error'
 import {
   Dialog,
   DialogContent,
@@ -13,7 +12,6 @@ import {
 import { isInvalidSessionError } from '@/features/auth/auth-errors'
 import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invalid-session-error'
 import { ApiError } from '@/lib/api/errors'
-import { SubscriptionCredential } from './subscription-access'
 import { isAmbiguousSubscriptionRotationError } from './subscription-errors'
 import type { SubscriptionMutationCoordinator } from './subscription-mutation-coordinator'
 import { rotateSubscriptionAccessMutationOptions } from './subscription-queries'
@@ -25,22 +23,20 @@ type RotationFeedback =
   | { kind: 'unknown'; reconciled: boolean }
 
 export function SubscriptionAccessPanel({
-  accessUrl,
-  accessPending,
-  accessUnavailable,
-  accessError,
+  accessContent,
+  accessAvailable,
   accessToken,
   mutationCoordinator,
   refreshAccess,
+  suppressAccess,
   canRecoverAccess,
 }: {
-  accessUrl: string | null
-  accessPending: boolean
-  accessUnavailable: boolean
-  accessError: unknown
+  accessContent: ReactNode
+  accessAvailable: boolean
   accessToken: string
   mutationCoordinator: SubscriptionMutationCoordinator
   refreshAccess: () => Promise<void>
+  suppressAccess: () => void
   canRecoverAccess: boolean
 }) {
   const [confirmationOpen, setConfirmationOpen] = useState(false)
@@ -98,6 +94,7 @@ export function SubscriptionAccessPanel({
   const rotate = async () => {
     if (!acknowledged || !mutationCoordinator.tryAcquire('rotate-access'))
       return
+    suppressAccess()
     sessionInvalidatedRef.current = false
     mutation.reset()
     setFeedback(null)
@@ -151,27 +148,11 @@ export function SubscriptionAccessPanel({
   }
 
   const recoveryFailed = feedback !== null && !feedback.reconciled
-  const canStartRotation = accessUrl !== null && !recoveryFailed
+  const canStartRotation = accessAvailable && !recoveryFailed
 
   return (
     <div className="space-y-5">
-      {accessUrl ? (
-        <SubscriptionCredential key={accessUrl} accessUrl={accessUrl} />
-      ) : accessPending ? (
-        <p className="text-sm text-muted-foreground" role="status">
-          正在读取订阅地址…
-        </p>
-      ) : accessUnavailable ? (
-        <p className="text-sm text-muted-foreground">
-          当前没有可展示的订阅地址。
-        </p>
-      ) : accessError && feedback === null ? (
-        <ReadError
-          message="暂时无法读取订阅地址。"
-          error={accessError}
-          retry={() => void reconcileSelectedAccess()}
-        />
-      ) : null}
+      {accessContent}
 
       {feedback ? <RotationFeedbackMessage feedback={feedback} /> : null}
 

@@ -1,18 +1,26 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ReadError } from '@/components/shared/read-error'
 import { isInvalidSessionError } from '@/features/auth/auth-errors'
 import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invalid-session-error'
+import { useAuthSessionStore } from '@/lib/auth/session-store'
 import { ApiError } from '@/lib/api/errors'
+import {
+  SubscriptionAccessLinkRuntime,
+  type SubscriptionAccessLinkRuntimeHandle,
+} from './subscription-access-link-runtime'
 import { SubscriptionAccessPanel } from './subscription-access-panel'
-import type { SubscriptionEntry } from './subscription-api'
+import type {
+  SubscriptionDeliveryEntry,
+  SubscriptionDeliveryOptions,
+  SubscriptionInfoMode,
+} from './subscription-api'
 import type { SubscriptionMutationCoordinator } from './subscription-mutation-coordinator'
 import {
-  subscriptionEntriesQueryOptions,
-  subscriptionEntryAccessQueryOptions,
+  subscriptionDeliveryOptionsQueryOptions,
   subscriptionQueryKeys,
-  useSubscriptionEntries,
+  useSubscriptionDeliveryOptions,
 } from './subscription-queries'
 import {
   clearSelectedSubscriptionEntry,
@@ -21,7 +29,7 @@ import {
 } from './subscription-selection-storage'
 
 interface EntrySelectionState {
-  selectedBaseUrl: string | null
+  selectedEntryId: string | null
   requiresReselection: boolean
 }
 
@@ -29,32 +37,28 @@ function isApiCode(error: unknown, code: string) {
   return error instanceof ApiError && error.code === code
 }
 
-function initialEntrySelection(entries: SubscriptionEntry[]) {
+function initialEntrySelection(
+  options: SubscriptionDeliveryOptions,
+): EntrySelectionState {
   const persisted = readSelectedSubscriptionEntry()
-  if (entries.length === 0) {
+  if (options.entries.length === 0) {
     clearSelectedSubscriptionEntry()
-    return { selectedBaseUrl: null, requiresReselection: false }
+    return { selectedEntryId: null, requiresReselection: false }
   }
-  if (persisted && entries.some((entry) => entry.baseUrl === persisted)) {
-    return { selectedBaseUrl: persisted, requiresReselection: false }
+  if (persisted && options.entries.some((entry) => entry.id === persisted)) {
+    return { selectedEntryId: persisted, requiresReselection: false }
   }
   if (persisted) {
     clearSelectedSubscriptionEntry()
-    return { selectedBaseUrl: null, requiresReselection: true }
   }
-
-  const firstBaseUrl = entries[0]!.baseUrl
-  writeSelectedSubscriptionEntry(firstBaseUrl)
-  return { selectedBaseUrl: firstBaseUrl, requiresReselection: false }
-}
-
-function entryDetail(baseUrl: string) {
-  try {
-    const url = new URL(baseUrl)
-    return `${url.host}${url.pathname === '/' ? '' : url.pathname}`
-  } catch {
-    return null
+  if (options.defaultEntryId !== null) {
+    writeSelectedSubscriptionEntry(options.defaultEntryId)
+    return {
+      selectedEntryId: options.defaultEntryId,
+      requiresReselection: false,
+    }
   }
+  return { selectedEntryId: null, requiresReselection: false }
 }
 
 export function SubscriptionEntryAccess({
@@ -64,22 +68,22 @@ export function SubscriptionEntryAccess({
   accessToken: string
   mutationCoordinator: SubscriptionMutationCoordinator
 }) {
-  const entries = useSubscriptionEntries(accessToken)
-  const invalidSessionError = isInvalidSessionError(entries.error)
-    ? entries.error
+  const deliveryOptions = useSubscriptionDeliveryOptions(accessToken)
+  const invalidSessionError = isInvalidSessionError(deliveryOptions.error)
+    ? deliveryOptions.error
     : null
   useExitOnInvalidSessionError(invalidSessionError)
 
   if (invalidSessionError) return null
-  if (entries.isPending) {
+  if (deliveryOptions.isPending) {
     return (
       <p className="text-sm text-muted-foreground" role="status">
         正在读取订阅入口…
       </p>
     )
   }
-  if (entries.isError && !entries.data) {
-    if (isApiCode(entries.error, 'SUBSCRIPTION_ACCESS_UNAVAILABLE')) {
+  if (deliveryOptions.isError && !deliveryOptions.data) {
+    if (isApiCode(deliveryOptions.error, 'SUBSCRIPTION_ACCESS_UNAVAILABLE')) {
       return (
         <p className="text-sm text-muted-foreground">
           当前没有可展示的订阅地址。
@@ -89,8 +93,8 @@ export function SubscriptionEntryAccess({
     return (
       <ReadError
         message="暂时无法读取订阅入口。"
-        error={entries.error}
-        retry={() => void entries.refetch()}
+        error={deliveryOptions.error}
+        retry={() => void deliveryOptions.refetch()}
       />
     )
   }
@@ -98,7 +102,7 @@ export function SubscriptionEntryAccess({
   return (
     <SubscriptionEntryAccessReady
       accessToken={accessToken}
-      entries={entries.data?.entries ?? []}
+      options={deliveryOptions.data ?? { defaultEntryId: null, entries: [] }}
       mutationCoordinator={mutationCoordinator}
     />
   )
@@ -106,69 +110,49 @@ export function SubscriptionEntryAccess({
 
 function SubscriptionEntryAccessReady({
   accessToken,
-  entries,
+  options,
   mutationCoordinator,
 }: {
   accessToken: string
-  entries: SubscriptionEntry[]
+  options: SubscriptionDeliveryOptions
   mutationCoordinator: SubscriptionMutationCoordinator
 }) {
   const queryClient = useQueryClient()
-  const previousAccessKeyRef = useRef<{
-    identity: string
-    queryKey: readonly unknown[]
-  } | null>(null)
-  const requestVersionRef = useRef(0)
-  const handledUnavailableRef = useRef<string | null>(null)
+  const sessionGeneration = useAuthSessionStore((state) => state.generation)
+  const accessRuntimeRef = useRef<SubscriptionAccessLinkRuntimeHandle>(null)
   const [selection, setSelection] = useState<EntrySelectionState>(() =>
-    initialEntrySelection(entries),
+    initialEntrySelection(options),
   )
-  const [requestVersion, setRequestVersion] = useState(0)
-  const [credentialSuppressed, setCredentialSuppressed] = useState(false)
-  const [refreshingAccess, setRefreshingAccess] = useState(false)
-  const [refreshAccessError, setRefreshAccessError] = useState<unknown>(null)
+  const [subscriptionInfo, setSubscriptionInfo] =
+    useState<SubscriptionInfoMode>('show')
+  const [availability, setAvailability] = useState<{
+    identity: string
+    available: boolean
+  } | null>(null)
   const [reselectionRefreshing, setReselectionRefreshing] = useState(false)
   const [reselectionRefreshError, setReselectionRefreshError] =
     useState<unknown>(null)
 
-  const selectedBaseUrl = selection.selectedBaseUrl
-  const accessQuery = useQuery({
-    ...subscriptionEntryAccessQueryOptions(
-      accessToken,
-      selectedBaseUrl ?? '',
-      requestVersion,
-    ),
-    enabled: selectedBaseUrl !== null,
-  })
-
-  useEffect(() => {
-    const current = selectedBaseUrl
-      ? {
-          identity: `${requestVersion}:${selectedBaseUrl}`,
-          queryKey: subscriptionQueryKeys.entryAccess(
-            selectedBaseUrl,
-            requestVersion,
-          ),
-        }
+  const selectedEntryId =
+    selection.selectedEntryId !== null &&
+    options.entries.some((entry) => entry.id === selection.selectedEntryId)
+      ? selection.selectedEntryId
       : null
-    const previous = previousAccessKeyRef.current
-    if (previous && previous.identity !== current?.identity) {
-      queryClient.removeQueries({ queryKey: previous.queryKey, exact: true })
-    }
-    previousAccessKeyRef.current = current
-  }, [queryClient, requestVersion, selectedBaseUrl])
+  const runtimeIdentity = selectedEntryId
+    ? `${sessionGeneration}:${selectedEntryId}:${subscriptionInfo}`
+    : null
 
-  const refreshEntriesForReselection = useCallback(async () => {
+  const refreshOptionsForReselection = useCallback(async () => {
     setReselectionRefreshing(true)
     setReselectionRefreshError(null)
     await queryClient.invalidateQueries({
-      queryKey: subscriptionQueryKeys.entries,
+      queryKey: subscriptionQueryKeys.deliveryOptions,
       exact: true,
       refetchType: 'none',
     })
     try {
       await queryClient.fetchQuery({
-        ...subscriptionEntriesQueryOptions(accessToken),
+        ...subscriptionDeliveryOptionsQueryOptions(accessToken),
         retry: false,
         staleTime: 0,
       })
@@ -180,216 +164,204 @@ function SubscriptionEntryAccessReady({
   }, [accessToken, queryClient])
 
   const requireReselection = useCallback(
-    (baseUrl: string, refreshEntries: boolean) => {
-      void queryClient.cancelQueries({
-        queryKey: ['subscription', 'entry-access', baseUrl],
-      })
+    (entryId: string, refreshOptions: boolean) => {
+      if (selection.selectedEntryId !== entryId) return
+      accessRuntimeRef.current?.suppress()
       clearSelectedSubscriptionEntry()
-      setCredentialSuppressed(true)
-      setSelection({
-        selectedBaseUrl: null,
-        requiresReselection: true,
-      })
-      if (refreshEntries) void refreshEntriesForReselection()
+      setAvailability(null)
+      setSelection({ selectedEntryId: null, requiresReselection: true })
+      if (refreshOptions) void refreshOptionsForReselection()
     },
-    [queryClient, refreshEntriesForReselection],
+    [refreshOptionsForReselection, selection.selectedEntryId],
   )
 
   useEffect(() => {
-    if (
-      !selectedBaseUrl ||
-      !isApiCode(accessQuery.error, 'SUBSCRIPTION_ENTRY_UNAVAILABLE')
-    ) {
+    const selected = selection.selectedEntryId
+    if (!selected || options.entries.some((entry) => entry.id === selected)) {
       return
     }
-    const identity = `${selectedBaseUrl}:${requestVersion}`
-    if (handledUnavailableRef.current === identity) return
-    handledUnavailableRef.current = identity
-    // Query errors are external server state; this transition disables stale actions.
-    requireReselection(selectedBaseUrl, true)
-  }, [accessQuery.error, requestVersion, requireReselection, selectedBaseUrl])
+    queueMicrotask(() => requireReselection(selected, false))
+  }, [options.entries, requireReselection, selection.selectedEntryId])
 
-  const selectEntry = (baseUrl: string) => {
-    if (!entries.some((entry) => entry.baseUrl === baseUrl)) return
-    if (selectedBaseUrl) {
-      void queryClient.cancelQueries({
-        queryKey: ['subscription', 'entry-access', selectedBaseUrl],
-      })
-    }
-    handledUnavailableRef.current = null
-    requestVersionRef.current += 1
-    setRequestVersion(requestVersionRef.current)
-    setCredentialSuppressed(false)
-    setRefreshingAccess(false)
-    setRefreshAccessError(null)
+  const selectEntry = (entryId: string) => {
+    if (!options.entries.some((entry) => entry.id === entryId)) return
+    accessRuntimeRef.current?.suppress()
+    setAvailability(null)
     setReselectionRefreshError(null)
-    writeSelectedSubscriptionEntry(baseUrl)
-    setSelection({
-      selectedBaseUrl: baseUrl,
-      requiresReselection: false,
-    })
+    writeSelectedSubscriptionEntry(entryId)
+    setSelection({ selectedEntryId: entryId, requiresReselection: false })
+  }
+
+  const changeSubscriptionInfo = (mode: SubscriptionInfoMode) => {
+    if (mode === subscriptionInfo) return
+    accessRuntimeRef.current?.suppress()
+    setAvailability(null)
+    setSubscriptionInfo(mode)
   }
 
   const refreshSelectedAccess = useCallback(async () => {
-    if (!selectedBaseUrl) throw new Error('No subscription entry selected')
-    setCredentialSuppressed(true)
-    setRefreshingAccess(true)
-    setRefreshAccessError(null)
-    requestVersionRef.current += 1
-    const nextVersion = requestVersionRef.current
-    const nextQueryKey = subscriptionQueryKeys.entryAccess(
-      selectedBaseUrl,
-      nextVersion,
-    )
-
-    try {
-      await queryClient.fetchQuery({
-        ...subscriptionEntryAccessQueryOptions(
-          accessToken,
-          selectedBaseUrl,
-          nextVersion,
-        ),
-        retry: false,
-      })
-      setRequestVersion(nextVersion)
-      setRefreshingAccess(false)
-      setCredentialSuppressed(false)
-    } catch (error) {
-      queryClient.removeQueries({ queryKey: nextQueryKey, exact: true })
-      setRefreshingAccess(false)
-      setRefreshAccessError(error)
-      if (isApiCode(error, 'SUBSCRIPTION_ACCESS_UNAVAILABLE')) {
-        return
-      }
-      if (isApiCode(error, 'SUBSCRIPTION_ENTRY_UNAVAILABLE')) {
-        requireReselection(selectedBaseUrl, true)
-      }
-      throw error
+    const runtime = accessRuntimeRef.current
+    if (!runtime || selectedEntryId === null) {
+      throw new Error('No subscription delivery entry selected')
     }
-  }, [accessToken, queryClient, requireReselection, selectedBaseUrl])
+    await runtime.refresh({ suppressError: true })
+  }, [selectedEntryId])
 
-  const invalidSessionError = isInvalidSessionError(refreshAccessError)
-    ? refreshAccessError
-    : isInvalidSessionError(accessQuery.error)
-      ? accessQuery.error
-      : isInvalidSessionError(reselectionRefreshError)
-        ? reselectionRefreshError
-        : null
-  useExitOnInvalidSessionError(invalidSessionError)
+  const suppressSelectedAccess = useCallback(() => {
+    accessRuntimeRef.current?.suppress()
+    setAvailability(null)
+  }, [])
 
-  if (invalidSessionError) return null
-  const availableEntries = entries
-  const selectionLocked =
-    mutationCoordinator.activeAction !== null || refreshingAccess
-  let selectionControl = null
-  if (selection.requiresReselection) {
-    selectionControl = (
-      <div className="space-y-4" role="alert">
-        <p className="text-sm font-semibold">原订阅入口已不可用，请重新选择</p>
-        {reselectionRefreshing ? (
-          <p className="text-sm text-muted-foreground" role="status">
-            正在刷新订阅入口…
-          </p>
-        ) : reselectionRefreshError ? (
-          <ReadError
-            message="暂时无法刷新订阅入口。"
-            error={reselectionRefreshError}
-            retry={() => void refreshEntriesForReselection()}
-          />
-        ) : availableEntries.length === 0 ? (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              暂无可重新选择的订阅入口。
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void refreshEntriesForReselection()}
-            >
-              重新读取订阅入口
-            </Button>
-          </div>
-        ) : (
-          <EntryChoices
-            entries={availableEntries}
-            disabled={selectionLocked}
-            onSelect={selectEntry}
-          />
-        )}
-      </div>
-    )
-  } else if (availableEntries.length === 0) {
-    selectionControl = (
-      <p className="text-sm text-muted-foreground">暂无可用订阅入口</p>
-    )
-  } else if (selectedBaseUrl) {
-    selectionControl = (
-      <EntrySelector
-        entries={availableEntries}
-        selectedBaseUrl={selectedBaseUrl}
-        disabled={selectionLocked}
-        onSelect={selectEntry}
-      />
-    )
-  }
-
-  const accessUnavailable = isApiCode(
-    refreshAccessError ?? accessQuery.error,
-    'SUBSCRIPTION_ACCESS_UNAVAILABLE',
+  const handleAvailabilityChange = useCallback(
+    (identity: string, available: boolean) => {
+      setAvailability({ identity, available })
+    },
+    [],
   )
-  const accessError = accessUnavailable
-    ? null
-    : (refreshAccessError ?? (accessQuery.isError ? accessQuery.error : null))
-  const visibleAccessUrl = credentialSuppressed
-    ? null
-    : (accessQuery.data?.accessUrl ?? null)
-  const accessPending =
-    selectedBaseUrl !== null &&
-    (refreshingAccess || accessQuery.isPending || accessQuery.isFetching)
+
+  const handleEntryUnavailable = useCallback(
+    (entryId: string) => requireReselection(entryId, true),
+    [requireReselection],
+  )
+
+  const invalidSessionError = isInvalidSessionError(reselectionRefreshError)
+    ? reselectionRefreshError
+    : null
+  useExitOnInvalidSessionError(invalidSessionError)
+  if (invalidSessionError) return null
+
+  const selectionLocked = mutationCoordinator.activeAction !== null
+  const requiresReselection =
+    selection.requiresReselection ||
+    (selection.selectedEntryId !== null && selectedEntryId === null)
+  const accessAvailable =
+    runtimeIdentity !== null &&
+    availability?.identity === runtimeIdentity &&
+    availability.available
 
   return (
     <div className="space-y-5">
-      {selectionControl}
+      <EntrySelectionControl
+        entries={options.entries}
+        selectedEntryId={selectedEntryId}
+        requiresReselection={requiresReselection}
+        disabled={selectionLocked}
+        refreshing={reselectionRefreshing}
+        refreshError={reselectionRefreshError}
+        onRefresh={() => void refreshOptionsForReselection()}
+        onSelect={selectEntry}
+      />
+
+      {selectedEntryId ? (
+        <SubscriptionInfoControl
+          value={subscriptionInfo}
+          disabled={selectionLocked}
+          onChange={changeSubscriptionInfo}
+        />
+      ) : null}
+
       <SubscriptionAccessPanel
-        accessUrl={visibleAccessUrl}
-        accessPending={accessPending}
-        accessUnavailable={accessUnavailable}
-        accessError={accessError}
+        accessContent={
+          selectedEntryId && runtimeIdentity ? (
+            <SubscriptionAccessLinkRuntime
+              key={runtimeIdentity}
+              ref={accessRuntimeRef}
+              accessToken={accessToken}
+              sessionGeneration={sessionGeneration}
+              entryId={selectedEntryId}
+              subscriptionInfo={subscriptionInfo}
+              runtimeIdentity={runtimeIdentity}
+              onAvailabilityChange={handleAvailabilityChange}
+              onEntryUnavailable={handleEntryUnavailable}
+            />
+          ) : null
+        }
+        accessAvailable={accessAvailable}
         accessToken={accessToken}
         mutationCoordinator={mutationCoordinator}
         refreshAccess={refreshSelectedAccess}
-        canRecoverAccess={selectedBaseUrl !== null && !accessPending}
+        suppressAccess={suppressSelectedAccess}
+        canRecoverAccess={selectedEntryId !== null}
       />
     </div>
   )
 }
 
-function EntrySelector({
+function EntrySelectionControl({
   entries,
-  selectedBaseUrl,
+  selectedEntryId,
+  requiresReselection,
   disabled,
+  refreshing,
+  refreshError,
+  onRefresh,
   onSelect,
 }: {
-  entries: SubscriptionEntry[]
-  selectedBaseUrl: string
+  entries: SubscriptionDeliveryEntry[]
+  selectedEntryId: string | null
+  requiresReselection: boolean
   disabled: boolean
-  onSelect: (baseUrl: string) => void
+  refreshing: boolean
+  refreshError: unknown
+  onRefresh: () => void
+  onSelect: (entryId: string) => void
 }) {
-  const selectedIndex = entries.findIndex(
-    (entry) => entry.baseUrl === selectedBaseUrl,
-  )
-  const selectedDetail = entryDetail(selectedBaseUrl)
+  if (requiresReselection) {
+    return (
+      <div className="space-y-4" role="alert">
+        <p className="text-sm font-semibold">原订阅入口已不可用，请重新选择</p>
+        {refreshing ? (
+          <p className="text-sm text-muted-foreground" role="status">
+            正在刷新订阅入口…
+          </p>
+        ) : refreshError ? (
+          <ReadError
+            message="暂时无法刷新订阅入口。"
+            error={refreshError}
+            retry={onRefresh}
+          />
+        ) : entries.length === 0 ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              暂无可重新选择的订阅入口。
+            </p>
+            <Button type="button" variant="outline" onClick={onRefresh}>
+              重新读取订阅入口
+            </Button>
+          </div>
+        ) : (
+          <EntryChoices
+            entries={entries}
+            disabled={disabled}
+            onSelect={onSelect}
+          />
+        )}
+      </div>
+    )
+  }
+
+  if (entries.length === 0) {
+    return <p className="text-sm text-muted-foreground">暂无可用订阅入口</p>
+  }
+
+  if (selectedEntryId === null) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">请选择订阅入口。</p>
+        <EntryChoices
+          entries={entries}
+          disabled={disabled}
+          onSelect={onSelect}
+        />
+      </div>
+    )
+  }
 
   if (entries.length === 1) {
     return (
       <div>
         <p className="text-sm font-semibold">订阅入口</p>
-        <p className="mt-1 text-sm">入口 1</p>
-        {selectedDetail ? (
-          <p className="mt-1 break-all font-mono text-xs text-muted-foreground">
-            {selectedDetail}
-          </p>
-        ) : null}
+        <p className="mt-1 text-sm">{entries[0]!.label}</p>
       </div>
     )
   }
@@ -400,24 +372,16 @@ function EntrySelector({
       <select
         aria-label="订阅入口"
         className="mt-2 h-11 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        value={selectedBaseUrl}
+        value={selectedEntryId}
         disabled={disabled}
         onChange={(event) => onSelect(event.target.value)}
       >
-        {entries.map((entry, index) => {
-          const detail = entryDetail(entry.baseUrl)
-          return (
-            <option key={entry.baseUrl} value={entry.baseUrl}>
-              {`入口 ${index + 1}${detail ? ` · ${detail}` : ''}`}
-            </option>
-          )
-        })}
+        {entries.map((entry) => (
+          <option key={entry.id} value={entry.id}>
+            {entry.label}
+          </option>
+        ))}
       </select>
-      {selectedIndex >= 0 && selectedDetail ? (
-        <span className="mt-2 block break-all font-mono text-xs text-muted-foreground">
-          {selectedDetail}
-        </span>
-      ) : null}
     </label>
   )
 }
@@ -427,32 +391,62 @@ function EntryChoices({
   disabled,
   onSelect,
 }: {
-  entries: SubscriptionEntry[]
+  entries: SubscriptionDeliveryEntry[]
   disabled: boolean
-  onSelect: (baseUrl: string) => void
+  onSelect: (entryId: string) => void
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      {entries.map((entry, index) => {
-        const detail = entryDetail(entry.baseUrl)
-        return (
-          <div key={entry.baseUrl} className="border-l-2 border-border pl-3">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={disabled}
-              onClick={() => onSelect(entry.baseUrl)}
-            >
-              使用入口 {index + 1}
-            </Button>
-            {detail ? (
-              <p className="mt-2 break-all font-mono text-xs text-muted-foreground">
-                {detail}
-              </p>
-            ) : null}
-          </div>
-        )
-      })}
+      {entries.map((entry) => (
+        <div key={entry.id} className="border-l-2 border-border pl-3">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={disabled}
+            onClick={() => onSelect(entry.id)}
+          >
+            {entry.label}
+          </Button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function SubscriptionInfoControl({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: SubscriptionInfoMode
+  disabled: boolean
+  onChange: (mode: SubscriptionInfoMode) => void
+}) {
+  return (
+    <div>
+      <p className="text-sm font-semibold">订阅信息</p>
+      <div
+        className="mt-2 inline-flex rounded-md border border-border bg-background p-0.5"
+        role="group"
+        aria-label="订阅信息"
+      >
+        {(['show', 'hide'] as const).map((mode) => (
+          <Button
+            key={mode}
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={
+              value === mode ? 'bg-secondary text-foreground' : undefined
+            }
+            aria-pressed={value === mode}
+            disabled={disabled}
+            onClick={() => onChange(mode)}
+          >
+            {mode === 'show' ? '显示订阅信息' : '隐藏订阅信息'}
+          </Button>
+        ))}
+      </div>
     </div>
   )
 }

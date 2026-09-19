@@ -9,16 +9,19 @@ Aureole v1: `LAUNCH READY / NOT PRODUCTION DEPLOYED`
 ## Contract baseline
 
 Active solution baseline:
-`b9175217001c2146b3a2aa0a98066882b770f3e1` (REG-M01 / A3 re-freeze; reviewed
-feature anchor `1729943b57e71ad9726b03f47b7882180e51ce91`). The re-frozen Contract uses wildcard non-credentialed Public CORS,
+`d52d78ce4b07dd5d0982811d666d8818a8bace69` (M04/M06 current main; reviewed
+technical anchor `c884a73d93e240e2dddc7ea9f4e8ab58dffb736b`). The re-frozen Contract uses wildcard non-credentialed Public CORS,
 keeps Bearer authentication explicit, and treats exact HTTPS Origin only as
 Checkout return-URL protocol metadata. P-09 continues to freeze `recaptcha` + `v2-checkbox`, provider-neutral
 `challengeToken`, V2Board authoritative verification and unsupported capability
 fail-closed behavior.
 
-## AUR-CF02 Multiple Subscription Entry Consumer
+## AUR-CF02 Multiple Subscription Entry Consumer — Historical Baseline
 
 Status: `ENGINEERING REVIEW HIGH FIX APPLIED / RE-REVIEW PENDING`.
+
+The active consumer is superseded by AUR-REG-M04-M06-01 below. This section retains historical CF-02 evidence;
+legacy Solution routes remain compatible but are no longer used by the active Subscription UI.
 
 Aureole now uses `GET /api/v1/subscription/entries` for ordered entry discovery and
 `POST /api/v1/subscription/entry-access` as the only selected-entry credential source.
@@ -53,6 +56,29 @@ production build and diff check passed. Controlled browser verification passed o
 and credential text, local QR, all import actions, selection reset and no horizontal overflow or
 application console warning/error. This browser run used local mock Public API responses and is
 not production runtime evidence.
+
+## AUR-REG-M04-M06-01 Subscription Delivery Consumer Migration
+
+Status: `IMPLEMENTATION COMPLETE / GEMINI CODE REVIEW REQUIRED`.
+
+The active Subscription Address consumer now uses authenticated
+`GET /api/v1/subscription/delivery-options` and `POST /api/v1/subscription/access-link`. Selection identity and
+optional session persistence use stable `entryId`; server order and labels are preserved; valid persisted selection
+precedes validated `defaultEntryId`, and no first-item default is invented when default is null. Historical baseUrl
+values are cleared without guessing. Only `profileId=default` is supported; M05 is not implemented.
+
+Delivery options remain non-secret Query state. Long-lived `accessUrl` is held only in a keyed local component
+runtime and never enters Query data/key, Zustand, storage, URL state, cookie or logs. Entry/info/session/rotation/error
+transitions suppress old Display/Copy/QR/Import immediately. AbortController, request generation, current token and
+Auth generation checks reject stale and cross-session completions. `subscriptionInfo` supports `show/hide` with a
+fresh access-link request. Clash and Quantumult X parameter encoding is explicit; Sing-box preserves the exact URL
+without appending a flag.
+
+Rotate/Advance coordination, UNKNOWN acknowledgement and recovery blocking remain intact; rotation reconciliation
+uses the current entry/default/info access-link and ignores the legacy rotate response URL. Current evidence is
+local/mock only: focused Subscription/Auth/Gift Card tests, full suite and production build passed. Real deployed
+Solution/Registry delivery options, public subscription origins and real client deep-link acceptance are `NOT TESTED`.
+No deployment was performed; Production remains `NOT AUTHORIZED / NOT DEPLOYED`.
 
 ## AUR-CF04 Advance Period Always-Visible Action
 

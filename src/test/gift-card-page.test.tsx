@@ -107,18 +107,10 @@ function renderWallet(
   queryClient: QueryClient = createQueryClient(),
 ) {
   window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'wallet-token')
-  queryClient.setQueryData(subscriptionQueryKeys.access, {
-    eligible: true,
-    accessUrl:
-      'https://gateway.example/api/v1/access/subscription?token=fake-token',
+  queryClient.setQueryData(subscriptionQueryKeys.deliveryOptions, {
+    defaultEntryId: 'primary',
+    entries: [{ id: 'primary', label: 'Subscription' }],
   })
-  queryClient.setQueryData(
-    subscriptionQueryKeys.entryAccess('https://entry.example', 0),
-    {
-      accessUrl:
-        'https://entry.example/api/v1/client/subscribe?token=fake-entry-token',
-    },
-  )
   const authApi: AuthApi = {
     login: vi.fn(),
     getCurrentUser: mocks.getCurrentUser,
@@ -298,13 +290,9 @@ describe('Gift Card confirmed success', () => {
       expect(mocks.getOverview).toHaveBeenCalledOnce()
       expect(mocks.getAccess).not.toHaveBeenCalled()
       expect(
-        queryClient.getQueryState(subscriptionQueryKeys.access)?.isInvalidated,
+        queryClient.getQueryState(subscriptionQueryKeys.deliveryOptions)
+          ?.isInvalidated,
       ).toBe(true)
-      expect(
-        queryClient.getQueriesData({
-          queryKey: subscriptionQueryKeys.entryAccessRoot,
-        }),
-      ).toEqual([])
       expect(JSON.stringify(giftCardMutationKeys.redeem)).not.toContain(
         'fake-card-code',
       )
@@ -484,7 +472,8 @@ describe('Gift Card unknown-result recovery', () => {
       expect(mocks.getOverview).toHaveBeenCalledOnce()
       expect(mocks.getAccess).not.toHaveBeenCalled()
       expect(
-        queryClient.getQueryState(subscriptionQueryKeys.access)?.isInvalidated,
+        queryClient.getQueryState(subscriptionQueryKeys.deliveryOptions)
+          ?.isInvalidated,
       ).toBe(true)
       expect(
         JSON.stringify(

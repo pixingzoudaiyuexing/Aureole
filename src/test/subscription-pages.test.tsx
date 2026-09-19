@@ -43,11 +43,14 @@ function installSubscriptionMocks() {
     eligible: true,
     accessUrl: credentialUrl,
   })
-  const getEntries = vi.spyOn(subscriptionApi, 'getEntries').mockResolvedValue({
-    entries: [{ baseUrl: 'https://entry.example/subscriptions' }],
-  })
+  const getEntries = vi
+    .spyOn(subscriptionApi, 'getDeliveryOptions')
+    .mockResolvedValue({
+      defaultEntryId: 'primary',
+      entries: [{ id: 'primary', label: 'Subscription' }],
+    })
   const getEntryAccess = vi
-    .spyOn(subscriptionApi, 'getEntryAccess')
+    .spyOn(subscriptionApi, 'getAccessLink')
     .mockResolvedValue({ accessUrl: credentialUrl })
   const getOverview = vi
     .spyOn(subscriptionApi, 'getOverview')
@@ -97,14 +100,10 @@ function createDeferred<T>() {
 
 describe('Subscription page', () => {
   it('uses stable credential-free canonical query keys', () => {
-    expect(subscriptionQueryKeys.entries).toEqual(['subscription', 'entries'])
-    expect(subscriptionQueryKeys.entryAccessRoot).toEqual([
+    expect(subscriptionQueryKeys.deliveryOptions).toEqual([
       'subscription',
-      'entry-access',
+      'delivery-options',
     ])
-    expect(
-      subscriptionQueryKeys.entryAccess('https://entry.example', 3),
-    ).toEqual(['subscription', 'entry-access', 'https://entry.example', 3])
     expect(subscriptionQueryKeys.overview).toEqual(['subscription', 'overview'])
   })
 
@@ -348,10 +347,7 @@ describe('Subscription page', () => {
         new ApiError({ status: 401, code, message: 'Authentication failed' }),
       )
       const queryClient = createQueryClient()
-      queryClient.setQueryData(
-        subscriptionQueryKeys.entryAccess('https://entry.example', 0),
-        { accessUrl: credentialUrl },
-      )
+      queryClient.setQueryData(['private-data'], { sensitive: true })
       const { router } = renderProtectedRoute('/subscription', queryClient)
 
       expect(
@@ -359,11 +355,7 @@ describe('Subscription page', () => {
       ).toBeInTheDocument()
       expect(router.state.location.pathname).toBe('/login')
       expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
-      expect(
-        queryClient.getQueryData(
-          subscriptionQueryKeys.entryAccess('https://entry.example', 0),
-        ),
-      ).toBeUndefined()
+      expect(queryClient.getQueryData(['private-data'])).toBeUndefined()
     },
   )
 
@@ -388,11 +380,7 @@ describe('Subscription page', () => {
         mocks.getEntryAccess.mockRejectedValue(error)
       } else mocks.getOverview.mockRejectedValue(error)
       const queryClient = createQueryClient()
-      queryClient.setQueryData(
-        subscriptionQueryKeys.entryAccess('https://entry.example', 0),
-        { accessUrl: credentialUrl },
-        { updatedAt: 0 },
-      )
+      queryClient.setQueryData(['private-data'], { sensitive: true })
       const { router } = renderProtectedRoute('/subscription', queryClient)
 
       expect(
@@ -400,11 +388,7 @@ describe('Subscription page', () => {
       ).toBeInTheDocument()
       expect(router.state.location.pathname).toBe('/login')
       expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
-      expect(
-        queryClient.getQueryData(
-          subscriptionQueryKeys.entryAccess('https://entry.example', 0),
-        ),
-      ).toBeUndefined()
+      expect(queryClient.getQueryData(['private-data'])).toBeUndefined()
     },
   )
 })

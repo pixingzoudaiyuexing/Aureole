@@ -21,6 +21,63 @@ const httpsCredentialUrlSchema = z.string().refine((value) => {
   }
 })
 
+const subscriptionDeliveryEntryIdSchema = z
+  .string()
+  .regex(/^[a-z](?:[a-z0-9]|-(?=[a-z0-9])){0,63}$/)
+
+const subscriptionDeliveryLabelSchema = z
+  .string()
+  .min(1)
+  .max(120)
+  .refine((value) => value.trim() === value)
+
+const subscriptionDeliveryOptionsSchema = z
+  .object({
+    defaultEntryId: subscriptionDeliveryEntryIdSchema.nullable(),
+    entries: z.array(
+      z
+        .object({
+          id: subscriptionDeliveryEntryIdSchema,
+          label: subscriptionDeliveryLabelSchema,
+        })
+        .strip(),
+    ),
+  })
+  .strip()
+  .superRefine((value, context) => {
+    const ids = new Set<string>()
+    value.entries.forEach((entry, index) => {
+      if (ids.has(entry.id)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['entries', index, 'id'],
+          message: 'Duplicate subscription delivery entry ID',
+        })
+      }
+      ids.add(entry.id)
+    })
+
+    if (value.defaultEntryId !== null && !ids.has(value.defaultEntryId)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['defaultEntryId'],
+        message: 'Default subscription delivery entry is unavailable',
+      })
+    }
+  })
+
+const subscriptionAccessLinkRequestSchema = z
+  .object({
+    entryId: subscriptionDeliveryEntryIdSchema,
+    profileId: z.literal('default'),
+    subscriptionInfo: z.enum(['show', 'hide']),
+  })
+  .strict()
+
+const subscriptionAccessLinkSchema = z
+  .object({ accessUrl: httpsCredentialUrlSchema })
+  .strip()
+
 const subscriptionEntryBaseUrlSchema = z
   .string()
   .min(1)
@@ -113,6 +170,18 @@ export type SubscriptionEntries = z.infer<typeof subscriptionEntriesSchema>
 export type SubscriptionEntryAccess = z.infer<
   typeof subscriptionEntryAccessSchema
 >
+export type SubscriptionDeliveryOptions = z.infer<
+  typeof subscriptionDeliveryOptionsSchema
+>
+export type SubscriptionDeliveryEntry =
+  SubscriptionDeliveryOptions['entries'][number]
+export type SubscriptionInfoMode = 'show' | 'hide'
+export type SubscriptionAccessLinkInput = z.input<
+  typeof subscriptionAccessLinkRequestSchema
+>
+export type SubscriptionAccessLink = z.infer<
+  typeof subscriptionAccessLinkSchema
+>
 export type SubscriptionAccess = z.infer<typeof subscriptionAccessSchema>
 export type SubscriptionAccessRotation = z.infer<
   typeof subscriptionAccessRotationSchema
@@ -177,6 +246,30 @@ export const subscriptionApi = {
       { method: 'POST', accessToken, body, signal },
     )
     return parseSubscriptionData(subscriptionEntryAccessSchema, data)
+  },
+
+  async getDeliveryOptions(accessToken: string, signal?: AbortSignal) {
+    const data = await apiClient.authenticatedRequest<unknown>(
+      '/api/v1/subscription/delivery-options',
+      { method: 'GET', accessToken, signal },
+    )
+    return parseSubscriptionData(subscriptionDeliveryOptionsSchema, data)
+  },
+
+  async getAccessLink(
+    accessToken: string,
+    input: SubscriptionAccessLinkInput,
+    signal?: AbortSignal,
+  ) {
+    const body = parseSubscriptionRequest(
+      subscriptionAccessLinkRequestSchema,
+      input,
+    )
+    const data = await apiClient.authenticatedRequest<unknown>(
+      '/api/v1/subscription/access-link',
+      { method: 'POST', accessToken, body, signal },
+    )
+    return parseSubscriptionData(subscriptionAccessLinkSchema, data)
   },
 
   async getOverview(accessToken: string) {

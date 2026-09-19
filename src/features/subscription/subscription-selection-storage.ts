@@ -1,24 +1,27 @@
 export const SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY =
   'aureole.subscription.selected-entry'
 
+const subscriptionEntryIdPattern = /^[a-z](?:[a-z0-9]|-(?=[a-z0-9])){0,63}$/
+
 export function readSelectedSubscriptionEntry() {
   try {
     const value = window.sessionStorage.getItem(
       SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY,
     )
-    return value && value.length <= 2048 && value.trim().length > 0
-      ? value
-      : null
+    if (value && subscriptionEntryIdPattern.test(value)) return value
+    if (value !== null) clearSelectedSubscriptionEntry()
+    return null
   } catch {
     return null
   }
 }
 
-export function writeSelectedSubscriptionEntry(baseUrl: string) {
+export function writeSelectedSubscriptionEntry(entryId: string) {
+  if (!subscriptionEntryIdPattern.test(entryId)) return
   try {
     window.sessionStorage.setItem(
       SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY,
-      baseUrl,
+      entryId,
     )
   } catch {
     // Selection persistence is optional; the current document still works.

@@ -22,7 +22,6 @@ import {
   buildSubscriptionImportUri,
   subscriptionImportNavigation,
 } from '@/features/subscription/subscription-imports'
-import { subscriptionQueryKeys } from '@/features/subscription/subscription-queries'
 import { SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY } from '@/features/subscription/subscription-selection-storage'
 import { trafficApi } from '@/features/traffic/traffic-api'
 import { ApiError } from '@/lib/api/errors'
@@ -34,9 +33,9 @@ vi.mock('qrcode.react', () => ({
   ),
 }))
 
-const entryA = 'https://a.example.com'
-const entryB = 'https://b.example.com/path'
-const entryC = 'https://c.example.com/path'
+const entryA = 'entry-a'
+const entryB = 'entry-b'
+const entryC = 'entry-c'
 
 const oldCredentialUrl =
   'https://gateway.example/api/v1/access/subscription?token=fake-old-token'
@@ -68,11 +67,14 @@ const overview: SubscriptionOverview = {
 }
 
 function installMocks() {
-  const getEntries = vi.spyOn(subscriptionApi, 'getEntries').mockResolvedValue({
-    entries: [{ baseUrl: 'https://entry.example/subscriptions' }],
-  })
+  const getEntries = vi
+    .spyOn(subscriptionApi, 'getDeliveryOptions')
+    .mockResolvedValue({
+      defaultEntryId: entryA,
+      entries: [{ id: entryA, label: 'Entry A' }],
+    })
   const getAccess = vi
-    .spyOn(subscriptionApi, 'getEntryAccess')
+    .spyOn(subscriptionApi, 'getAccessLink')
     .mockResolvedValue({ accessUrl: oldCredentialUrl })
   const rotateAccess = vi
     .spyOn(subscriptionApi, 'rotateAccess')
@@ -192,6 +194,9 @@ describe('Subscription access rotation', () => {
     fireEvent.click(confirm)
 
     await waitFor(() => expect(mocks.rotateAccess).toHaveBeenCalledOnce())
+    expect(screen.queryByRole('button', { name: '复制' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '显示二维码' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Clash' })).toBeNull()
     expect(
       within(screen.getByRole('dialog')).getByRole('button', {
         name: '正在重置…',
@@ -237,19 +242,19 @@ describe('Subscription access rotation', () => {
     expect(writeText).toHaveBeenCalledOnce()
     expect(fetchSpy).not.toHaveBeenCalled()
     expect(
-      queryClient.getQueryData(
-        subscriptionQueryKeys.entryAccess(
-          'https://entry.example/subscriptions',
-          1,
-        ),
-      ),
-    ).toEqual({ accessUrl: newCredentialUrl })
-    expect(
       JSON.stringify(
         queryClient
           .getQueryCache()
           .getAll()
           .map((query) => query.state.data),
+      ),
+    ).not.toContain('legacy-rotate-token')
+    expect(
+      JSON.stringify(
+        queryClient
+          .getMutationCache()
+          .getAll()
+          .map((mutation) => mutation.state.data),
       ),
     ).not.toContain('legacy-rotate-token')
     expect(router.state.location.search).toEqual({})
@@ -292,14 +297,9 @@ describe('Subscription access rotation', () => {
     expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
       'opaque-session-token',
     )
-    expect(
-      queryClient.getQueryData(
-        subscriptionQueryKeys.entryAccess(
-          'https://entry.example/subscriptions',
-          1,
-        ),
-      ),
-    ).toBeUndefined()
+    expect(JSON.stringify(queryClient.getQueryCache().getAll())).not.toContain(
+      oldCredentialUrl,
+    )
   })
 
   it('handles a definitive rotation failure, reconciles, and requires a new confirmation', async () => {
@@ -365,13 +365,8 @@ describe('Subscription access rotation', () => {
       expect(mocks.rotateAccess).toHaveBeenCalledOnce()
       expect(mocks.getAccess).toHaveBeenCalledTimes(2)
       expect(
-        queryClient.getQueryData(
-          subscriptionQueryKeys.entryAccess(
-            'https://entry.example/subscriptions',
-            1,
-          ),
-        ),
-      ).toEqual({ accessUrl: newCredentialUrl })
+        JSON.stringify(queryClient.getQueryCache().getAll()),
+      ).not.toContain(newCredentialUrl)
 
       const second = await openConfirmation('再次重置订阅地址')
       expect(
@@ -535,12 +530,13 @@ describe('Subscription access rotation', () => {
       entryB,
     )
     mocks.getEntries.mockResolvedValue({
-      entries: [entryA, entryB, entryC].map((baseUrl) => ({ baseUrl })),
+      defaultEntryId: entryA,
+      entries: [entryA, entryB, entryC].map((id) => ({ id, label: id })),
     })
     let bReads = 0
     let cReads = 0
-    mocks.getAccess.mockImplementation(async (_token, baseUrl) => {
-      if (baseUrl === entryB) {
+    mocks.getAccess.mockImplementation(async (_token, input) => {
+      if (input.entryId === entryB) {
         bReads += 1
         if (bReads === 1) return { accessUrl: entryBCredentialUrl }
         throw new ApiError({
@@ -549,7 +545,7 @@ describe('Subscription access rotation', () => {
           message: 'offline',
         })
       }
-      if (baseUrl === entryC) {
+      if (input.entryId === entryC) {
         cReads += 1
         return { accessUrl: entryCCredentialUrl }
       }
@@ -598,7 +594,8 @@ describe('Subscription access rotation', () => {
       entryB,
     )
     mocks.getEntries.mockResolvedValue({
-      entries: [entryA, entryB, entryC].map((baseUrl) => ({ baseUrl })),
+      defaultEntryId: entryA,
+      entries: [entryA, entryB, entryC].map((id) => ({ id, label: id })),
     })
     mocks.rotateAccess.mockRejectedValue(
       new ApiError({
@@ -608,8 +605,8 @@ describe('Subscription access rotation', () => {
       }),
     )
     let bReads = 0
-    mocks.getAccess.mockImplementation(async (_token, baseUrl) => {
-      if (baseUrl === entryB) {
+    mocks.getAccess.mockImplementation(async (_token, input) => {
+      if (input.entryId === entryB) {
         bReads += 1
         if (bReads === 1) return { accessUrl: entryBCredentialUrl }
         throw new ApiError({
@@ -618,7 +615,7 @@ describe('Subscription access rotation', () => {
           message: 'offline',
         })
       }
-      if (baseUrl === entryC) return { accessUrl: entryCCredentialUrl }
+      if (input.entryId === entryC) return { accessUrl: entryCCredentialUrl }
       return { accessUrl: oldCredentialUrl }
     })
     renderSubscription()
@@ -652,15 +649,17 @@ describe('Subscription access rotation', () => {
     )
     mocks.getEntries
       .mockResolvedValueOnce({
-        entries: [entryA, entryB, entryC].map((baseUrl) => ({ baseUrl })),
+        defaultEntryId: entryA,
+        entries: [entryA, entryB, entryC].map((id) => ({ id, label: id })),
       })
       .mockResolvedValue({
-        entries: [entryA, entryC].map((baseUrl) => ({ baseUrl })),
+        defaultEntryId: entryA,
+        entries: [entryA, entryC].map((id) => ({ id, label: id })),
       })
     let bReads = 0
     let cReads = 0
-    mocks.getAccess.mockImplementation(async (_token, baseUrl) => {
-      if (baseUrl === entryB) {
+    mocks.getAccess.mockImplementation(async (_token, input) => {
+      if (input.entryId === entryB) {
         bReads += 1
         if (bReads === 1) return { accessUrl: entryBCredentialUrl }
         throw new ApiError({
@@ -669,7 +668,7 @@ describe('Subscription access rotation', () => {
           message: 'stale',
         })
       }
-      if (baseUrl === entryC) {
+      if (input.entryId === entryC) {
         cReads += 1
         return { accessUrl: entryCCredentialUrl }
       }
@@ -691,9 +690,7 @@ describe('Subscription access rotation', () => {
     })
     expect(advanceButton).toBeDisabled()
 
-    await first.user.click(
-      await screen.findByRole('button', { name: '使用入口 2' }),
-    )
+    await first.user.click(await screen.findByRole('button', { name: entryC }))
     await screen.findByLabelText('订阅地址已隐藏')
     expect(
       screen.getByRole('button', { name: '重新读取订阅地址' }),
@@ -720,10 +717,12 @@ describe('Subscription access rotation', () => {
     )
     mocks.getEntries
       .mockResolvedValueOnce({
-        entries: [entryA, entryB, entryC].map((baseUrl) => ({ baseUrl })),
+        defaultEntryId: entryA,
+        entries: [entryA, entryB, entryC].map((id) => ({ id, label: id })),
       })
       .mockResolvedValue({
-        entries: [entryA, entryC].map((baseUrl) => ({ baseUrl })),
+        defaultEntryId: entryA,
+        entries: [entryA, entryC].map((id) => ({ id, label: id })),
       })
     mocks.rotateAccess.mockRejectedValue(
       new ApiError({
@@ -733,8 +732,8 @@ describe('Subscription access rotation', () => {
       }),
     )
     let bReads = 0
-    mocks.getAccess.mockImplementation(async (_token, baseUrl) => {
-      if (baseUrl === entryB) {
+    mocks.getAccess.mockImplementation(async (_token, input) => {
+      if (input.entryId === entryB) {
         bReads += 1
         if (bReads === 1) return { accessUrl: entryBCredentialUrl }
         throw new ApiError({
@@ -743,7 +742,7 @@ describe('Subscription access rotation', () => {
           message: 'stale',
         })
       }
-      if (baseUrl === entryC) return { accessUrl: entryCCredentialUrl }
+      if (input.entryId === entryC) return { accessUrl: entryCCredentialUrl }
       return { accessUrl: oldCredentialUrl }
     })
     renderSubscription()
@@ -754,9 +753,7 @@ describe('Subscription access rotation', () => {
       await screen.findByText('原订阅入口已不可用，请重新选择'),
     ).toBeInTheDocument()
     expect(screen.queryByText(entryBCredentialUrl)).toBeNull()
-    await first.user.click(
-      await screen.findByRole('button', { name: '使用入口 2' }),
-    )
+    await first.user.click(await screen.findByRole('button', { name: entryC }))
     await screen.findByLabelText('订阅地址已隐藏')
     await first.user.click(
       screen.getByRole('button', { name: '重新读取订阅地址' }),
@@ -785,10 +782,12 @@ describe('Subscription access rotation', () => {
     )
     mocks.getEntries
       .mockResolvedValueOnce({
-        entries: [entryA, entryB, entryC].map((baseUrl) => ({ baseUrl })),
+        defaultEntryId: entryA,
+        entries: [entryA, entryB, entryC].map((id) => ({ id, label: id })),
       })
       .mockResolvedValue({
-        entries: [entryA, entryC].map((baseUrl) => ({ baseUrl })),
+        defaultEntryId: entryA,
+        entries: [entryA, entryC].map((id) => ({ id, label: id })),
       })
     mocks.rotateAccess.mockRejectedValue(
       new ApiError({
@@ -798,8 +797,8 @@ describe('Subscription access rotation', () => {
       }),
     )
     let bReads = 0
-    mocks.getAccess.mockImplementation(async (_token, baseUrl) => {
-      if (baseUrl === entryB) {
+    mocks.getAccess.mockImplementation(async (_token, input) => {
+      if (input.entryId === entryB) {
         bReads += 1
         if (bReads === 1) return { accessUrl: entryBCredentialUrl }
         throw new ApiError({
@@ -808,7 +807,7 @@ describe('Subscription access rotation', () => {
           message: 'stale',
         })
       }
-      if (baseUrl === entryC) return { accessUrl: entryCCredentialUrl }
+      if (input.entryId === entryC) return { accessUrl: entryCCredentialUrl }
       return { accessUrl: oldCredentialUrl }
     })
     const navigation = vi
@@ -819,9 +818,7 @@ describe('Subscription access rotation', () => {
     const writeText = installClipboard()
     await acknowledgeAndConfirm(first.dialog, first.user)
     await screen.findByText('原订阅入口已不可用，请重新选择')
-    await first.user.click(
-      await screen.findByRole('button', { name: '使用入口 2' }),
-    )
+    await first.user.click(await screen.findByRole('button', { name: entryC }))
     await screen.findByLabelText('订阅地址已隐藏')
     await first.user.click(
       screen.getByRole('button', { name: '重新读取订阅地址' }),
@@ -921,9 +918,6 @@ describe('Subscription access rotation', () => {
       ).toBeInTheDocument()
       expect(router.state.location.pathname).toBe('/login')
       expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
-      expect(
-        queryClient.getQueryData(subscriptionQueryKeys.access),
-      ).toBeUndefined()
       expect(queryClient.getQueryData(['private-data'])).toBeUndefined()
       expect(mocks.rotateAccess).toHaveBeenCalledOnce()
     },

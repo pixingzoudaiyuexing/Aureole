@@ -160,29 +160,29 @@ form-local synchronous lock 防止 same-tick 重复提交。成功意味着上�
 
 ## Subscription read model and mutations
 
-`features/subscription` 持有 CF-02 Entry Discovery、selected entry credential、Overview 与既有
+`features/subscription` 持有 REG-M04/M06 Delivery Options、selected access-link credential、Overview 与既有
 mutation 的 Public API parser、canonical query keys 和 presentation。Dashboard 与 Subscription Page
 复用同一个 Overview query；entry eligibility 与当前 product 相互独立，前端不得从任一 read 推断
 另一个 read 的业务状态。普通 read failure 只影响对应 section，AUTH_REQUIRED/AUTH_FAILED 则复用
 Auth logout 清除 credential 与完整 Query cache。
 
-`GET /api/v1/subscription/entries` 是入口集合唯一权威，保持 server order 与原始 `baseUrl`。
-React local state 的 `selectedBaseUrl` 是当前 selection 单一来源；sessionStorage 只 fail-safe 保存该
-non-sensitive identity。有效 selection 可在刷新后恢复；stale persisted/current selection 会清除并进入
-requires-reselection，绝不自动 fallback。`POST /api/v1/subscription/entry-access` 是 Display、Copy、QR
-和四种 client import 的唯一 credential source；legacy `GET /api/v1/subscription` 不参与 CF-02 UI。
+`GET /api/v1/subscription/delivery-options` 是 active 入口集合权威，只公开有序 stable `id/label` 与
+`defaultEntryId`。React local state 的 `selectedEntryId` 是 current selection source；sessionStorage 只
+fail-safe 保存该 non-sensitive stable ID。历史 CF-02 baseUrl 不做推断迁移。有效 persisted ID 优先，否则只
+使用 validated defaultEntryId；default 为 null 时不发明首项默认。运行中 selection 消失或 access-link 返回
+`SUBSCRIPTION_ENTRY_UNAVAILABLE` 时进入 explicit reselection。
 
-Selected-entry `accessUrl` 是 V2Board-generated sensitive opaque credential，只允许存在于 TanStack
-Query memory state、API result 与当前 React render。它不进入 Zustand、storage、URL state、analytics、
-日志或 query key，也不成为长期 DOM `href` 或 prefetch target。页面默认掩码；Copy、local QR 与
-Clash/Shadowrocket/Quantumult X/SingBox user-gesture URI builder 都只消费同一个 current
-`selectedAccessUrl`。Aureole 不请求 `/api/v1/access/subscription`，不下载或解析 subscription content。
+`POST /api/v1/subscription/access-link` 只支持 `profileId=default`，并按 current `entryId` 与
+`subscriptionInfo=show|hide` 返回 exact authoritative HTTPS credential。`accessUrl` 不进入 TanStack Query、
+Query key、Zustand、storage、URL state、cookie、analytics 或日志；它只存在于 keyed child component 的局部
+state 与当前 render。页面默认掩码；Copy、local QR 与 Clash/Shadowrocket/Quantumult X/SingBox user-gesture
+builders 只消费同一个 current accessUrl，且不会修改 credential URL。
 
-Entry-access query key 包含 selected `baseUrl` 与 request version，不包含 credential。Selection change
-先卸载旧 credential action，再开始新 POST；previous key 被精确删除，AbortSignal/cancel 与 key isolation
-共同保证晚到 response 不覆盖当前 selection。该 POST 显式关闭 retry、retryOnMount、mount/reconnect
-refetch；失败 key 不交给 observer 触发隐式重读。`422 SUBSCRIPTION_ENTRY_UNAVAILABLE` 清除 credential
-与 persisted selection、刷新 entries，并要求用户显式重新选择。
+Entry、subscriptionInfo、Auth generation 或 runtime ownership 变化会先 suppress/unmount旧 credential，再
+发起新 access-link。每个请求使用 AbortController 与 monotonic request generation；completion 还必须匹配
+current accessToken、Auth generation、entryId 和 subscriptionInfo，避免晚到 A response 出现在 B/session B。
+普通失败与 malformed response 都 fail closed，不恢复旧 credential。Aureole 不请求
+`/api/v1/access/subscription`，不下载或解析 subscription content；REG-M05 profile transformation 不在本阶段。
 
 Overview 只展示 Public Contract 原始字段。Byte formatting 与 absolute date formatting 仅是
 presentation；不得生成 remaining traffic、usage percentage、remaining days、expiry flag 或
@@ -194,9 +194,9 @@ AUR-M6-001 的 `POST /api/v1/subscription/rotate-access` 继续没有 request bo
 entry credential 是否可用显示，最终 eligibility 始终由 solution/V2Board 判断；用户必须阅读
 credential 失效后果并勾选确认后才允许提交。
 
-CF-02 下 rotate response 的 solution legacy gateway `accessUrl` 不再是 UI authority，也绝不写入
-selected-entry query。Success、409、明确 failure 与 UNKNOWN 都先 suppress 当前 credential，再只对当前
-`selectedBaseUrl` 重新执行 entry-access。成功 re-resolution 通过新 request version 重置 reveal/copy/QR/
+Rotate response 的 solution legacy gateway `accessUrl` 不是 UI authority，也绝不写入 Query。Success、409、
+明确 failure 与 UNKNOWN 都先 suppress 当前 credential，再只对 current entryId/default/subscriptionInfo
+重新执行 access-link。成功 re-resolution 通过 keyed runtime remount 重置 reveal/copy/QR/
 import transient state；恢复失败时旧 credential 不能重新启用，并继续 fail closed 阻断 Rotate 与 Advance。
 UNKNOWN 不根据 URL 变化推断因果，恢复成功后仍要求新的明确确认。Mutation 或 recovery 的 Auth failure
 继续复用 sealed Auth Session Core。AUR-M6-001 不请求 subscription content。

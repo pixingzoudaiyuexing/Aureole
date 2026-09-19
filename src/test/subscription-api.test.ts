@@ -3,7 +3,6 @@ import { subscriptionApi } from '@/features/subscription/subscription-api'
 import {
   advanceSubscriptionPeriodMutationOptions,
   rotateSubscriptionAccessMutationOptions,
-  subscriptionEntryAccessQueryOptions,
   subscriptionMutationKeys,
   subscriptionQueryKeys,
 } from '@/features/subscription/subscription-queries'
@@ -29,6 +28,111 @@ const validOverview = {
 }
 
 describe('Subscription API contract', () => {
+  it('reads ordered delivery options and validates the declared default', async () => {
+    const request = vi
+      .spyOn(apiClient, 'authenticatedRequest')
+      .mockResolvedValue({
+        defaultEntryId: 'primary',
+        entries: [
+          { id: 'primary', label: 'Subscription', private: true },
+          { id: 'backup', label: 'Backup' },
+        ],
+        registry: 'stripped',
+      })
+
+    await expect(
+      subscriptionApi.getDeliveryOptions(accessToken),
+    ).resolves.toEqual({
+      defaultEntryId: 'primary',
+      entries: [
+        { id: 'primary', label: 'Subscription' },
+        { id: 'backup', label: 'Backup' },
+      ],
+    })
+    expect(request).toHaveBeenCalledWith(
+      '/api/v1/subscription/delivery-options',
+      { method: 'GET', accessToken, signal: undefined },
+    )
+  })
+
+  it.each([
+    { defaultEntryId: 'missing', entries: [{ id: 'primary', label: 'One' }] },
+    { defaultEntryId: null, entries: [{ id: 'Bad_ID', label: 'One' }] },
+    { defaultEntryId: null, entries: [{ id: 'primary', label: '' }] },
+    {
+      defaultEntryId: 'primary',
+      entries: [
+        { id: 'primary', label: 'One' },
+        { id: 'primary', label: 'Duplicate' },
+      ],
+    },
+  ])('rejects malformed delivery options %#', async (payload) => {
+    vi.spyOn(apiClient, 'authenticatedRequest').mockResolvedValue(payload)
+    await expect(
+      subscriptionApi.getDeliveryOptions(accessToken),
+    ).rejects.toMatchObject({ code: 'MALFORMED_RESPONSE' })
+  })
+
+  it('requests the exact default profile access link and keeps it opaque', async () => {
+    const request = vi
+      .spyOn(apiClient, 'authenticatedRequest')
+      .mockResolvedValue({ accessUrl: credentialUrl, token: 'stripped' })
+
+    await expect(
+      subscriptionApi.getAccessLink(accessToken, {
+        entryId: 'primary',
+        profileId: 'default',
+        subscriptionInfo: 'show',
+      }),
+    ).resolves.toEqual({ accessUrl: credentialUrl })
+    expect(request).toHaveBeenCalledWith('/api/v1/subscription/access-link', {
+      method: 'POST',
+      accessToken,
+      body: {
+        entryId: 'primary',
+        profileId: 'default',
+        subscriptionInfo: 'show',
+      },
+      signal: undefined,
+    })
+  })
+
+  it.each([
+    { entryId: 'Bad_ID', profileId: 'default', subscriptionInfo: 'show' },
+    { entryId: 'primary', profileId: 'enhanced', subscriptionInfo: 'show' },
+    { entryId: 'primary', profileId: 'default', subscriptionInfo: 'other' },
+    {
+      entryId: 'primary',
+      profileId: 'default',
+      subscriptionInfo: 'show',
+      extra: true,
+    },
+  ])('rejects an invalid access-link request %#', async (input) => {
+    const request = vi.spyOn(apiClient, 'authenticatedRequest')
+    await expect(
+      subscriptionApi.getAccessLink(accessToken, input as never),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' })
+    expect(request).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    {},
+    { accessUrl: null },
+    { accessUrl: 'http://subscription.example/TOKEN' },
+    { accessUrl: 'https://user:pass@subscription.example/TOKEN' },
+    { accessUrl: 'javascript:alert(1)' },
+    { accessUrl: ` ${credentialUrl}` },
+  ])('rejects malformed access-link data %#', async (payload) => {
+    vi.spyOn(apiClient, 'authenticatedRequest').mockResolvedValue(payload)
+    await expect(
+      subscriptionApi.getAccessLink(accessToken, {
+        entryId: 'primary',
+        profileId: 'default',
+        subscriptionInfo: 'show',
+      }),
+    ).rejects.toMatchObject({ code: 'MALFORMED_RESPONSE' })
+  })
+
   it('reads entries in server order and strips additive fields', async () => {
     const request = vi
       .spyOn(apiClient, 'authenticatedRequest')
@@ -224,13 +328,10 @@ describe('Subscription API contract', () => {
       rotateSubscriptionAccessMutationOptions(accessToken)
     const advanceMutation =
       advanceSubscriptionPeriodMutationOptions(accessToken)
-    const entryAccessQuery = subscriptionEntryAccessQueryOptions(
-      accessToken,
-      'https://entry.example/path',
-      2,
-    )
-
-    expect(subscriptionQueryKeys.access).toEqual(['subscription', 'access'])
+    expect(subscriptionQueryKeys.deliveryOptions).toEqual([
+      'subscription',
+      'delivery-options',
+    ])
     expect(subscriptionMutationKeys.rotateAccess).toEqual([
       'subscription',
       'rotate-access',
@@ -243,17 +344,19 @@ describe('Subscription API contract', () => {
     expect(advanceMutation.mutationKey).not.toContain(accessToken)
     expect(rotationMutation.retry).toBe(false)
     expect(advanceMutation.retry).toBe(false)
-    expect(entryAccessQuery.queryKey).toEqual([
-      'subscription',
-      'entry-access',
-      'https://entry.example/path',
-      2,
-    ])
-    expect(entryAccessQuery.queryKey).not.toContain(accessToken)
-    expect(entryAccessQuery.retry).toBe(false)
-    expect(entryAccessQuery.retryOnMount).toBe(false)
-    expect(entryAccessQuery.refetchOnMount).toBe(false)
-    expect(entryAccessQuery.refetchOnReconnect).toBe(false)
+    expect(JSON.stringify(subscriptionQueryKeys)).not.toContain(accessToken)
+    expect(JSON.stringify(subscriptionQueryKeys)).not.toContain(credentialUrl)
+  })
+
+  it('discards the legacy rotate credential before MutationCache ownership', async () => {
+    vi.spyOn(subscriptionApi, 'rotateAccess').mockResolvedValue({
+      rotated: true,
+      accessUrl: credentialUrl,
+    })
+
+    await expect(
+      rotateSubscriptionAccessMutationOptions(accessToken).mutationFn(),
+    ).resolves.toEqual({ rotated: true })
   })
 
   it.each([

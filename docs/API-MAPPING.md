@@ -73,24 +73,25 @@ footer defaults。Runtime Settings 不控制 API origin、Authorization、CSP、
 
 ## Subscription read mapping
 
-- AUR-CF02 的冻结 Contract SSOT 是 solution
-  `3cc0de610b8e748b5d88d2ab3444e08461ab91ef`。`GET /api/v1/subscription/entries`
-  是入口发现的唯一来源；Aureole 保持 server order，以原始 `baseUrl` 作为 selection identity，
-  不排序、不生成 ID、不创建 fallback domain。
-- `POST /api/v1/subscription/entry-access` 是当前 selected entry credential 的唯一来源。Request
-  只发送 strict `{ baseUrl }`；response `accessUrl` 作为完整 opaque HTTPS credential 使用，前端
-  不解析 token/OTP/path、不拼接 subscribe URL，也不经过 legacy `GET /api/v1/subscription` 或
-  `/api/v1/access/subscription`。
-- `selectedBaseUrl` 是 Display、Copy、QR、Clash、Shadowrocket、Quantumult X 与 SingBox 的单一
-  selection source。只有 `baseUrl` 可 fail-safe 保存到 sessionStorage；`accessUrl` 与所有派生 import
-  URI 只存在于 TanStack Query memory / 当前 React render，不进入 storage、URL、日志或 analytics。
-- 首次无已存 selection 时使用 server 第一项；有效已存 selection 可恢复。若已存/current entry 已从
-  authoritative entries 消失，或 entry-access 返回 `422 SUBSCRIPTION_ENTRY_UNAVAILABLE`，立即隐藏并
-  丢弃 credential、刷新 entries、清除 selection persistence，并要求用户显式重新选择；即使只剩一个
-  entry 也不静默 fallback。
-- Entry change 使用 selection/version-scoped query key，并在新 request pending 时立即卸载旧 credential
-  actions。旧 key 会被精确删除，取消或晚到的 B response 不能覆盖当前 C。Entry-access 明确关闭 retry、
-  retry-on-mount、mount/reconnect refetch；再次 POST 只来自用户选择、明确重试或 Rotate recovery。
+- AUR-REG-M04-M06-01 的冻结 Contract SSOT 是 solution
+  `c884a73d93e240e2dddc7ea9f4e8ab58dffb736b`。`GET /api/v1/subscription/delivery-options`
+  是 active 入口发现来源；Aureole 保持 server order，只消费 stable `id` 与 presentation `label`，并严格验证
+  non-null `defaultEntryId` 属于返回 entries。Registry unavailable 的 `defaultEntryId=null, entries=[]` 是受控
+  empty state；前端不读取 origin、path、token 或 Registry metadata。
+- Selector identity 与可选 persistence 都是 stable `entryId`。历史 CF-02 `baseUrl` 值会被清除，不通过
+  host/path/label 猜测迁移。有效 persisted ID 优先；否则使用 authoritative `defaultEntryId`；若 default 为
+  null，则不自动选择 `entries[0]`。运行中 entry 消失或 `SUBSCRIPTION_ENTRY_UNAVAILABLE` 会立即抑制 credential、
+  刷新 delivery options 并要求显式选择。
+- `POST /api/v1/subscription/access-link` 是 active selected credential authority。Aureole 只发送 strict
+  `{entryId, profileId:'default', subscriptionInfo:'show'|'hide'}`，并原样使用返回的 canonical HTTPS
+  `accessUrl`。浏览器不重建 token URL、不请求 subscription content，也不实现 M05 profile selector。
+- Delivery options 使用 credential-free `['subscription','delivery-options']` Query。`accessUrl` 明确不进入
+  TanStack Query、Query key、Zustand、storage、URL、cookie、日志或 analytics，只存在于当前 Subscription
+  component 的局部 ephemeral runtime。Entry、subscriptionInfo、session、rotation 或 error 变化会立即清除
+  Display/Copy/QR/Import；AbortController、request generation 与 Auth generation 共同拒绝晚到结果。
+- subscriptionInfo 默认为 `show`；切换 `show/hide` 会重新请求当前 entry 的 default profile，pending 期间不
+  复用旧 URL。Clash、Shadowrocket、Quantumult X 与 Sing-box import 只编码 exact authoritative URL；Sing-box
+  不再向 credential URL 追加 `flag`。
 - `GET /api/v1/subscription/overview` 是 current product、expiry、traffic、device 和 cycle
   config 的权威 read。Dashboard 与 Subscription Page 复用 canonical Overview query；Dashboard
   不创建独立 fetcher。
@@ -101,8 +102,8 @@ footer defaults。Runtime Settings 不控制 API origin、Authorization、CSP、
   unlimited。
 - `renewalAllowed` 只翻译为“新周期功能已启用/未启用”，不作为 mutation eligibility。
 - `POST /api/v1/subscription/rotate-access` 是无 body 的非幂等 credential mutation，仅在当前 selected
-  entry access 可用时显示入口，仍由 server 最终判断资格。Mutation 不 retry；success、409、明确失败
-  或 UNKNOWN 后都丢弃当前 selected credential，并重新 POST 当前 `baseUrl` 的 entry-access。Rotate
+  access-link 可用时显示入口，仍由 server 最终判断资格。Mutation 不 retry；success、409、明确失败
+  或 UNKNOWN 后都丢弃当前 selected credential，并重新 POST 当前 `entryId/default/subscriptionInfo` access-link。Rotate
   response 中 legacy gateway `accessUrl` 只做 strict response validation，不进入 UI 或 query cache。
   UNKNOWN recovery 未成功时禁止再次 POST，成功后也要求新的明确确认。
 - Rotate success 只接受 `rotated=true` 与安全 HTTPS legacy `accessUrl`，additive fields 会被 strip；

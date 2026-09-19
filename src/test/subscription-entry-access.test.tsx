@@ -1,21 +1,21 @@
-import { QueryClient } from '@tanstack/react-query'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import type { QueryClient } from '@tanstack/react-query'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { StrictMode } from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { AppProviders } from '@/app/providers/app-providers'
 import { createQueryClient } from '@/app/providers/query-client'
 import { createAppRouter } from '@/app/router/router'
 import type { AuthApi, CurrentUser } from '@/features/auth/auth-api'
-import { subscriptionApi } from '@/features/subscription/subscription-api'
 import {
-  buildSubscriptionImportUri,
-  subscriptionImportNavigation,
-} from '@/features/subscription/subscription-imports'
+  subscriptionApi,
+  type SubscriptionDeliveryOptions,
+} from '@/features/subscription/subscription-api'
+import { subscriptionImportNavigation } from '@/features/subscription/subscription-imports'
 import { SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY } from '@/features/subscription/subscription-selection-storage'
 import { trafficApi } from '@/features/traffic/traffic-api'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
+import { useAuthSessionStore } from '@/lib/auth/session-store'
 
 vi.mock('qrcode.react', () => ({
   QRCodeSVG: ({ value }: { value: string }) => (
@@ -23,74 +23,32 @@ vi.mock('qrcode.react', () => ({
   ),
 }))
 
-const entryA = 'https://a.example.com'
-const entryB = 'https://same.example.com/b'
-const entryC = 'https://same.example.com/c'
-const accessA = `${entryA}/api/v1/client/subscribe?token=dummy-a`
-const accessB = `${entryB}/api/v1/client/subscribe?token=dummy-b`
-const accessC = `${entryC}/api/v1/client/subscribe?token=dummy-c`
-
+const entries = [
+  { id: 'primary', label: 'Primary Subscription' },
+  { id: 'backup', label: 'Backup Subscription' },
+  { id: 'regional', label: 'Regional Subscription' },
+]
+const accessUrls = {
+  primary: 'https://subscription.example/PRIMARY_TOKEN',
+  backup: 'https://subscription.example/BACKUP_TOKEN',
+  regional: 'https://subscription.example/REGIONAL_TOKEN',
+}
 const currentUser: CurrentUser = {
   email: 'member@example.com',
   expiresAt: '2030-01-01T00:00:00.000Z',
   status: 'active',
 }
-
 const overview = {
   product: { id: '7', name: 'Pro Plan' },
   expiresAt: '2030-01-01T00:00:00.000Z',
-  traffic: {
-    uploadedBytes: 1,
-    downloadedBytes: 2,
-    allowanceBytes: 3,
-  },
+  traffic: { uploadedBytes: 1, downloadedBytes: 2, allowanceBytes: 3 },
   deviceLimit: 3,
   activeDevices: 1,
   resetDay: 15,
   renewalAllowed: true,
 }
 
-function installPageMocks(entries = [entryA]) {
-  const getEntries = vi.spyOn(subscriptionApi, 'getEntries').mockResolvedValue({
-    entries: entries.map((baseUrl) => ({ baseUrl })),
-  })
-  const getEntryAccess = vi
-    .spyOn(subscriptionApi, 'getEntryAccess')
-    .mockImplementation(async (_token, baseUrl) => ({
-      accessUrl:
-        baseUrl === entryA ? accessA : baseUrl === entryB ? accessB : accessC,
-    }))
-  vi.spyOn(subscriptionApi, 'getOverview').mockResolvedValue(overview)
-  vi.spyOn(subscriptionApi, 'rotateAccess').mockResolvedValue({
-    rotated: true,
-    accessUrl:
-      'https://legacy.example/api/v1/access/subscription?token=legacy-only',
-  })
-  vi.spyOn(subscriptionApi, 'advancePeriod').mockResolvedValue({
-    advanced: true,
-  })
-  vi.spyOn(trafficApi, 'getLogs').mockResolvedValue([])
-  return { getEntries, getEntryAccess }
-}
-
-function renderSubscription(
-  queryClient: QueryClient = createQueryClient(),
-  strictMode = false,
-) {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'opaque-token')
-  const authApi: AuthApi = {
-    login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue(currentUser),
-  }
-  const router = createAppRouter({ initialEntries: ['/subscription'] })
-  const app = (
-    <AppProviders router={router} authApi={authApi} queryClient={queryClient} />
-  )
-  render(strictMode ? <StrictMode>{app}</StrictMode> : app)
-  return { queryClient, router }
-}
-
-function createDeferred<T>() {
+function deferred<T>() {
   let resolve!: (value: T) => void
   let reject!: (reason: unknown) => void
   const promise = new Promise<T>((resolvePromise, rejectPromise) => {
@@ -98,6 +56,51 @@ function createDeferred<T>() {
     reject = rejectPromise
   })
   return { promise, reject, resolve }
+}
+
+function installMocks(
+  delivery: SubscriptionDeliveryOptions = {
+    defaultEntryId: 'primary',
+    entries,
+  },
+) {
+  const getDeliveryOptions = vi
+    .spyOn(subscriptionApi, 'getDeliveryOptions')
+    .mockResolvedValue(delivery)
+  const getAccessLink = vi
+    .spyOn(subscriptionApi, 'getAccessLink')
+    .mockImplementation(async (_token, input) => ({
+      accessUrl: accessUrls[input.entryId as keyof typeof accessUrls],
+    }))
+  vi.spyOn(subscriptionApi, 'getOverview').mockResolvedValue(overview)
+  vi.spyOn(subscriptionApi, 'rotateAccess').mockResolvedValue({
+    rotated: true,
+    accessUrl: 'https://legacy.example/LEGACY_TOKEN',
+  })
+  vi.spyOn(subscriptionApi, 'advancePeriod').mockResolvedValue({
+    advanced: true,
+  })
+  vi.spyOn(trafficApi, 'getLogs').mockResolvedValue([])
+  return { getAccessLink, getDeliveryOptions }
+}
+
+function renderSubscription(
+  queryClient: QueryClient = createQueryClient(),
+  authApi: AuthApi = {
+    login: vi.fn(),
+    getCurrentUser: vi.fn().mockResolvedValue(currentUser),
+  },
+) {
+  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'session-a-token')
+  const router = createAppRouter({ initialEntries: ['/subscription'] })
+  render(
+    <AppProviders
+      router={router}
+      authApi={authApi}
+      queryClient={queryClient}
+    />,
+  )
+  return { queryClient, router }
 }
 
 function installClipboard() {
@@ -109,237 +112,278 @@ function installClipboard() {
   return writeText
 }
 
-beforeEach(() => {
-  document.title = 'Aureole Test'
-})
-
-describe('Multiple subscription entry selection', () => {
-  it('renders zero entries without requesting or exposing credential actions', async () => {
-    const mocks = installPageMocks([])
-    renderSubscription()
-
-    expect(await screen.findByText('暂无可用订阅入口')).toBeInTheDocument()
-    expect(mocks.getEntryAccess).not.toHaveBeenCalled()
-    expect(screen.queryByRole('button', { name: '复制' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '显示二维码' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Clash' })).toBeNull()
-  })
-
-  it('loads selected access under React StrictMode without removing the current query', async () => {
-    installPageMocks([entryA, entryB])
-    renderSubscription(createQueryClient(), true)
-
-    expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: '订阅入口' })).toHaveValue(
-      entryA,
-    )
-  })
-
-  it('uses the first entry by default and preserves server order for multiple entries', async () => {
-    const mocks = installPageMocks([entryB, entryA, entryC])
-    renderSubscription()
-
-    const selector = await screen.findByRole('combobox', {
-      name: '订阅入口',
+describe('Subscription delivery selection and credential runtime', () => {
+  it('uses the declared default and preserves server order and labels', async () => {
+    const mocks = installMocks({
+      defaultEntryId: 'backup',
+      entries: [entries[2]!, entries[1]!, entries[0]!],
     })
-    expect(selector).toHaveValue(entryB)
+    renderSubscription()
+
+    const selector = await screen.findByRole('combobox', { name: '订阅入口' })
+    expect(selector).toHaveValue('backup')
     expect(
-      Array.from((selector as HTMLSelectElement).options).map(
-        (option) => option.value,
-      ),
-    ).toEqual([entryB, entryA, entryC])
-    expect(mocks.getEntryAccess).toHaveBeenCalledWith(
-      'opaque-token',
-      entryB,
+      Array.from((selector as HTMLSelectElement).options).map((option) => [
+        option.value,
+        option.textContent,
+      ]),
+    ).toEqual([
+      ['regional', 'Regional Subscription'],
+      ['backup', 'Backup Subscription'],
+      ['primary', 'Primary Subscription'],
+    ])
+    expect(mocks.getAccessLink).toHaveBeenCalledWith(
+      'session-a-token',
+      {
+        entryId: 'backup',
+        profileId: 'default',
+        subscriptionInfo: 'show',
+      },
       expect.any(AbortSignal),
     )
     expect(
       window.sessionStorage.getItem(SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY),
-    ).toBe(entryB)
+    ).toBe('backup')
   })
 
-  it('restores a valid persisted selection and requires explicit choice for a stale one', async () => {
-    window.sessionStorage.setItem(
-      SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY,
-      entryB,
-    )
-    const mocks = installPageMocks([entryA, entryC])
+  it('does not invent the first entry when defaultEntryId is null', async () => {
+    const mocks = installMocks({ defaultEntryId: null, entries })
     renderSubscription()
 
+    expect(await screen.findByText('请选择订阅入口。')).toBeInTheDocument()
     expect(
-      await screen.findByText('原订阅入口已不可用，请重新选择'),
+      screen.getByRole('button', { name: 'Primary Subscription' }),
     ).toBeInTheDocument()
-    expect(mocks.getEntryAccess).not.toHaveBeenCalled()
+    expect(mocks.getAccessLink).not.toHaveBeenCalled()
     expect(
       window.sessionStorage.getItem(SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY),
     ).toBeNull()
-
-    await userEvent
-      .setup()
-      .click(screen.getByRole('button', { name: '使用入口 2' }))
-    expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
-    expect(mocks.getEntryAccess).toHaveBeenCalledWith(
-      'opaque-token',
-      entryC,
-      expect.any(AbortSignal),
-    )
   })
 
-  it('restores an existing valid selection on refresh', async () => {
+  it('clears a historical baseUrl without guessing an entryId', async () => {
     window.sessionStorage.setItem(
       SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY,
-      entryC,
+      'https://legacy.example/subscriptions',
     )
-    const mocks = installPageMocks([entryA, entryB, entryC])
+    installMocks({ defaultEntryId: null, entries })
+    renderSubscription()
+
+    expect(await screen.findByText('请选择订阅入口。')).toBeInTheDocument()
+    expect(
+      window.sessionStorage.getItem(SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY),
+    ).toBeNull()
+  })
+
+  it('restores only a current stable persisted entryId', async () => {
+    window.sessionStorage.setItem(
+      SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY,
+      'regional',
+    )
+    const mocks = installMocks()
     renderSubscription()
 
     expect(
       await screen.findByRole('combobox', { name: '订阅入口' }),
-    ).toHaveValue(entryC)
-    expect(mocks.getEntryAccess).toHaveBeenCalledWith(
-      'opaque-token',
-      entryC,
+    ).toHaveValue('regional')
+    expect(mocks.getAccessLink).toHaveBeenCalledWith(
+      'session-a-token',
+      expect.objectContaining({ entryId: 'regional' }),
       expect.any(AbortSignal),
     )
   })
 
-  it('hides A actions immediately while B is pending', async () => {
-    const mocks = installPageMocks([entryA, entryB])
-    const pendingB = createDeferred<{ accessUrl: string }>()
-    mocks.getEntryAccess.mockImplementation(async (_token, baseUrl) => {
-      if (baseUrl === entryB) return pendingB.promise
-      return { accessUrl: accessA }
-    })
-    const { queryClient } = renderSubscription()
+  it('clears a stale stable entryId and uses the authoritative default', async () => {
+    window.sessionStorage.setItem(
+      SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY,
+      'removed-entry',
+    )
+    const mocks = installMocks({ defaultEntryId: 'backup', entries })
+    renderSubscription()
+
+    expect(
+      await screen.findByRole('combobox', { name: '订阅入口' }),
+    ).toHaveValue('backup')
+    expect(
+      window.sessionStorage.getItem(SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY),
+    ).toBe('backup')
+    expect(mocks.getAccessLink).toHaveBeenCalledWith(
+      'session-a-token',
+      expect.objectContaining({ entryId: 'backup' }),
+      expect.any(AbortSignal),
+    )
+  })
+
+  it('accepts empty options as a controlled unavailable state', async () => {
+    const mocks = installMocks({ defaultEntryId: null, entries: [] })
+    renderSubscription()
+
+    expect(await screen.findByText('暂无可用订阅入口')).toBeInTheDocument()
+    expect(mocks.getAccessLink).not.toHaveBeenCalled()
+  })
+
+  it('keeps accessUrl out of Query cache and durable storage', async () => {
+    installMocks()
+    const { queryClient, router } = renderSubscription()
+
+    await screen.findByLabelText('订阅地址已隐藏')
+    const serializedQueryData = JSON.stringify(
+      queryClient
+        .getQueryCache()
+        .getAll()
+        .map((query) => query.state.data),
+    )
+    expect(serializedQueryData).not.toContain(accessUrls.primary)
+    expect(JSON.stringify({ ...window.localStorage })).not.toContain(
+      accessUrls.primary,
+    )
+    expect(JSON.stringify({ ...window.sessionStorage })).not.toContain(
+      accessUrls.primary,
+    )
+    expect(router.state.location.search).toEqual({})
+  })
+
+  it('suppresses A immediately and ignores its late result after selecting B', async () => {
+    const pendingA = deferred<{ accessUrl: string }>()
+    const mocks = installMocks()
+    mocks.getAccessLink.mockImplementation((_token, input) =>
+      input.entryId === 'primary'
+        ? pendingA.promise
+        : Promise.resolve({ accessUrl: accessUrls.backup }),
+    )
+    renderSubscription()
     const user = userEvent.setup()
-    installClipboard()
+
+    const selector = await screen.findByRole('combobox', { name: '订阅入口' })
+    await user.selectOptions(selector, 'backup')
+    expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
+    await user.click(screen.getAllByRole('button', { name: '显示' }).at(-1)!)
+    expect(screen.getByText(accessUrls.backup)).toBeInTheDocument()
+
+    act(() => pendingA.resolve({ accessUrl: accessUrls.primary }))
+    await waitFor(() =>
+      expect(screen.getByText(accessUrls.backup)).toBeInTheDocument(),
+    )
+    expect(screen.queryByText(accessUrls.primary)).toBeNull()
+  })
+
+  it('removes a visible A credential immediately while B is pending', async () => {
+    const pendingB = deferred<{ accessUrl: string }>()
+    const mocks = installMocks()
+    mocks.getAccessLink.mockImplementation((_token, input) =>
+      input.entryId === 'backup'
+        ? pendingB.promise
+        : Promise.resolve({ accessUrl: accessUrls.primary }),
+    )
+    renderSubscription()
+    const user = userEvent.setup()
 
     await screen.findByLabelText('订阅地址已隐藏')
     await user.click(screen.getByRole('button', { name: '显示' }))
-    await user.click(screen.getByRole('button', { name: '复制' }))
-    await user.click(screen.getByRole('button', { name: '显示二维码' }))
-    expect(screen.getByTestId('subscription-qr')).toHaveAttribute(
-      'data-value',
-      accessA,
-    )
+    expect(screen.getByText(accessUrls.primary)).toBeInTheDocument()
+
     await user.selectOptions(
       screen.getByRole('combobox', { name: '订阅入口' }),
-      entryB,
+      'backup',
     )
-
-    expect(screen.queryByText(accessA)).toBeNull()
-    expect(screen.queryByTestId('subscription-qr')).toBeNull()
-    expect(screen.queryByText('已复制')).toBeNull()
+    expect(screen.queryByText(accessUrls.primary)).toBeNull()
     expect(screen.queryByRole('button', { name: '复制' })).toBeNull()
     expect(screen.queryByRole('button', { name: '显示二维码' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Clash' })).toBeNull()
     expect(screen.getByText('正在读取订阅地址…')).toBeInTheDocument()
 
-    act(() => pendingB.resolve({ accessUrl: accessB }))
+    act(() => pendingB.resolve({ accessUrl: accessUrls.backup }))
     expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
-    await waitFor(() =>
-      expect(
-        JSON.stringify(
-          queryClient
-            .getQueryCache()
-            .getAll()
-            .map((query) => query.state.data),
-        ),
-      ).not.toContain(accessA),
-    )
   })
 
-  it('keeps C authoritative when B resolves after a rapid A to B to C switch', async () => {
-    const mocks = installPageMocks([entryA, entryB, entryC])
-    const pendingB = createDeferred<{ accessUrl: string }>()
-    const pendingC = createDeferred<{ accessUrl: string }>()
-    mocks.getEntryAccess.mockImplementation(async (_token, baseUrl) => {
-      if (baseUrl === entryB) return pendingB.promise
-      if (baseUrl === entryC) return pendingC.promise
-      return { accessUrl: accessA }
-    })
-    renderSubscription()
-    const user = userEvent.setup()
-    const selector = await screen.findByRole('combobox', {
-      name: '订阅入口',
-    })
-
-    await user.selectOptions(selector, entryB)
-    await user.selectOptions(selector, entryC)
-    act(() => pendingC.resolve({ accessUrl: accessC }))
-    await user.click(await screen.findByRole('button', { name: '显示' }))
-    expect(screen.getByText(accessC)).toBeInTheDocument()
-
-    act(() => pendingB.resolve({ accessUrl: accessB }))
-    await waitFor(() => expect(screen.getByText(accessC)).toBeInTheDocument())
-    expect(screen.queryByText(accessB)).toBeNull()
-  })
-
-  it('uses one selected access URL for display, copy, QR and all client imports', async () => {
-    installPageMocks([entryA, entryB])
-    const navigation = vi
-      .spyOn(subscriptionImportNavigation, 'goTo')
-      .mockImplementation(() => undefined)
-    renderSubscription()
-    const user = userEvent.setup()
-    const writeText = installClipboard()
-
-    await user.selectOptions(
-      await screen.findByRole('combobox', { name: '订阅入口' }),
-      entryB,
+  it('suppresses credential actions while subscriptionInfo changes', async () => {
+    const pendingHide = deferred<{ accessUrl: string }>()
+    const mocks = installMocks()
+    mocks.getAccessLink.mockImplementation((_token, input) =>
+      input.subscriptionInfo === 'hide'
+        ? pendingHide.promise
+        : Promise.resolve({ accessUrl: accessUrls.primary }),
     )
+    renderSubscription()
+    const user = userEvent.setup()
     await screen.findByLabelText('订阅地址已隐藏')
-    await user.click(screen.getByRole('button', { name: '显示' }))
-    expect(screen.getByText(accessB)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: '复制' }))
-    expect(writeText).toHaveBeenCalledWith(accessB)
-    await user.click(screen.getByRole('button', { name: '显示二维码' }))
-    expect(screen.getByTestId('subscription-qr')).toHaveAttribute(
-      'data-value',
-      accessB,
+
+    const info = screen.getByRole('group', { name: '订阅信息' })
+    await user.click(within(info).getByRole('button', { name: '隐藏订阅信息' }))
+    expect(screen.queryByRole('button', { name: '复制' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '显示二维码' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Clash' })).toBeNull()
+    expect(screen.getByText('正在读取订阅地址…')).toBeInTheDocument()
+
+    act(() =>
+      pendingHide.resolve({
+        accessUrl: `${accessUrls.primary}?info=hide`,
+      }),
     )
-
-    for (const [label, client] of [
-      ['Clash', 'clash'],
-      ['Shadowrocket', 'shadowrocket'],
-      ['Quantumult X', 'quantumult-x'],
-      ['SingBox', 'sing-box'],
-    ] as const) {
-      await user.click(screen.getByRole('button', { name: label }))
-      expect(navigation).toHaveBeenLastCalledWith(
-        buildSubscriptionImportUri(client, accessB, 'Aureole Test'),
-      )
-    }
-
-    const durableState = JSON.stringify({
-      local: { ...window.localStorage },
-      session: { ...window.sessionStorage },
-    })
-    expect(durableState).not.toContain(accessB)
-    expect(durableState).not.toContain('clash://')
-    expect(durableState).not.toContain('shadowrocket://')
-    expect(durableState).not.toContain('quantumult-x://')
-    expect(durableState).not.toContain('sing-box://')
+    expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
+    expect(mocks.getAccessLink).toHaveBeenLastCalledWith(
+      'session-a-token',
+      expect.objectContaining({ subscriptionInfo: 'hide' }),
+      expect.any(AbortSignal),
+    )
   })
 
-  it('refreshes entries after 422 and does not silently select another entry', async () => {
-    window.sessionStorage.setItem(
-      SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY,
-      entryB,
+  it('clears a failed credential and retries without restoring the old URL', async () => {
+    const mocks = installMocks()
+    mocks.getAccessLink
+      .mockResolvedValueOnce({ accessUrl: accessUrls.primary })
+      .mockRejectedValueOnce(
+        new ApiError({ status: 0, code: 'NETWORK_ERROR', message: 'private' }),
+      )
+      .mockResolvedValueOnce({ accessUrl: `${accessUrls.primary}?info=hide` })
+    renderSubscription()
+    const user = userEvent.setup()
+    await screen.findByLabelText('订阅地址已隐藏')
+
+    await user.click(
+      within(screen.getByRole('group', { name: '订阅信息' })).getByRole(
+        'button',
+        { name: '隐藏订阅信息' },
+      ),
     )
-    const mocks = installPageMocks([entryA, entryB, entryC])
-    mocks.getEntries
-      .mockResolvedValueOnce({
-        entries: [entryA, entryB, entryC].map((baseUrl) => ({ baseUrl })),
-      })
-      .mockResolvedValueOnce({
-        entries: [entryA, entryC].map((baseUrl) => ({ baseUrl })),
-      })
-    mocks.getEntryAccess.mockRejectedValue(
+    expect(
+      await screen.findByText('暂时无法读取订阅地址。'),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '复制' })).toBeNull()
+    expect(screen.queryByText(accessUrls.primary)).toBeNull()
+    await user.click(screen.getByRole('button', { name: '重试' }))
+    expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
+  })
+
+  it('fails closed when access is unavailable', async () => {
+    const mocks = installMocks()
+    mocks.getAccessLink.mockRejectedValue(
+      new ApiError({
+        status: 409,
+        code: 'SUBSCRIPTION_ACCESS_UNAVAILABLE',
+        message: 'private unavailable detail',
+      }),
+    )
+    renderSubscription()
+
+    expect(
+      await screen.findByText('当前没有可展示的订阅地址。'),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '复制' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '显示二维码' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Clash' })).toBeNull()
+    expect(screen.queryByText('private unavailable detail')).toBeNull()
+  })
+
+  it('reconciles a 422 by refreshing options and requiring explicit selection', async () => {
+    const mocks = installMocks()
+    mocks.getDeliveryOptions
+      .mockResolvedValueOnce({ defaultEntryId: 'primary', entries })
+      .mockResolvedValue({ defaultEntryId: 'backup', entries: [entries[1]!] })
+    mocks.getAccessLink.mockRejectedValueOnce(
       new ApiError({
         status: 422,
         code: 'SUBSCRIPTION_ENTRY_UNAVAILABLE',
-        message: 'private stale detail',
+        message: 'private',
       }),
     )
     renderSubscription()
@@ -347,100 +391,77 @@ describe('Multiple subscription entry selection', () => {
     expect(
       await screen.findByText('原订阅入口已不可用，请重新选择'),
     ).toBeInTheDocument()
-    await waitFor(() => expect(mocks.getEntries).toHaveBeenCalledTimes(2))
-    expect(mocks.getEntryAccess).toHaveBeenCalledOnce()
+    expect(
+      await screen.findByRole('button', { name: 'Backup Subscription' }),
+    ).toBeInTheDocument()
+    expect(mocks.getDeliveryOptions).toHaveBeenCalledTimes(2)
     expect(screen.queryByRole('button', { name: '复制' })).toBeNull()
-    expect(screen.queryByText('private stale detail')).toBeNull()
-    expect(
-      screen.getByRole('button', { name: '使用入口 1' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: '使用入口 2' }),
-    ).toBeInTheDocument()
   })
 
-  it.each([
-    [0, 'NETWORK_ERROR'],
-    [502, 'UPSTREAM_ERROR'],
-    [504, 'UPSTREAM_TIMEOUT'],
-    [200, 'MALFORMED_RESPONSE'],
-  ])(
-    'does not automatically retry entry-access after %s/%s',
-    async (status, code) => {
-      const mocks = installPageMocks([entryA])
-      mocks.getEntryAccess.mockRejectedValue(
-        new ApiError({ status, code, message: 'private failure' }),
-      )
-      renderSubscription()
+  it('keeps copy, QR and imports bound to the current exact URL', async () => {
+    installMocks()
+    const navigation = vi
+      .spyOn(subscriptionImportNavigation, 'goTo')
+      .mockImplementation(() => undefined)
+    renderSubscription()
+    const user = userEvent.setup()
+    const writeText = installClipboard()
+    await screen.findByLabelText('订阅地址已隐藏')
 
-      expect(
-        await screen.findByText('暂时无法读取订阅地址。'),
-      ).toBeInTheDocument()
-      expect(mocks.getEntryAccess).toHaveBeenCalledOnce()
-      expect(screen.queryByText('private failure')).toBeNull()
-      expect(screen.queryByRole('button', { name: '复制' })).toBeNull()
-    },
-  )
+    await user.click(screen.getByRole('button', { name: '复制' }))
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(accessUrls.primary),
+    )
+    await user.click(screen.getByRole('button', { name: '显示二维码' }))
+    expect(screen.getByTestId('subscription-qr')).toHaveAttribute(
+      'data-value',
+      accessUrls.primary,
+    )
+    await user.click(screen.getByRole('button', { name: 'Clash' }))
+    expect(navigation).toHaveBeenCalledWith(
+      expect.stringContaining(encodeURIComponent(accessUrls.primary)),
+    )
+  })
 
-  it.each([
-    [0, 'NETWORK_ERROR'],
-    [500, 'UPSTREAM_ERROR'],
-    [502, 'UPSTREAM_ERROR'],
-    [504, 'UPSTREAM_TIMEOUT'],
-    [200, 'MALFORMED_RESPONSE'],
-  ])(
-    'shows a safe recoverable entries error after %s/%s',
-    async (status, code) => {
-      const mocks = installPageMocks([entryA])
-      mocks.getEntries.mockRejectedValue(
-        new ApiError({
-          status,
-          code,
-          message: 'private entries failure',
-          requestId: 'req-entries',
-        }),
-      )
-      renderSubscription()
-
-      expect(
-        await screen.findByText('暂时无法读取订阅入口。', undefined, {
-          timeout: 3_000,
-        }),
-      ).toBeInTheDocument()
-      expect(screen.getByText('请求编号：req-entries')).toBeInTheDocument()
-      expect(screen.queryByText('private entries failure')).toBeNull()
-      expect(mocks.getEntryAccess).not.toHaveBeenCalled()
-    },
-  )
-
-  it('keeps working when selected-entry sessionStorage access fails', async () => {
-    installPageMocks([entryA])
-    window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'opaque-token')
-    const originalGetItem = Storage.prototype.getItem
-    const originalSetItem = Storage.prototype.setItem
-    const getItem = vi
-      .spyOn(Storage.prototype, 'getItem')
-      .mockImplementation(function (this: Storage, key) {
-        if (key === SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY) {
-          throw new Error('blocked')
-        }
-        return originalGetItem.call(this, key)
-      })
-    const setItem = vi
-      .spyOn(Storage.prototype, 'setItem')
-      .mockImplementation(function (this: Storage, key, value) {
-        if (key === SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY) {
-          throw new Error('blocked')
-        }
-        return originalSetItem.call(this, key, value)
-      })
-
-    try {
-      renderSubscription()
-      expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
-    } finally {
-      getItem.mockRestore()
-      setItem.mockRestore()
+  it('never renders a delayed Session A credential after Session B becomes active', async () => {
+    const pendingA = deferred<{ accessUrl: string }>()
+    const mocks = installMocks()
+    mocks.getAccessLink.mockImplementation((token) =>
+      token === 'session-a-token'
+        ? pendingA.promise
+        : Promise.resolve({ accessUrl: accessUrls.backup }),
+    )
+    const authApi: AuthApi = {
+      login: vi.fn().mockResolvedValue({
+        accessToken: 'session-b-token',
+        tokenType: 'Bearer',
+      }),
+      getCurrentUser: vi.fn().mockImplementation(async (token) => ({
+        ...currentUser,
+        email: token === 'session-b-token' ? 'b@example.com' : 'a@example.com',
+      })),
     }
+    const { router } = renderSubscription(createQueryClient(), authApi)
+    const user = userEvent.setup()
+    await waitFor(() => expect(mocks.getAccessLink).toHaveBeenCalled())
+
+    const logout = screen.getAllByRole('button', { name: '退出登录' })[0]!
+    await user.click(logout)
+    await user.type(await screen.findByLabelText('邮箱'), 'b@example.com')
+    await user.type(screen.getByLabelText('密码'), 'password123')
+    await user.click(screen.getByRole('button', { name: '登录' }))
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe('/dashboard'),
+    )
+    await act(async () => router.navigate({ to: '/subscription' }))
+    expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
+
+    act(() => pendingA.resolve({ accessUrl: accessUrls.primary }))
+    await waitFor(() =>
+      expect(useAuthSessionStore.getState().accessToken).toBe(
+        'session-b-token',
+      ),
+    )
+    expect(screen.queryByText(accessUrls.primary)).toBeNull()
   })
 })
