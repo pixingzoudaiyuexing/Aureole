@@ -354,8 +354,11 @@ Public effect。Signed INT 原样展示，不 abs、clamp、round 或转换为�
 minor-unit fallback。Aureole 不计算新余额、到期时间、流量、reset day 或套餐。
 
 成功后重新读取 canonical Wallet、Me 与 Subscription Overview，并以 `refetchType:none` invalidate
-legacy Access、删除 CF-02 entry-access root cache，而不主动读取 accessUrl。必要 read 任一失败时仍保留“礼品卡已兑换”，但 fail closed 到三项全部读取
-成功。UNKNOWN 同样读取三项 authority，但绝不根据字段变化推断本次兑换成败；全部成功后仍需专用
+Wallet、Subscription Overview 与 non-secret `delivery-options` Query。三项 authoritative reconciliation read 仍为
+Wallet、Me 与 Subscription Overview；delivery-options 只包含 non-secret delivery selection metadata。Gift Card 不自动
+请求 access-link、不缓存或持久化 `accessUrl`，也不建立 Subscription credential authority；Subscription credential
+authority 仍由现有 component-local ephemeral access-link runtime 持有。必要 read 任一失败时仍保留“礼品卡已兑换”，但
+fail closed 到三项全部读取成功。UNKNOWN 同样读取三项 authority，但绝不根据字段变化推断本次兑换成败；全部成功后仍需专用
 acknowledgement 与新的标准确认才能再次 POST。Deposit 与 Gift Card 共用页面级同步 Wallet mutation
 coordinator，最多一个金融 POST 处于活动状态。Gift Card history/preview、ledger、pending balance、
 bonus/fee、第二套 Payment flow 和其他后续里程碑能力均未实现。
