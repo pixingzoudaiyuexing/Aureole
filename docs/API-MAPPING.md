@@ -82,15 +82,18 @@ footer defaults。Runtime Settings 不控制 API origin、Authorization、CSP、
   host/path/label 猜测迁移。有效 persisted ID 优先；否则使用 authoritative `defaultEntryId`；若 default 为
   null，则不自动选择 `entries[0]`。运行中 entry 消失或 `SUBSCRIPTION_ENTRY_UNAVAILABLE` 会立即抑制 credential、
   刷新 delivery options 并要求显式选择。
-- `POST /api/v1/subscription/access-link` 是 active selected credential authority。Aureole 只发送 strict
-  `{entryId, profileId:'default', subscriptionInfo:'show'|'hide'}`，并原样使用返回的 canonical HTTPS
-  `accessUrl`。浏览器不重建 token URL、不请求 subscription content，也不实现 M05 profile selector。
+- `POST /api/v1/subscription/access-link` 是 active selected credential authority。Contract 继续接受 strict
+  `{entryId, profileId:'default', subscriptionInfo:'show'|'hide'}`；活动页面只主动发送 `show`，并原样使用返回的
+  canonical HTTPS `accessUrl`。浏览器不重建 token URL、不请求 subscription content，也不实现 M05 profile
+  selector。
 - Delivery options 使用 credential-free `['subscription','delivery-options']` Query。`accessUrl` 明确不进入
   TanStack Query、Query key、Zustand、storage、URL、cookie、日志或 analytics，只存在于当前 Subscription
-  component 的局部 ephemeral runtime。Entry、subscriptionInfo、session、rotation 或 error 变化会立即清除
-  Display/Copy/QR/Import；AbortController、request generation 与 Auth generation 共同拒绝晚到结果。
-- subscriptionInfo 默认为 `show`；切换 `show/hide` 会重新请求当前 entry 的 default profile，pending 期间不
-  复用旧 URL。Clash、Shadowrocket、Quantumult X 与 Sing-box import 只编码 exact authoritative URL；Sing-box
+  component 的局部 ephemeral runtime。Entry、session、rotation 或 error 变化会立即清除 Display/Copy/QR/Import；
+  AbortController、request generation 与 Auth generation 共同拒绝晚到结果。成功时页面直接显示 current URL，
+  但不新增持久化。
+- 页面固定使用 `subscriptionInfo='show'`，不提供 show/hide 切换控件；这不改变后端对既有 `hide` 请求或 URL
+  的兼容。`SUBSCRIPTION_ACCESS_UNAVAILABLE` 时不显示 URL 或 Copy/QR/Import actions；502/504 等暂时性错误不
+  被解释为无资格。Clash、Shadowrocket、Quantumult X 与 Sing-box import 只编码 exact authoritative URL；Sing-box
   不再向 credential URL 追加 `flag`。
 - `GET /api/v1/subscription/overview` 是 current product、expiry、traffic、device 和 cycle
   config 的权威 read。Dashboard 与 Subscription Page 复用 canonical Overview query；Dashboard
@@ -103,7 +106,7 @@ footer defaults。Runtime Settings 不控制 API origin、Authorization、CSP、
 - `renewalAllowed` 只翻译为“新周期功能已启用/未启用”，不作为 mutation eligibility。
 - `POST /api/v1/subscription/rotate-access` 是无 body 的非幂等 credential mutation，仅在当前 selected
   access-link 可用时显示入口，仍由 server 最终判断资格。Mutation 不 retry；success、409、明确失败
-  或 UNKNOWN 后都丢弃当前 selected credential，并重新 POST 当前 `entryId/default/subscriptionInfo` access-link。Rotate
+  或 UNKNOWN 后都丢弃当前 selected credential，并重新 POST 当前 `entryId/default/show` access-link。Rotate
   response 中 legacy gateway `accessUrl` 只做 strict response validation，不进入 UI 或 query cache。
   UNKNOWN recovery 未成功时禁止再次 POST，成功后也要求新的明确确认。
 - Rotate success 只接受 `rotated=true` 与安全 HTTPS legacy `accessUrl`，additive fields 会被 strip；
