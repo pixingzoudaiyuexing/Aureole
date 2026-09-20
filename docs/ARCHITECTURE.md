@@ -172,16 +172,18 @@ fail-safe 保存该 non-sensitive stable ID。历史 CF-02 baseUrl 不做推断�
 使用 validated defaultEntryId；default 为 null 时不发明首项默认。运行中 selection 消失或 access-link 返回
 `SUBSCRIPTION_ENTRY_UNAVAILABLE` 时进入 explicit reselection。
 
-`POST /api/v1/subscription/access-link` 只支持 `profileId=default`，并按 current `entryId` 与
-`subscriptionInfo=show|hide` 返回 exact authoritative HTTPS credential。`accessUrl` 不进入 TanStack Query、
-Query key、Zustand、storage、URL state、cookie、analytics 或日志；它只存在于 keyed child component 的局部
-state 与当前 render。页面默认掩码；Copy、local QR 与 Clash/Shadowrocket/Quantumult X/SingBox user-gesture
-builders 只消费同一个 current accessUrl，且不会修改 credential URL。
+`POST /api/v1/subscription/access-link` 的 Contract 继续支持 `profileId=default` 与
+`subscriptionInfo=show|hide`，并返回 exact authoritative HTTPS credential。活动页面只主动发送
+`subscriptionInfo=show`，不提供 show/hide 产品控件，也不重写服务器返回的既有 URL。`accessUrl` 不进入
+TanStack Query、Query key、Zustand、storage、URL state、cookie、analytics 或日志；它只存在于 keyed child
+component 的局部 state 与当前 render。成功后页面直接显示 current accessUrl；Copy、local QR 与
+Clash/Shadowrocket/Quantumult X/SingBox user-gesture builders 只消费同一个 URL，且不会修改 credential URL。
 
-Entry、subscriptionInfo、Auth generation 或 runtime ownership 变化会先 suppress/unmount旧 credential，再
-发起新 access-link。每个请求使用 AbortController 与 monotonic request generation；completion 还必须匹配
-current accessToken、Auth generation、entryId 和 subscriptionInfo，避免晚到 A response 出现在 B/session B。
-普通失败与 malformed response 都 fail closed，不恢复旧 credential。Aureole 不请求
+Entry、Auth generation 或 runtime ownership 变化会先 suppress/unmount旧 credential，再发起新的 show
+access-link。每个请求使用 AbortController 与 monotonic request generation；completion 还必须匹配 current
+accessToken、Auth generation 与 entryId，避免晚到 A response 出现在 B/session B。普通失败与 malformed
+response 都 fail closed，不恢复旧 credential。`SUBSCRIPTION_ACCESS_UNAVAILABLE` 是后端权威拒绝：不显示
+credential 或其 Copy/QR/Import actions；502/504 等暂时性故障保持可恢复错误，不被解释为无资格。Aureole 不请求
 `/api/v1/access/subscription`，不下载或解析 subscription content；REG-M05 profile transformation 不在本阶段。
 
 Overview 只展示 Public Contract 原始字段。Byte formatting 与 absolute date formatting 仅是
@@ -195,15 +197,15 @@ entry credential 是否可用显示，最终 eligibility 始终由 solution/V2Bo
 credential 失效后果并勾选确认后才允许提交。
 
 Rotate response 的 solution legacy gateway `accessUrl` 不是 UI authority，也绝不写入 Query。Success、409、
-明确 failure 与 UNKNOWN 都先 suppress 当前 credential，再只对 current entryId/default/subscriptionInfo
-重新执行 access-link。成功 re-resolution 通过 keyed runtime remount 重置 reveal/copy/QR/
-import transient state；恢复失败时旧 credential 不能重新启用，并继续 fail closed 阻断 Rotate 与 Advance。
+明确 failure 与 UNKNOWN 都先 suppress 当前 credential，再只对 current entryId/default/show access-link
+重新执行 access-link。成功 re-resolution 通过 keyed runtime remount 重置 copy/QR/import transient state；
+恢复失败时旧 credential 不能重新启用，并继续 fail closed 阻断 Rotate 与 Advance。
 UNKNOWN 不根据 URL 变化推断因果，恢复成功后仍要求新的明确确认。Mutation 或 recovery 的 Auth failure
 继续复用 sealed Auth Session Core。AUR-M6-001 不请求 subscription content。
 
 Rotate feedback、recovery owner 与 UNKNOWN acknowledgement 的生命周期高于 selected entry；入口切换或
 `422 SUBSCRIPTION_ENTRY_UNAVAILABLE` 进入 explicit reselection 时不能卸载该 owner。Credential
-Reveal/Copy/QR/Import 仍由 `accessUrl` keyed child 独立重置。Recovery block 期间，普通 entry switch 不会
+Copy/QR/Import 仍由 `accessUrl` keyed child 独立重置。Recovery block 期间，普通 entry switch 不会
 自动解除 block；用户完成 explicit selection 后，必须通过仍可见的 manual recovery 对当前 selected entry
 再次进行 authoritative read，成功后才能解除 Rotate/Advance block。若原 outcome 为 UNKNOWN，恢复后仍
 保留“再次重置订阅地址”及专用 acknowledgement。Destructive mutation 与其 entry-access recovery request
