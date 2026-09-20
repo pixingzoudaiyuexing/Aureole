@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AppProviders } from '@/app/providers/app-providers'
@@ -225,7 +225,7 @@ describe('Subscription delivery selection and credential runtime', () => {
     installMocks()
     const { queryClient, router } = renderSubscription()
 
-    await screen.findByLabelText('订阅地址已隐藏')
+    expect(await screen.findByText(accessUrls.primary)).toBeInTheDocument()
     const serializedQueryData = JSON.stringify(
       queryClient
         .getQueryCache()
@@ -255,9 +255,7 @@ describe('Subscription delivery selection and credential runtime', () => {
 
     const selector = await screen.findByRole('combobox', { name: '订阅入口' })
     await user.selectOptions(selector, 'backup')
-    expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
-    await user.click(screen.getAllByRole('button', { name: '显示' }).at(-1)!)
-    expect(screen.getByText(accessUrls.backup)).toBeInTheDocument()
+    expect(await screen.findByText(accessUrls.backup)).toBeInTheDocument()
 
     act(() => pendingA.resolve({ accessUrl: accessUrls.primary }))
     await waitFor(() =>
@@ -277,9 +275,7 @@ describe('Subscription delivery selection and credential runtime', () => {
     renderSubscription()
     const user = userEvent.setup()
 
-    await screen.findByLabelText('订阅地址已隐藏')
-    await user.click(screen.getByRole('button', { name: '显示' }))
-    expect(screen.getByText(accessUrls.primary)).toBeInTheDocument()
+    expect(await screen.findByText(accessUrls.primary)).toBeInTheDocument()
 
     await user.selectOptions(
       screen.getByRole('combobox', { name: '订阅入口' }),
@@ -292,66 +288,45 @@ describe('Subscription delivery selection and credential runtime', () => {
     expect(screen.getByText('正在读取订阅地址…')).toBeInTheDocument()
 
     act(() => pendingB.resolve({ accessUrl: accessUrls.backup }))
-    expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
+    expect(await screen.findByText(accessUrls.backup)).toBeInTheDocument()
   })
 
-  it('suppresses credential actions while subscriptionInfo changes', async () => {
-    const pendingHide = deferred<{ accessUrl: string }>()
+  it('always requests show and exposes no subscription info mode controls', async () => {
     const mocks = installMocks()
-    mocks.getAccessLink.mockImplementation((_token, input) =>
-      input.subscriptionInfo === 'hide'
-        ? pendingHide.promise
-        : Promise.resolve({ accessUrl: accessUrls.primary }),
-    )
     renderSubscription()
-    const user = userEvent.setup()
-    await screen.findByLabelText('订阅地址已隐藏')
-
-    const info = screen.getByRole('group', { name: '订阅信息' })
-    await user.click(within(info).getByRole('button', { name: '隐藏订阅信息' }))
-    expect(screen.queryByRole('button', { name: '复制' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '显示二维码' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Clash' })).toBeNull()
-    expect(screen.getByText('正在读取订阅地址…')).toBeInTheDocument()
-
-    act(() =>
-      pendingHide.resolve({
-        accessUrl: `${accessUrls.primary}?info=hide`,
-      }),
-    )
-    expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
-    expect(mocks.getAccessLink).toHaveBeenLastCalledWith(
+    expect(await screen.findByText(accessUrls.primary)).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: '订阅信息' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '显示订阅信息' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '隐藏订阅信息' })).toBeNull()
+    expect(mocks.getAccessLink).toHaveBeenCalledWith(
       'session-a-token',
-      expect.objectContaining({ subscriptionInfo: 'hide' }),
+      expect.objectContaining({ subscriptionInfo: 'show' }),
       expect.any(AbortSignal),
     )
+    expect(
+      mocks.getAccessLink.mock.calls.every(
+        ([, input]) => input.subscriptionInfo === 'show',
+      ),
+    ).toBe(true)
   })
 
   it('clears a failed credential and retries without restoring the old URL', async () => {
     const mocks = installMocks()
     mocks.getAccessLink
-      .mockResolvedValueOnce({ accessUrl: accessUrls.primary })
       .mockRejectedValueOnce(
         new ApiError({ status: 0, code: 'NETWORK_ERROR', message: 'private' }),
       )
-      .mockResolvedValueOnce({ accessUrl: `${accessUrls.primary}?info=hide` })
+      .mockResolvedValueOnce({ accessUrl: accessUrls.primary })
     renderSubscription()
     const user = userEvent.setup()
-    await screen.findByLabelText('订阅地址已隐藏')
 
-    await user.click(
-      within(screen.getByRole('group', { name: '订阅信息' })).getByRole(
-        'button',
-        { name: '隐藏订阅信息' },
-      ),
-    )
     expect(
       await screen.findByText('暂时无法读取订阅地址。'),
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '复制' })).toBeNull()
     expect(screen.queryByText(accessUrls.primary)).toBeNull()
     await user.click(screen.getByRole('button', { name: '重试' }))
-    expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
+    expect(await screen.findByText(accessUrls.primary)).toBeInTheDocument()
   })
 
   it('fails closed when access is unavailable', async () => {
@@ -406,7 +381,7 @@ describe('Subscription delivery selection and credential runtime', () => {
     renderSubscription()
     const user = userEvent.setup()
     const writeText = installClipboard()
-    await screen.findByLabelText('订阅地址已隐藏')
+    expect(await screen.findByText(accessUrls.primary)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '复制' }))
     await waitFor(() =>
@@ -454,7 +429,7 @@ describe('Subscription delivery selection and credential runtime', () => {
       expect(router.state.location.pathname).toBe('/dashboard'),
     )
     await act(async () => router.navigate({ to: '/subscription' }))
-    expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
+    expect(await screen.findByText(accessUrls.backup)).toBeInTheDocument()
 
     act(() => pendingA.resolve({ accessUrl: accessUrls.primary }))
     await waitFor(() =>

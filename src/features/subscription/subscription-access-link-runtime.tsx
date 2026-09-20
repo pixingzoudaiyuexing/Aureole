@@ -15,7 +15,7 @@ import {
 } from '@/lib/auth/session-store'
 import { ApiError } from '@/lib/api/errors'
 import { SubscriptionCredential } from './subscription-access'
-import { subscriptionApi, type SubscriptionInfoMode } from './subscription-api'
+import { subscriptionApi } from './subscription-api'
 
 export interface SubscriptionAccessLinkRuntimeHandle {
   refresh: (options?: { suppressError?: boolean }) => Promise<void>
@@ -38,7 +38,6 @@ export const SubscriptionAccessLinkRuntime = forwardRef<
     accessToken: string
     sessionGeneration: number
     entryId: string
-    subscriptionInfo: SubscriptionInfoMode
     runtimeIdentity: string
     onAvailabilityChange: (identity: string, available: boolean) => void
     onEntryUnavailable: (entryId: string) => void
@@ -48,7 +47,6 @@ export const SubscriptionAccessLinkRuntime = forwardRef<
     accessToken,
     sessionGeneration,
     entryId,
-    subscriptionInfo,
     runtimeIdentity,
     onAvailabilityChange,
     onEntryUnavailable,
@@ -85,7 +83,7 @@ export const SubscriptionAccessLinkRuntime = forwardRef<
       const requestInput = {
         entryId,
         profileId: 'default' as const,
-        subscriptionInfo,
+        subscriptionInfo: 'show' as const,
       }
 
       try {
@@ -146,7 +144,6 @@ export const SubscriptionAccessLinkRuntime = forwardRef<
       onEntryUnavailable,
       runtimeIdentity,
       sessionGeneration,
-      subscriptionInfo,
     ],
   )
 
