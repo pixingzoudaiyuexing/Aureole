@@ -209,7 +209,7 @@ describe('Subscription access rotation', () => {
     expect(mocks.rotateAccess).toHaveBeenCalledOnce()
   })
 
-  it('makes the reconciled URL canonical and resets reveal/copy state without fetching or copying it', async () => {
+  it('makes the reconciled URL canonical and resets copy state without fetching or copying it', async () => {
     const mocks = installMocks()
     mocks.getAccess
       .mockResolvedValueOnce({ accessUrl: oldCredentialUrl })
@@ -224,8 +224,7 @@ describe('Subscription access rotation', () => {
     const user = userEvent.setup()
     const writeText = installClipboard()
 
-    await user.click(await screen.findByRole('button', { name: '显示' }))
-    expect(screen.getByText(oldCredentialUrl)).toBeInTheDocument()
+    expect(await screen.findByText(oldCredentialUrl)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '复制' }))
     expect(screen.getByRole('button', { name: '已复制' })).toBeInTheDocument()
 
@@ -236,8 +235,7 @@ describe('Subscription access rotation', () => {
       await screen.findByText('订阅地址已重置，请使用新地址重新获取订阅。'),
     ).toBeInTheDocument()
     expect(screen.queryByText(oldCredentialUrl)).toBeNull()
-    expect(screen.queryByText(newCredentialUrl)).toBeNull()
-    expect(screen.getByLabelText('订阅地址已隐藏')).toBeInTheDocument()
+    expect(screen.getByText(newCredentialUrl)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '复制' })).toBeInTheDocument()
     expect(writeText).toHaveBeenCalledOnce()
     expect(fetchSpy).not.toHaveBeenCalled()
@@ -260,9 +258,6 @@ describe('Subscription access rotation', () => {
     expect(router.state.location.search).toEqual({})
     expect(Object.values(window.localStorage)).not.toContain(newCredentialUrl)
     expect(Object.values(window.sessionStorage)).not.toContain(newCredentialUrl)
-
-    await user.click(screen.getByRole('button', { name: '显示' }))
-    expect(screen.getByText(newCredentialUrl)).toBeInTheDocument()
   })
 
   it('handles access unavailable as a definitive no-mutation result and removes rotation', async () => {
@@ -567,7 +562,7 @@ describe('Subscription access rotation', () => {
       screen.getByRole('combobox', { name: '订阅入口' }),
       entryC,
     )
-    expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
+    expect(await screen.findByText(entryCCredentialUrl)).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: '重新读取订阅地址' }),
     ).toBeInTheDocument()
@@ -627,7 +622,7 @@ describe('Subscription access rotation', () => {
       screen.getByRole('combobox', { name: '订阅入口' }),
       entryC,
     )
-    await screen.findByLabelText('订阅地址已隐藏')
+    await screen.findByText(entryCCredentialUrl)
     await first.user.click(
       screen.getByRole('button', { name: '重新读取订阅地址' }),
     )
@@ -691,7 +686,7 @@ describe('Subscription access rotation', () => {
     expect(advanceButton).toBeDisabled()
 
     await first.user.click(await screen.findByRole('button', { name: entryC }))
-    await screen.findByLabelText('订阅地址已隐藏')
+    await screen.findByText(entryCCredentialUrl)
     expect(
       screen.getByRole('button', { name: '重新读取订阅地址' }),
     ).toBeInTheDocument()
@@ -754,7 +749,7 @@ describe('Subscription access rotation', () => {
     ).toBeInTheDocument()
     expect(screen.queryByText(entryBCredentialUrl)).toBeNull()
     await first.user.click(await screen.findByRole('button', { name: entryC }))
-    await screen.findByLabelText('订阅地址已隐藏')
+    await screen.findByText(entryCCredentialUrl)
     await first.user.click(
       screen.getByRole('button', { name: '重新读取订阅地址' }),
     )
@@ -819,13 +814,12 @@ describe('Subscription access rotation', () => {
     await acknowledgeAndConfirm(first.dialog, first.user)
     await screen.findByText('原订阅入口已不可用，请重新选择')
     await first.user.click(await screen.findByRole('button', { name: entryC }))
-    await screen.findByLabelText('订阅地址已隐藏')
+    await screen.findByText(entryCCredentialUrl)
     await first.user.click(
       screen.getByRole('button', { name: '重新读取订阅地址' }),
     )
     await screen.findByRole('button', { name: '再次重置订阅地址' })
 
-    await first.user.click(screen.getByRole('button', { name: '显示' }))
     expect(screen.getByText(entryCCredentialUrl)).toBeInTheDocument()
     expect(screen.queryByText(entryBCredentialUrl)).toBeNull()
     await first.user.click(screen.getByRole('button', { name: '复制' }))

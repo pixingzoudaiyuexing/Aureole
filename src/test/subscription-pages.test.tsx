@@ -142,25 +142,30 @@ describe('Subscription page', () => {
     expect(screen.getByText('未启用')).toBeInTheDocument()
   })
 
-  it('masks, reveals, and hides the credential without changing browser URL state', async () => {
-    installSubscriptionMocks()
+  it('shows the credential directly without legacy reveal controls or URL state', async () => {
+    const mocks = installSubscriptionMocks()
     const { router } = renderProtectedRoute('/subscription')
-    const user = userEvent.setup()
 
-    expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
-    expect(screen.queryByText(credentialUrl)).toBeNull()
+    expect(await screen.findByText(credentialUrl)).toBeInTheDocument()
+    expect(
+      screen
+        .getAllByText('Subscription')
+        .some((element) => element.tagName === 'P'),
+    ).toBe(true)
+    expect(screen.queryByRole('combobox', { name: '订阅入口' })).toBeNull()
     expect(document.querySelector(`a[href="${credentialUrl}"]`)).toBeNull()
-    const locationBefore = router.state.location.href
-
-    await user.click(screen.getByRole('button', { name: '显示' }))
-    expect(screen.getByText(credentialUrl)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '隐藏' })).toBeInTheDocument()
-    expect(router.state.location.href).toBe(locationBefore)
-
-    await user.click(screen.getByRole('button', { name: '隐藏' }))
-    expect(screen.queryByText(credentialUrl)).toBeNull()
-    expect(screen.getByLabelText('订阅地址已隐藏')).toBeInTheDocument()
-    expect(router.state.location.href).toBe(locationBefore)
+    expect(screen.queryByRole('button', { name: '显示' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '隐藏' })).toBeNull()
+    expect(mocks.getEntryAccess).toHaveBeenCalledWith(
+      'opaque-session-token',
+      {
+        entryId: 'primary',
+        profileId: 'default',
+        subscriptionInfo: 'show',
+      },
+      expect.any(AbortSignal),
+    )
+    expect(router.state.location.search).toEqual({})
   })
 
   it('copies the exact credential while feedback never includes it', async () => {
@@ -175,7 +180,7 @@ describe('Subscription page', () => {
     expect(writeText).toHaveBeenCalledWith(credentialUrl)
     expect(screen.getByRole('button', { name: '已复制' })).toBeInTheDocument()
     expect(screen.getAllByText('已复制')).toHaveLength(2)
-    expect(screen.queryByText(credentialUrl)).toBeNull()
+    expect(screen.getByText(credentialUrl)).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/subscription')
     expect(router.state.location.search).toEqual({})
     expect(Object.values(window.localStorage)).not.toContain(credentialUrl)
@@ -194,9 +199,9 @@ describe('Subscription page', () => {
 
     expect(writeText).toHaveBeenCalledOnce()
     expect(
-      await screen.findByText('无法复制订阅地址，请重试或先显示后手动复制。'),
+      await screen.findByText('无法复制订阅地址，请重试或手动复制。'),
     ).toBeInTheDocument()
-    expect(screen.queryByText(credentialUrl)).toBeNull()
+    expect(screen.getByText(credentialUrl)).toBeInTheDocument()
   })
 
   it('renders an unavailable access state without inventing a cause', async () => {
@@ -217,14 +222,34 @@ describe('Subscription page', () => {
     expect(screen.queryByRole('button', { name: '复制' })).toBeNull()
   })
 
+  it('keeps temporary delivery discovery failure distinct from unavailable access', async () => {
+    const mocks = installSubscriptionMocks()
+    mocks.getEntries.mockRejectedValue(
+      new ApiError({
+        status: 502,
+        code: 'UPSTREAM_ERROR',
+        message: 'private registry detail',
+      }),
+    )
+    renderProtectedRoute('/subscription')
+
+    expect(
+      await screen.findByText('暂时无法读取订阅入口。', {}, { timeout: 3_000 }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('当前没有可展示的订阅地址。')).toBeNull()
+    expect(screen.queryByText(credentialUrl)).toBeNull()
+    expect(screen.queryByRole('button', { name: '复制' })).toBeNull()
+    expect(screen.queryByText('private registry detail')).toBeNull()
+  })
+
   it('keeps eligible access visible when current product is null', async () => {
     const mocks = installSubscriptionMocks()
     mocks.getOverview.mockResolvedValue({ ...overview, product: null })
     renderProtectedRoute('/subscription')
 
     expect(await screen.findByText('暂无当前套餐')).toBeInTheDocument()
-    expect(screen.getByLabelText('订阅地址已隐藏')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '显示' })).toBeInTheDocument()
+    expect(screen.getByText(credentialUrl)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '显示' })).toBeNull()
   })
 
   it('keeps overview available when access fails and retries only access', async () => {
@@ -245,7 +270,7 @@ describe('Subscription page', () => {
     expect(screen.getByText('暂时无法读取订阅地址。')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '重试' }))
 
-    expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
+    expect(await screen.findByText(credentialUrl)).toBeInTheDocument()
     expect(mocks.getEntryAccess).toHaveBeenCalledTimes(2)
     expect(mocks.getOverview).toHaveBeenCalledOnce()
   })
@@ -264,7 +289,7 @@ describe('Subscription page', () => {
     renderProtectedRoute('/subscription')
     const user = userEvent.setup()
 
-    expect(await screen.findByLabelText('订阅地址已隐藏')).toBeInTheDocument()
+    expect(await screen.findByText(credentialUrl)).toBeInTheDocument()
     expect(screen.getByText('暂时无法读取订阅概览。')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '重试' }))
 
@@ -328,7 +353,7 @@ describe('Subscription page', () => {
     const user = userEvent.setup()
 
     expect(await screen.findByText('Pro Plan')).toBeInTheDocument()
-    expect(screen.getByLabelText('订阅地址已隐藏')).toBeInTheDocument()
+    expect(screen.getByText(credentialUrl)).toBeInTheDocument()
     expect(screen.getByText('暂时无法读取流量历史。')).toBeInTheDocument()
     expect(screen.getByText('请求编号：req-traffic')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '重试' }))

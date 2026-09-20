@@ -14,7 +14,6 @@ import { SubscriptionAccessPanel } from './subscription-access-panel'
 import type {
   SubscriptionDeliveryEntry,
   SubscriptionDeliveryOptions,
-  SubscriptionInfoMode,
 } from './subscription-api'
 import type { SubscriptionMutationCoordinator } from './subscription-mutation-coordinator'
 import {
@@ -123,8 +122,6 @@ function SubscriptionEntryAccessReady({
   const [selection, setSelection] = useState<EntrySelectionState>(() =>
     initialEntrySelection(options),
   )
-  const [subscriptionInfo, setSubscriptionInfo] =
-    useState<SubscriptionInfoMode>('show')
   const [availability, setAvailability] = useState<{
     identity: string
     available: boolean
@@ -139,7 +136,7 @@ function SubscriptionEntryAccessReady({
       ? selection.selectedEntryId
       : null
   const runtimeIdentity = selectedEntryId
-    ? `${sessionGeneration}:${selectedEntryId}:${subscriptionInfo}`
+    ? `${sessionGeneration}:${selectedEntryId}`
     : null
 
   const refreshOptionsForReselection = useCallback(async () => {
@@ -190,13 +187,6 @@ function SubscriptionEntryAccessReady({
     setReselectionRefreshError(null)
     writeSelectedSubscriptionEntry(entryId)
     setSelection({ selectedEntryId: entryId, requiresReselection: false })
-  }
-
-  const changeSubscriptionInfo = (mode: SubscriptionInfoMode) => {
-    if (mode === subscriptionInfo) return
-    accessRuntimeRef.current?.suppress()
-    setAvailability(null)
-    setSubscriptionInfo(mode)
   }
 
   const refreshSelectedAccess = useCallback(async () => {
@@ -252,14 +242,6 @@ function SubscriptionEntryAccessReady({
         onSelect={selectEntry}
       />
 
-      {selectedEntryId ? (
-        <SubscriptionInfoControl
-          value={subscriptionInfo}
-          disabled={selectionLocked}
-          onChange={changeSubscriptionInfo}
-        />
-      ) : null}
-
       <SubscriptionAccessPanel
         accessContent={
           selectedEntryId && runtimeIdentity ? (
@@ -269,7 +251,6 @@ function SubscriptionEntryAccessReady({
               accessToken={accessToken}
               sessionGeneration={sessionGeneration}
               entryId={selectedEntryId}
-              subscriptionInfo={subscriptionInfo}
               runtimeIdentity={runtimeIdentity}
               onAvailabilityChange={handleAvailabilityChange}
               onEntryUnavailable={handleEntryUnavailable}
@@ -409,44 +390,6 @@ function EntryChoices({
           </Button>
         </div>
       ))}
-    </div>
-  )
-}
-
-function SubscriptionInfoControl({
-  value,
-  disabled,
-  onChange,
-}: {
-  value: SubscriptionInfoMode
-  disabled: boolean
-  onChange: (mode: SubscriptionInfoMode) => void
-}) {
-  return (
-    <div>
-      <p className="text-sm font-semibold">订阅信息</p>
-      <div
-        className="mt-2 inline-flex rounded-md border border-border bg-background p-0.5"
-        role="group"
-        aria-label="订阅信息"
-      >
-        {(['show', 'hide'] as const).map((mode) => (
-          <Button
-            key={mode}
-            type="button"
-            variant="ghost"
-            size="sm"
-            className={
-              value === mode ? 'bg-secondary text-foreground' : undefined
-            }
-            aria-pressed={value === mode}
-            disabled={disabled}
-            onClick={() => onChange(mode)}
-          >
-            {mode === 'show' ? '显示订阅信息' : '隐藏订阅信息'}
-          </Button>
-        ))}
-      </div>
     </div>
   )
 }

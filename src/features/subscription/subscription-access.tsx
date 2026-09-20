@@ -1,4 +1,4 @@
-import { Check, Copy, ExternalLink, Eye, EyeOff, QrCode, X } from 'lucide-react'
+import { Check, Copy, ExternalLink, QrCode, X } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -19,7 +19,6 @@ const importClients: Array<{
 ]
 
 export function SubscriptionCredential({ accessUrl }: { accessUrl: string }) {
-  const [revealed, setRevealed] = useState(false)
   const [copied, setCopied] = useState(false)
   const [copyFailed, setCopyFailed] = useState(false)
   const [qrVisible, setQrVisible] = useState(false)
@@ -38,35 +37,10 @@ export function SubscriptionCredential({ accessUrl }: { accessUrl: string }) {
   return (
     <div className="space-y-4">
       <div className="min-h-11 border-y border-border py-3">
-        {revealed ? (
-          <p className="break-all font-mono text-sm leading-6">{accessUrl}</p>
-        ) : (
-          <p
-            className="font-mono text-sm tracking-widest text-muted-foreground"
-            aria-label="订阅地址已隐藏"
-          >
-            ••••••••••••••••••••
-          </p>
-        )}
+        <p className="break-all font-mono text-sm leading-6">{accessUrl}</p>
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            setRevealed((value) => !value)
-            setCopied(false)
-            setCopyFailed(false)
-          }}
-        >
-          {revealed ? (
-            <EyeOff className="size-4" aria-hidden="true" />
-          ) : (
-            <Eye className="size-4" aria-hidden="true" />
-          )}
-          {revealed ? '隐藏' : '显示'}
-        </Button>
         <Button type="button" onClick={() => void copy()}>
           {copied ? (
             <Check className="size-4" aria-hidden="true" />
@@ -93,7 +67,7 @@ export function SubscriptionCredential({ accessUrl }: { accessUrl: string }) {
         {copied ? <p className="text-primary">已复制</p> : null}
         {copyFailed ? (
           <p className="text-destructive" role="alert">
-            无法复制订阅地址，请重试或先显示后手动复制。
+            无法复制订阅地址，请重试或手动复制。
           </p>
         ) : null}
       </div>
