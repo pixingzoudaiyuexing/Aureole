@@ -144,16 +144,18 @@ export function AuthProvider({
   useEffect(() => {
     if (remoteShared === undefined || remoteShared === null) return
     queueMicrotask(() => {
+      const shared = coordinator.readSharedState()
+      if (!shared) return
       const local = useAuthSessionStore.getState()
       if (
-        remoteShared?.status === 'active' &&
+        shared.status !== 'logged-out' &&
         local.accessToken &&
-        local.sessionVersion === remoteShared.version
+        local.sessionVersion === shared.version
       ) {
         return
       }
       if (!local.accessToken && !local.sessionVersion) {
-        if (remoteShared?.status === 'active') {
+        if (shared.status === 'active') {
           const expectedIdentity = captureAuthSessionIdentity()
           void coordinator
             .requestCurrentSession()
@@ -166,7 +168,7 @@ export function AuthProvider({
         return
       }
       isolateLocalSession()
-      if (remoteShared?.status === 'active') {
+      if (shared.status === 'active') {
         const expectedIdentity = captureAuthSessionIdentity()
         void coordinator
           .requestCurrentSession()
@@ -212,18 +214,28 @@ export function AuthProvider({
   useEffect(() => {
     if (!currentUserQuery.data || !accessToken || !sessionVersion) return
     queueMicrotask(() => {
-      const current = useAuthSessionStore.getState()
+      const expectedIdentity = captureAuthSessionIdentity()
       if (
-        current.accessToken !== accessToken ||
-        current.sessionVersion !== sessionVersion
+        expectedIdentity.accessToken !== accessToken ||
+        expectedIdentity.sessionVersion !== sessionVersion
       ) {
         return
       }
-      if (!coordinator.publishActiveIfCurrent(sessionVersion)) {
-        isolateLocalSession()
-        return
-      }
-      setValidated(true)
+      void coordinator.publishActiveIfCurrent(sessionVersion).then((result) => {
+        const current = captureAuthSessionIdentity()
+        if (
+          current.accessToken !== expectedIdentity.accessToken ||
+          current.generation !== expectedIdentity.generation ||
+          current.sessionVersion !== expectedIdentity.sessionVersion
+        ) {
+          return
+        }
+        if (result === 'conflict') {
+          isolateLocalSession()
+          return
+        }
+        setValidated(true)
+      })
     })
   }, [
     accessToken,
@@ -254,11 +266,12 @@ export function AuthProvider({
       ) {
         return
       }
-      coordinator.publishLogoutIfCurrent(
+      const publication = coordinator.publishLogoutIfCurrent(
         identity.sessionVersion,
         coordinator.createVersion(),
       )
       isolateLocalSession()
+      void publication
     })
   }, [
     accessToken,
@@ -270,7 +283,7 @@ export function AuthProvider({
 
   const establishSession = async (nextAccessToken: string) => {
     const version = coordinator.createVersion()
-    coordinator.publishState({ version, status: 'changing' })
+    await coordinator.publishState({ version, status: 'changing' })
     isolateLocalSession()
     setAccessToken(nextAccessToken, version)
     setCrossTabReady(true)
@@ -291,7 +304,7 @@ export function AuthProvider({
           }
         },
       })
-      const current = useAuthSessionStore.getState()
+      let current = useAuthSessionStore.getState()
       if (
         current.accessToken !== nextAccessToken ||
         current.sessionVersion !== version ||
@@ -299,7 +312,16 @@ export function AuthProvider({
       ) {
         throw new Error('Stale session establishment')
       }
-      if (!coordinator.publishActiveIfCurrent(version)) {
+      const publication = await coordinator.publishActiveIfCurrent(version)
+      current = useAuthSessionStore.getState()
+      if (
+        current.accessToken !== nextAccessToken ||
+        current.sessionVersion !== version ||
+        current.generation !== nextGeneration
+      ) {
+        throw new Error('Stale session establishment')
+      }
+      if (publication === 'conflict') {
         isolateLocalSession()
         throw new Error('Shared session version changed')
       }
@@ -319,11 +341,12 @@ export function AuthProvider({
         if (!coordinator.isVersionCurrent(version, ['active', 'changing'])) {
           isolateLocalSession()
         } else if (isInvalidSessionError(error)) {
-          coordinator.publishLogoutIfCurrent(
+          const publication = coordinator.publishLogoutIfCurrent(
             version,
             coordinator.createVersion(),
           )
           isolateLocalSession()
+          void publication
         }
       }
       throw error
@@ -336,8 +359,14 @@ export function AuthProvider({
   }
 
   const clearSession = () => {
-    const version = coordinator.createVersion()
-    coordinator.publishState({ version, status: 'logged-out' })
+    const current = useAuthSessionStore.getState()
+    if (current.sessionVersion) {
+      const publication = coordinator.publishLogoutIfCurrent(
+        current.sessionVersion,
+        coordinator.createVersion(),
+      )
+      void publication
+    }
     isolateLocalSession()
   }
 

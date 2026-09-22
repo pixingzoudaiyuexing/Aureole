@@ -85,6 +85,22 @@ function readSharedState() {
   }
 }
 
+class ManualBroadcastChannel {
+  static instance: ManualBroadcastChannel | null = null
+  onmessage: ((event: MessageEvent) => void) | null = null
+
+  constructor() {
+    ManualBroadcastChannel.instance = this
+  }
+
+  postMessage() {}
+  close() {}
+
+  deliver(data: unknown) {
+    this.onmessage?.({ data } as MessageEvent)
+  }
+}
+
 function AuthTransitionHarness() {
   const {
     currentUser: user,
@@ -208,6 +224,28 @@ describe('Auth session lifecycle', () => {
     expect(getCurrentUser).toHaveBeenCalledWith('opaque-session-token')
     expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
     expect(window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
+  })
+
+  it('completes login in local-only mode when Web Locks are unavailable', async () => {
+    vi.stubGlobal('navigator', { locks: undefined })
+    const getCurrentUser = vi.fn().mockResolvedValue(currentUser)
+    renderAuthTransition(createAuthApi({ getCurrentUser }))
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'login session B' }))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('auth-status')).toHaveTextContent(
+        'authenticated',
+      ),
+    )
+    expect(getCurrentUser).toHaveBeenCalledWith('opaque-session-token')
+    expect(useAuthSessionStore.getState().accessToken).toBe(
+      'opaque-session-token',
+    )
+    expect(window.localStorage.getItem(AUTH_SHARED_STATE_KEY)).toBeNull()
+    vi.unstubAllGlobals()
   })
 
   it('disables duplicate login submission while the request is pending', async () => {
@@ -767,6 +805,205 @@ describe('Auth session lifecycle', () => {
       vi.unstubAllGlobals()
     },
   )
+
+  it('ignores delayed old logout but still applies the current shared logout', async () => {
+    vi.stubGlobal('BroadcastChannel', ManualBroadcastChannel)
+    window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'session-v2-token')
+    window.sessionStorage.setItem(
+      AUTH_SESSION_VERSION_STORAGE_KEY,
+      'session-v2',
+    )
+    writeSharedState('session-v2', 'active')
+    const sessionV2User = {
+      ...currentUser,
+      email: 'session-v2@example.com',
+    }
+    const queryClient = renderAuthTransition(
+      createAuthApi({
+        getCurrentUser: vi.fn().mockResolvedValue(sessionV2User),
+      }),
+    )
+
+    await waitFor(() =>
+      expect(screen.getByTestId('auth-status')).toHaveTextContent(
+        'authenticated',
+      ),
+    )
+    queryClient.setQueryData(['private-session-v2'], { secret: 'cached' })
+
+    act(() => {
+      ManualBroadcastChannel.instance?.deliver({
+        type: 'LOGOUT',
+        version: 'session-v1-logout',
+      })
+    })
+
+    await waitFor(() =>
+      expect(screen.getByTestId('auth-status')).toHaveTextContent(
+        'authenticated',
+      ),
+    )
+    expect(useAuthSessionStore.getState().accessToken).toBe('session-v2-token')
+    expect(queryClient.getQueryData(['private-session-v2'])).toEqual({
+      secret: 'cached',
+    })
+    expect(readSharedState()).toEqual({
+      version: 'session-v2',
+      status: 'active',
+    })
+
+    writeSharedState('session-v2-logout', 'logged-out')
+    act(() => {
+      ManualBroadcastChannel.instance?.deliver({
+        type: 'LOGOUT',
+        version: 'session-v2-logout',
+      })
+    })
+
+    await waitFor(() =>
+      expect(screen.getByTestId('auth-status')).toHaveTextContent(
+        'unauthenticated',
+      ),
+    )
+    expect(useAuthSessionStore.getState().accessToken).toBeNull()
+    expect(queryClient.getQueryData(['private-session-v2'])).toBeUndefined()
+    vi.unstubAllGlobals()
+  })
+
+  it.each(['changing', 'active'] as const)(
+    'keeps session v2 when delayed session v1 %s notification arrives',
+    async (status) => {
+      vi.stubGlobal('BroadcastChannel', ManualBroadcastChannel)
+      window.sessionStorage.setItem(
+        AUTH_SESSION_STORAGE_KEY,
+        'session-v2-token',
+      )
+      window.sessionStorage.setItem(
+        AUTH_SESSION_VERSION_STORAGE_KEY,
+        'session-v2',
+      )
+      writeSharedState('session-v2', 'active')
+      renderAuthTransition(createAuthApi())
+
+      await waitFor(() =>
+        expect(screen.getByTestId('auth-status')).toHaveTextContent(
+          'authenticated',
+        ),
+      )
+      act(() => {
+        ManualBroadcastChannel.instance?.deliver({
+          type: 'SESSION_CHANGED',
+          version: 'session-v1',
+          status,
+        })
+      })
+
+      await waitFor(() =>
+        expect(screen.getByTestId('auth-status')).toHaveTextContent(
+          'authenticated',
+        ),
+      )
+      expect(useAuthSessionStore.getState().accessToken).toBe(
+        'session-v2-token',
+      )
+      expect(readSharedState()).toEqual({
+        version: 'session-v2',
+        status: 'active',
+      })
+      vi.unstubAllGlobals()
+    },
+  )
+
+  it('keeps the current changing session when an old logout arrives', async () => {
+    vi.stubGlobal('BroadcastChannel', ManualBroadcastChannel)
+    const pendingUser = createDeferred<CurrentUser>()
+    const getCurrentUser = vi.fn(() => pendingUser.promise)
+    renderAuthTransition(createAuthApi({ getCurrentUser }))
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'login session B' }))
+    await waitFor(() =>
+      expect(getCurrentUser).toHaveBeenCalledWith('opaque-session-token'),
+    )
+    const changingVersion = useAuthSessionStore.getState().sessionVersion
+    expect(readSharedState()).toEqual({
+      version: changingVersion,
+      status: 'changing',
+    })
+
+    await act(async () => {
+      ManualBroadcastChannel.instance?.deliver({
+        type: 'LOGOUT',
+        version: 'session-v1-logout',
+      })
+      await Promise.resolve()
+    })
+
+    expect(useAuthSessionStore.getState().accessToken).toBe(
+      'opaque-session-token',
+    )
+    expect(useAuthSessionStore.getState().sessionVersion).toBe(changingVersion)
+    expect(readSharedState()).toEqual({
+      version: changingVersion,
+      status: 'changing',
+    })
+
+    await act(async () => {
+      pendingUser.resolve(currentUser)
+      await pendingUser.promise
+    })
+    await waitFor(() =>
+      expect(screen.getByTestId('auth-status')).toHaveTextContent(
+        'authenticated',
+      ),
+    )
+    vi.unstubAllGlobals()
+  })
+
+  it('bootstraps the current shared session despite a delayed old logout', async () => {
+    class BootstrapBroadcastChannel {
+      onmessage: ((event: MessageEvent) => void) | null = null
+
+      postMessage(message: unknown) {
+        const request = message as {
+          type?: string
+          requestId?: string
+          version?: string
+        }
+        if (request.type !== 'REQUEST_SESSION') return
+        queueMicrotask(() => {
+          this.onmessage?.({
+            data: { type: 'LOGOUT', version: 'session-v1-logout' },
+          } as MessageEvent)
+          this.onmessage?.({
+            data: {
+              type: 'PROVIDE_SESSION',
+              requestId: request.requestId,
+              version: request.version,
+              accessToken: 'session-v2-token',
+            },
+          } as MessageEvent)
+        })
+      }
+
+      close() {}
+    }
+    vi.stubGlobal('BroadcastChannel', BootstrapBroadcastChannel)
+    writeSharedState('session-v2', 'active')
+    const getCurrentUser = vi.fn().mockResolvedValue(currentUser)
+    renderAuthTransition(createAuthApi({ getCurrentUser }))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('auth-status')).toHaveTextContent(
+        'authenticated',
+      ),
+    )
+    expect(getCurrentUser).toHaveBeenCalledWith('session-v2-token')
+    expect(useAuthSessionStore.getState().accessToken).toBe('session-v2-token')
+    expect(useAuthSessionStore.getState().sessionVersion).toBe('session-v2')
+    vi.unstubAllGlobals()
+  })
 
   it.each(['resolve', 'reject'] as const)(
     'does not let a local login %s overwrite a remotely advanced version',

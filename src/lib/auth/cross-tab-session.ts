@@ -1,10 +1,16 @@
 export const AUTH_SHARED_STATE_KEY = 'aureole.auth.shared-session'
 export const AUTH_BROADCAST_CHANNEL = 'aureole.auth.session'
+export const AUTH_SHARED_STATE_LOCK = 'aureole.auth.shared-session.lock'
+
+const AUTH_SHARED_STATE_LOCK_TIMEOUT_MS = 1_000
 
 export type SharedSessionState = {
   version: string
   status: 'active' | 'changing' | 'logged-out'
 }
+
+export type SharedStateTransitionResult =
+  'published' | 'conflict' | 'local-only'
 
 type SessionMessage =
   | { type: 'REQUEST_SESSION'; requestId: string; version: string }
@@ -24,6 +30,12 @@ type SessionMessage =
 export interface CrossTabSessionEnvironment {
   storage: Pick<Storage, 'getItem' | 'setItem'> | null
   createChannel: (() => BroadcastChannel) | null
+  requestLock:
+    | (<T>(
+        signal: AbortSignal,
+        callback: () => T | PromiseLike<T>,
+      ) => Promise<T>)
+    | null
   addWindowListener: typeof window.addEventListener
   removeWindowListener: typeof window.removeEventListener
   document: Pick<
@@ -79,10 +91,24 @@ function isSessionMessage(value: unknown): value is SessionMessage {
 
 export function browserCrossTabSessionEnvironment(): CrossTabSessionEnvironment {
   let storage: Storage | null = null
+  let requestLock: CrossTabSessionEnvironment['requestLock'] = null
   try {
     storage = window.localStorage
   } catch {
     // Memory/sessionStorage-only authentication remains available.
+  }
+  try {
+    const locks = navigator.locks
+    if (locks && typeof locks.request === 'function') {
+      requestLock = (signal, callback) =>
+        locks.request(
+          AUTH_SHARED_STATE_LOCK,
+          { mode: 'exclusive', signal },
+          () => callback(),
+        )
+    }
+  } catch {
+    // Cross-tab sharing is disabled when lock arbitration is unavailable.
   }
   return {
     storage,
@@ -90,6 +116,7 @@ export function browserCrossTabSessionEnvironment(): CrossTabSessionEnvironment 
       typeof BroadcastChannel === 'undefined'
         ? null
         : () => new BroadcastChannel(AUTH_BROADCAST_CHANNEL),
+    requestLock,
     addWindowListener: window.addEventListener.bind(window),
     removeWindowListener: window.removeEventListener.bind(window),
     document,
@@ -109,6 +136,7 @@ export class CrossTabSessionCoordinator {
     state: SharedSessionState | null,
   ) => void
   private channel: BroadcastChannel | null = null
+  private sharedCoordinationDisabled = false
   private pending: {
     requestId: string
     version: string
@@ -128,7 +156,9 @@ export class CrossTabSessionCoordinator {
 
   start() {
     try {
-      this.channel = this.environment.createChannel?.() ?? null
+      this.channel = this.hasSharedCoordination()
+        ? (this.environment.createChannel?.() ?? null)
+        : null
       if (this.channel) this.channel.onmessage = this.onMessage
     } catch {
       this.channel = null
@@ -178,45 +208,56 @@ export class CrossTabSessionCoordinator {
   }
 
   publishActiveIfCurrent(version: string) {
-    const snapshot = this.readSharedStateSnapshot()
-    if (
-      snapshot.available &&
-      snapshot.state !== null &&
-      (snapshot.state.version !== version ||
-        snapshot.state.status === 'logged-out')
-    ) {
-      return false
-    }
-    this.publishState({ version, status: 'active' })
-    return true
+    return this.withSharedStateLock(() => {
+      const snapshot = this.readSharedStateSnapshot()
+      if (!snapshot.available) return 'local-only'
+      if (
+        snapshot.state !== null &&
+        (snapshot.state.version !== version ||
+          snapshot.state.status === 'logged-out')
+      ) {
+        return 'conflict'
+      }
+      return this.writeSharedState({ version, status: 'active' })
+    })
   }
 
   publishLogoutIfCurrent(expectedVersion: string, logoutVersion: string) {
-    const snapshot = this.readSharedStateSnapshot()
-    if (
-      snapshot.available &&
-      snapshot.state !== null &&
-      snapshot.state.version !== expectedVersion
-    ) {
-      return false
-    }
-    this.publishState({ version: logoutVersion, status: 'logged-out' })
-    return true
+    return this.withSharedStateLock(() => {
+      const snapshot = this.readSharedStateSnapshot()
+      if (!snapshot.available) return 'local-only'
+      if (
+        snapshot.state !== null &&
+        snapshot.state.version !== expectedVersion
+      ) {
+        return 'conflict'
+      }
+      return this.writeSharedState({
+        version: logoutVersion,
+        status: 'logged-out',
+      })
+    })
   }
 
   private readSharedStateSnapshot(): {
     available: boolean
     state: SharedSessionState | null
   } {
-    if (!this.environment.storage) return { available: false, state: null }
+    const storage = this.environment.storage
+    if (
+      this.sharedCoordinationDisabled ||
+      !storage ||
+      !this.environment.requestLock
+    ) {
+      return { available: false, state: null }
+    }
     try {
       return {
         available: true,
-        state: parseSharedState(
-          this.environment.storage.getItem(AUTH_SHARED_STATE_KEY),
-        ),
+        state: parseSharedState(storage.getItem(AUTH_SHARED_STATE_KEY)),
       }
     } catch {
+      this.disableSharedCoordination()
       return { available: false, state: null }
     }
   }
@@ -226,13 +267,70 @@ export class CrossTabSessionCoordinator {
   }
 
   publishState(state: SharedSessionState) {
+    return this.withSharedStateLock(() => this.writeSharedState(state))
+  }
+
+  private hasSharedCoordination() {
+    return Boolean(
+      !this.sharedCoordinationDisabled &&
+      this.environment.storage &&
+      this.environment.requestLock,
+    )
+  }
+
+  private async withSharedStateLock(
+    callback: () => SharedStateTransitionResult,
+  ): Promise<SharedStateTransitionResult> {
+    const requestLock = this.environment.requestLock
+    if (!this.hasSharedCoordination() || !requestLock) {
+      // localStorage has no cross-tab CAS, so unarbitrated writes stay disabled.
+      return 'local-only'
+    }
+    if (typeof AbortController === 'undefined') {
+      this.disableSharedCoordination()
+      return 'local-only'
+    }
+
+    const controller = new AbortController()
+    const timer = this.environment.setTimeout(
+      () => controller.abort(),
+      AUTH_SHARED_STATE_LOCK_TIMEOUT_MS,
+    )
     try {
-      this.environment.storage?.setItem(
+      const result = await requestLock(controller.signal, callback)
+      if (result === 'local-only') this.disableSharedCoordination()
+      return result
+    } catch {
+      this.disableSharedCoordination()
+      return 'local-only'
+    } finally {
+      this.environment.clearTimeout(timer)
+    }
+  }
+
+  private disableSharedCoordination() {
+    if (this.sharedCoordinationDisabled) return
+    this.sharedCoordinationDisabled = true
+    try {
+      this.channel?.close()
+    } catch {
+      // The local-only fallback does not depend on channel cleanup succeeding.
+    }
+    this.channel = null
+    this.finishPending(null)
+  }
+
+  private writeSharedState(
+    state: SharedSessionState,
+  ): SharedStateTransitionResult {
+    if (!this.environment.storage) return 'local-only'
+    try {
+      this.environment.storage.setItem(
         AUTH_SHARED_STATE_KEY,
         JSON.stringify(state),
       )
     } catch {
-      // Broadcast still provides a best-effort same-runtime boundary.
+      return 'local-only'
     }
     if (state.status === 'logged-out') {
       this.post({ type: 'LOGOUT', version: state.version })
@@ -243,6 +341,7 @@ export class CrossTabSessionCoordinator {
         status: state.status,
       })
     }
+    return 'published'
   }
 
   async requestCurrentSession(timeoutMs = 700) {
@@ -317,14 +416,7 @@ export class CrossTabSessionCoordinator {
       }
       return
     }
-    this.onSharedStateChanged(
-      message.type === 'LOGOUT'
-        ? { version: message.version, status: 'logged-out' }
-        : {
-            version: message.version,
-            status: message.status,
-          },
-    )
+    this.reconcile()
   }
 
   private onStorage = (event: StorageEvent) => {

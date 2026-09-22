@@ -71,3 +71,32 @@ Object.defineProperty(window, 'scrollTo', {
   writable: true,
   value: () => undefined,
 })
+
+const testLockTails = new Map<string, Promise<void>>()
+
+Object.defineProperty(navigator, 'locks', {
+  configurable: true,
+  value: {
+    request: <T>(
+      name: string,
+      options: LockOptions,
+      callback: (lock: Lock) => T | PromiseLike<T>,
+    ) => {
+      const previous = testLockTails.get(name) ?? Promise.resolve()
+      const result = previous.then(() => {
+        if (options.signal?.aborted) {
+          throw new DOMException('Lock request aborted', 'AbortError')
+        }
+        return callback({ name, mode: 'exclusive' } as Lock)
+      })
+      testLockTails.set(
+        name,
+        result.then(
+          () => undefined,
+          () => undefined,
+        ),
+      )
+      return result
+    },
+  },
+})
