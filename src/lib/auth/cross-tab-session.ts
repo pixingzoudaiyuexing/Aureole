@@ -14,7 +14,11 @@ type SessionMessage =
       version: string
       accessToken: string
     }
-  | { type: 'SESSION_CHANGED'; version: string }
+  | {
+      type: 'SESSION_CHANGED'
+      version: string
+      status: 'active' | 'changing'
+    }
   | { type: 'LOGOUT'; version: string }
 
 export interface CrossTabSessionEnvironment {
@@ -59,8 +63,10 @@ function isSessionMessage(value: unknown): value is SessionMessage {
   if (typeof message.type !== 'string' || typeof message.version !== 'string') {
     return false
   }
-  if (message.type === 'SESSION_CHANGED' || message.type === 'LOGOUT')
-    return true
+  if (message.type === 'LOGOUT') return true
+  if (message.type === 'SESSION_CHANGED') {
+    return message.status === 'active' || message.status === 'changing'
+  }
   if (typeof (message as { requestId?: unknown }).requestId !== 'string') {
     return false
   }
@@ -147,12 +153,71 @@ export class CrossTabSessionCoordinator {
   }
 
   readSharedState() {
+    return this.readSharedStateSnapshot().state
+  }
+
+  isSharedActive(version: string) {
+    const snapshot = this.readSharedStateSnapshot()
+    return (
+      snapshot.available &&
+      snapshot.state?.status === 'active' &&
+      snapshot.state.version === version
+    )
+  }
+
+  isVersionCurrent(
+    version: string,
+    allowedStatuses: Array<SharedSessionState['status']>,
+  ) {
+    const snapshot = this.readSharedStateSnapshot()
+    if (!snapshot.available || snapshot.state === null) return true
+    return (
+      snapshot.state.version === version &&
+      allowedStatuses.includes(snapshot.state.status)
+    )
+  }
+
+  publishActiveIfCurrent(version: string) {
+    const snapshot = this.readSharedStateSnapshot()
+    if (
+      snapshot.available &&
+      snapshot.state !== null &&
+      (snapshot.state.version !== version ||
+        snapshot.state.status === 'logged-out')
+    ) {
+      return false
+    }
+    this.publishState({ version, status: 'active' })
+    return true
+  }
+
+  publishLogoutIfCurrent(expectedVersion: string, logoutVersion: string) {
+    const snapshot = this.readSharedStateSnapshot()
+    if (
+      snapshot.available &&
+      snapshot.state !== null &&
+      snapshot.state.version !== expectedVersion
+    ) {
+      return false
+    }
+    this.publishState({ version: logoutVersion, status: 'logged-out' })
+    return true
+  }
+
+  private readSharedStateSnapshot(): {
+    available: boolean
+    state: SharedSessionState | null
+  } {
+    if (!this.environment.storage) return { available: false, state: null }
     try {
-      return parseSharedState(
-        this.environment.storage?.getItem(AUTH_SHARED_STATE_KEY) ?? null,
-      )
+      return {
+        available: true,
+        state: parseSharedState(
+          this.environment.storage.getItem(AUTH_SHARED_STATE_KEY),
+        ),
+      }
     } catch {
-      return null
+      return { available: false, state: null }
     }
   }
 
@@ -169,10 +234,15 @@ export class CrossTabSessionCoordinator {
     } catch {
       // Broadcast still provides a best-effort same-runtime boundary.
     }
-    this.post({
-      type: state.status === 'logged-out' ? 'LOGOUT' : 'SESSION_CHANGED',
-      version: state.version,
-    })
+    if (state.status === 'logged-out') {
+      this.post({ type: 'LOGOUT', version: state.version })
+    } else {
+      this.post({
+        type: 'SESSION_CHANGED',
+        version: state.version,
+        status: state.status,
+      })
+    }
   }
 
   async requestCurrentSession(timeoutMs = 700) {
@@ -247,7 +317,14 @@ export class CrossTabSessionCoordinator {
       }
       return
     }
-    this.reconcile()
+    this.onSharedStateChanged(
+      message.type === 'LOGOUT'
+        ? { version: message.version, status: 'logged-out' }
+        : {
+            version: message.version,
+            status: message.status,
+          },
+    )
   }
 
   private onStorage = (event: StorageEvent) => {

@@ -55,6 +55,39 @@ describe('Auth session isolation', () => {
     expect(useAuthSessionStore.getState().accessToken).toBe('session-b-token')
   })
 
+  it('does not attribute a newly-started old-token request to the current session', async () => {
+    const client = createApiClient({
+      baseUrl: 'https://gateway.example',
+      fetchImpl: vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            ok: false,
+            error: { code: 'AUTH_FAILED', message: 'Authentication failed' },
+          }),
+          { status: 401, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    })
+    useAuthSessionStore.setState({
+      accessToken: 'session-b-token',
+      sessionVersion: 'session-b',
+      generation: 2,
+      hydrated: true,
+      validated: true,
+    })
+
+    const error = await client
+      .authenticatedRequest('/api/v1/me', {
+        method: 'GET',
+        accessToken: 'session-a-token',
+      })
+      .catch((caught) => caught)
+
+    expect(error).toMatchObject({ code: 'AUTH_FAILED' })
+    expect(isErrorFromCurrentAuthSession(error)).toBe(false)
+    expect(useAuthSessionStore.getState().accessToken).toBe('session-b-token')
+  })
+
   it('keeps a detached old query result out of a recreated private key', async () => {
     const client = new QueryClient()
     const oldResult = deferred<{ owner: string }>()

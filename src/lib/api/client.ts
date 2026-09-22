@@ -206,7 +206,10 @@ export function createApiClient({
     path: string,
     { accessToken, ...options }: AuthenticatedApiRequestOptions,
   ) {
-    const identity = captureAuthSessionIdentity()
+    const identity = {
+      ...captureAuthSessionIdentity(),
+      accessToken,
+    }
     return executeRequest<T>(path, options, accessToken).catch((error) => {
       tagErrorWithAuthSession(error, identity)
       throw error

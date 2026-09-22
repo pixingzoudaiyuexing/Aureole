@@ -74,6 +74,7 @@ export function isCurrentAuthSessionGeneration(generation: number) {
 }
 
 export interface AuthSessionIdentity {
+  accessToken: string | null
   generation: number
   sessionVersion: string | null
 }
@@ -83,6 +84,7 @@ const authErrorIdentity = new WeakMap<object, AuthSessionIdentity>()
 export function captureAuthSessionIdentity(): AuthSessionIdentity {
   const state = useAuthSessionStore.getState()
   return {
+    accessToken: state.accessToken,
     generation: state.generation,
     sessionVersion: state.sessionVersion,
   }
@@ -103,7 +105,13 @@ export function isErrorFromCurrentAuthSession(error: unknown) {
   if (!identity) return true
   const current = captureAuthSessionIdentity()
   return (
+    identity.accessToken === current.accessToken &&
     identity.generation === current.generation &&
     identity.sessionVersion === current.sessionVersion
   )
+}
+
+export function getErrorAuthSessionIdentity(error: unknown) {
+  if (typeof error !== 'object' || error === null) return undefined
+  return authErrorIdentity.get(error)
 }

@@ -44,8 +44,10 @@ afterEach(() => {
   resetSessionSafetyRuntimeForTests()
   useAuthSessionStore.setState({
     accessToken: null,
+    sessionVersion: null,
     generation: 0,
     hydrated: false,
+    validated: false,
   })
   document.documentElement.classList.remove('dark')
   document.documentElement.style.colorScheme = ''
