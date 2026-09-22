@@ -1,5 +1,9 @@
 import { ApiError } from './errors'
 import { isApiFailure, isApiSuccess } from './envelope'
+import {
+  captureAuthSessionIdentity,
+  tagErrorWithAuthSession,
+} from '@/lib/auth/session-store'
 
 export interface ApiRequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown
@@ -202,7 +206,11 @@ export function createApiClient({
     path: string,
     { accessToken, ...options }: AuthenticatedApiRequestOptions,
   ) {
-    return executeRequest<T>(path, options, accessToken)
+    const identity = captureAuthSessionIdentity()
+    return executeRequest<T>(path, options, accessToken).catch((error) => {
+      tagErrorWithAuthSession(error, identity)
+      throw error
+    })
   }
 
   return { authenticatedRequest, request }

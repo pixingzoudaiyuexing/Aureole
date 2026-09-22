@@ -19,7 +19,11 @@ import { referralsApi } from '@/features/referrals/referrals-api'
 import { referralsQueryKeys } from '@/features/referrals/referrals-queries'
 import { walletApi } from '@/features/wallet/wallet-api'
 import { ApiError } from '@/lib/api/errors'
-import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
+import {
+  AUTH_SESSION_STORAGE_KEY,
+  AUTH_SESSION_VERSION_STORAGE_KEY,
+} from '@/lib/auth/credential-storage'
+import { AUTH_SHARED_STATE_KEY } from '@/lib/auth/cross-tab-session'
 
 const overview = {
   codes: [{ code: 'OLD1', createdAt: '2026-09-14T01:00:00.000Z' }],
@@ -69,6 +73,14 @@ function installMocks() {
 
 function renderReferrals(queryClient: QueryClient = createQueryClient()) {
   window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'referral-token')
+  window.sessionStorage.setItem(
+    AUTH_SESSION_VERSION_STORAGE_KEY,
+    'referral-session',
+  )
+  window.localStorage.setItem(
+    AUTH_SHARED_STATE_KEY,
+    JSON.stringify({ version: 'referral-session', status: 'active' }),
+  )
   queryClient.setQueryData(['private-state'], 'clear-me')
   const authApi: AuthApi = {
     login: vi.fn(),

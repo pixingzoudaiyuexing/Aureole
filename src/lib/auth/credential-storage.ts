@@ -1,4 +1,5 @@
 export const AUTH_SESSION_STORAGE_KEY = 'aureole.auth.access-token'
+export const AUTH_SESSION_VERSION_STORAGE_KEY = 'aureole.auth.session-version'
 
 export function readSessionCredential() {
   try {
@@ -20,6 +21,31 @@ export function writeSessionCredential(accessToken: string) {
 export function clearSessionCredential() {
   try {
     window.sessionStorage.removeItem(AUTH_SESSION_STORAGE_KEY)
+  } catch {
+    // Memory state is still cleared by the caller when storage is unavailable.
+  }
+}
+
+export function readSessionVersion() {
+  try {
+    return window.sessionStorage.getItem(AUTH_SESSION_VERSION_STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function writeSessionVersion(version: string) {
+  try {
+    window.sessionStorage.setItem(AUTH_SESSION_VERSION_STORAGE_KEY, version)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function clearSessionVersion() {
+  try {
+    window.sessionStorage.removeItem(AUTH_SESSION_VERSION_STORAGE_KEY)
   } catch {
     // Memory state is still cleared by the caller when storage is unavailable.
   }
