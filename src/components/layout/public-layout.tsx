@@ -2,6 +2,7 @@ import { Link, Outlet } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { Brand } from '@/components/layout/brand'
 import { ThemeToggle } from '@/components/layout/theme-toggle'
+import { AnnouncementsSurface } from '@/features/announcements/announcements-surface'
 import { useRuntimeSettings } from '@/features/runtime-settings/runtime-settings-context'
 
 export function PublicLayout() {
@@ -33,6 +34,7 @@ export function PublicLayout() {
           </Link>
           <ThemeToggle />
         </header>
+        <AnnouncementsSurface />
         <div className="flex flex-1 items-center-safe justify-center px-5 py-12 sm:px-8">
           <Outlet />
         </div>

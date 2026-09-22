@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { getNavigationPageTitle } from '@/config/navigation'
 import { AccountSummary } from '@/features/auth/account-summary'
+import { AnnouncementsSurface } from '@/features/announcements/announcements-surface'
 import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invalid-session-error'
 import { useCustomPages } from '@/features/custom-pages/custom-pages-queries'
 import { isCustomPageRoutePath } from '@/features/custom-pages/custom-pages-routing'
@@ -78,6 +79,7 @@ export function AppShell() {
           </h1>
           <ThemeToggle />
         </header>
+        <AnnouncementsSurface />
 
         <main
           data-layout={customPageLayout ? 'custom-page' : 'standard'}
