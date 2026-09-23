@@ -83,9 +83,59 @@ describe('Cookie session UI', () => {
       expect(screen.getByTestId('status')).toHaveTextContent('authenticated'),
     )
     expect(screen.getByTestId('user')).toHaveTextContent(member.email)
-    expect(getCurrentUser).toHaveBeenCalledWith('')
+    expect(getCurrentUser).toHaveBeenCalledExactlyOnceWith('')
     expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
     expect(useAuthSessionStore.getState().accessToken).not.toBe('old-bearer')
+  })
+
+  it('rechecks both versions after a cross-tab change interrupts cold restore', async () => {
+    class TestChannel {
+      onmessage: (() => void) | null = null
+      postMessage() {}
+      close() {}
+    }
+    const channels: TestChannel[] = []
+    vi.stubGlobal(
+      'BroadcastChannel',
+      class extends TestChannel {
+        constructor() {
+          super()
+          channels.push(this)
+        }
+      },
+    )
+    const old = deferred<CurrentUser>()
+    const current = {
+      ...member,
+      sessionVersion: '11111111-1111-4111-8111-111111111111',
+    }
+    const changed = {
+      ...other,
+      sessionVersion: '22222222-2222-4222-8222-222222222222',
+    }
+    const getCurrentUser = vi
+      .fn()
+      .mockImplementationOnce(() => old.promise)
+      .mockResolvedValueOnce(current)
+      .mockResolvedValueOnce(changed)
+      .mockResolvedValue(changed)
+    const { queryClient } = renderSession({ login: vi.fn(), getCurrentUser })
+    await waitFor(() => expect(getCurrentUser).toHaveBeenCalledTimes(1))
+    await act(async () => channels[0]?.onmessage?.())
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('error'),
+    )
+    expect(getCurrentUser).toHaveBeenCalledTimes(3)
+    expect(queryClient.getQueryData(authQueryKeys.me)).toBeUndefined()
+    await act(async () => {
+      old.resolve(member)
+      await old.promise
+    })
+    expect(screen.getByTestId('user')).toHaveTextContent('none')
+    await userEvent.setup().click(screen.getByRole('button', { name: 'retry' }))
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(changed.email),
+    )
   })
 
   it('isolates private Query and preserves tab-local financial uncertainty on account switch', async () => {
@@ -166,7 +216,7 @@ describe('Cookie session UI', () => {
       { queryKey: authQueryKeys.me, exact: true, type: 'active' },
       { cancelRefetch: false },
     )
-    await waitFor(() => expect(getCurrentUser).toHaveBeenCalledTimes(3))
+    await waitFor(() => expect(getCurrentUser).toHaveBeenCalledTimes(2))
     await userEvent.setup().click(screen.getByRole('button', { name: 'login' }))
     await waitFor(() =>
       expect(screen.getByTestId('user')).toHaveTextContent(other.email),
@@ -457,7 +507,7 @@ describe('Cookie session UI', () => {
     queryClient.setQueryData(['private'], { email: member.email })
     fail = true
     act(() => window.dispatchEvent(new Event('focus')))
-    await waitFor(() => expect(getCurrentUser).toHaveBeenCalledTimes(3))
+    await waitFor(() => expect(getCurrentUser).toHaveBeenCalledTimes(2))
     expect(screen.getByTestId('status')).toHaveTextContent('authenticated')
     expect(screen.getByTestId('user')).toHaveTextContent(member.email)
     expect(useAuthSessionStore.getState().accessToken).toBe(identity)
@@ -498,12 +548,14 @@ describe('Cookie session UI', () => {
       ...other,
       sessionVersion: '22222222-2222-4222-8222-222222222222',
     }
-    const getCurrentUser = vi
-      .fn()
-      .mockResolvedValueOnce(first)
-      .mockResolvedValue(second)
+    const getCurrentUser = vi.fn().mockResolvedValue(first)
     const { queryClient } = renderSession({ login: vi.fn(), getCurrentUser })
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('authenticated'),
+    )
     queryClient.setQueryData(['private'], { owner: first.email })
+    getCurrentUser.mockResolvedValueOnce(first).mockResolvedValue(second)
+    await userEvent.setup().click(screen.getByRole('button', { name: 'retry' }))
     await waitFor(() =>
       expect(screen.getByTestId('status')).toHaveTextContent('error'),
     )

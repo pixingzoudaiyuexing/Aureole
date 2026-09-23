@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
-import { LoaderCircle, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { Brand } from '@/components/layout/brand'
 import { Button } from '@/components/ui/button'
 import { useAuth } from './auth-context'
@@ -7,17 +7,25 @@ import { getBootstrapErrorMessage } from './auth-errors'
 
 export function AuthBootstrapScreen() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-6">
-      <section className="text-center" aria-live="polite" aria-busy="true">
-        <Brand className="justify-center" />
-        <LoaderCircle
-          className="mx-auto mt-8 size-5 animate-spin text-primary"
+    <div
+      className="min-h-screen bg-background"
+      role="status"
+      aria-label="页面加载中"
+      aria-busy="true"
+    >
+      <div className="flex h-16 items-center border-b border-border px-4 sm:px-6">
+        <Brand />
+      </div>
+      <main className="mx-auto w-full max-w-[82rem] px-4 py-8 sm:px-6 sm:py-10 lg:px-10">
+        <div className="h-7 w-28 rounded bg-muted" aria-hidden="true" />
+        <div className="mt-8 h-px bg-border" aria-hidden="true" />
+        <div className="mt-8 h-4 w-40 rounded bg-muted" aria-hidden="true" />
+        <div
+          className="mt-4 h-4 w-full max-w-md rounded bg-muted"
           aria-hidden="true"
         />
-        <h1 className="mt-4 text-base font-semibold">正在验证登录状态</h1>
-        <p className="mt-1 text-sm text-muted-foreground">请稍候。</p>
-      </section>
-    </main>
+      </main>
+    </div>
   )
 }
 
