@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { onRequest } from '../../functions/api/v1/[[path]]'
 import {
   COOKIE_NAME,
+  FAMILY_COOKIE_NAME,
   type SessionDatabase,
 } from '../../functions/api/v1/session'
 
@@ -747,19 +748,131 @@ describe('fixed-cookie server session protocol', () => {
     expect(fetchImpl).not.toHaveBeenCalled()
   })
 
-  it('rejects old cookies for optional auth without silently degrading to anonymous', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockImplementation((url: URL, init: RequestInit) => {
+  it('keeps public announcements available after logout without restoring old private access', async () => {
+    const upstreamFetch = vi
+      .fn()
+      .mockImplementation((url: URL, init: RequestInit) => {
         const path = new URL(String(url)).pathname
         if (path.endsWith('/auth/login')) return loginResponse('member')
-        if (path.endsWith('/announcements'))
-          return new Response(JSON.stringify({ ok: true, data: { items: [] } }))
+        if (path.endsWith('/announcements')) {
+          const authorization = new Headers(init.headers).get('authorization')
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              data: {
+                items: [
+                  {
+                    id: authorization ? 'private' : 'public',
+                    title: 'Notice',
+                    body: 'Safe',
+                  },
+                ],
+              },
+            }),
+          )
+        }
         return userResponse(
           new Headers(init.headers).get('authorization')!.slice(7),
         )
-      }),
+      })
+    vi.stubGlobal('fetch', upstreamFetch)
+    const jar = new Map<string, string>()
+    const anonymous = await onRequest({
+      request: request('announcements', jar),
+      env,
+    })
+    expect((await anonymous.json()).data.items[0].id).toBe('public')
+    applyResponse(
+      jar,
+      await onRequest({ request: request('auth/browser', jar), env }),
     )
+    applyResponse(
+      jar,
+      await onRequest({ request: request('auth/login', jar, 'POST'), env }),
+    )
+    const oldJar = new Map(jar)
+    const authenticated = await onRequest({
+      request: request('announcements', jar),
+      env,
+    })
+    expect((await authenticated.json()).data.items[0].id).toBe('private')
+    const logout = await onRequest({
+      request: request('auth/logout', jar, 'POST'),
+      env,
+    })
+    applyResponse(jar, logout)
+    expect(logout.headers.getSetCookie()).toEqual([])
+    expect(jar.get(COOKIE_NAME)).toBe(oldJar.get(COOKIE_NAME))
+    const loggedOut = await onRequest({
+      request: request('announcements', jar),
+      env,
+    })
+    expect(loggedOut.status).toBe(200)
+    expect((await loggedOut.json()).data.items[0].id).toBe('public')
+    expect(
+      (await onRequest({ request: request('wallet', oldJar), env })).status,
+    ).toBe(401)
+    expect(
+      (await onRequest({ request: request('auth/session', oldJar), env }))
+        .status,
+    ).toBe(401)
+    const announcementCalls = upstreamFetch.mock.calls.filter(([url]) =>
+      new URL(String(url)).pathname.endsWith('/announcements'),
+    )
+    expect(
+      announcementCalls.map(([, init]) =>
+        new Headers(init.headers).get('authorization'),
+      ),
+    ).toEqual([null, 'Bearer member', null])
+  })
+
+  it('does not downgrade optional reads when session storage is unavailable', async () => {
+    const upstreamFetch = vi.fn()
+    vi.stubGlobal('fetch', upstreamFetch)
+    const unavailableEnv = {
+      ...env,
+      AUREOLE_SESSION_DB: undefined,
+    }
+    const staleJar = new Map([
+      [COOKIE_NAME, 'a'.repeat(43)],
+      [FAMILY_COOKIE_NAME, 'b'.repeat(43)],
+    ])
+    const response = await onRequest({
+      request: request('announcements', staleJar),
+      env: unavailableEnv,
+    })
+    expect(response.status).toBe(503)
+    expect((await response.json()).error.code).toBe('SESSION_UNAVAILABLE')
+    expect(upstreamFetch).not.toHaveBeenCalled()
+  })
+
+  it('keeps a newer account after a delayed logout while isolating the old announcement identity', async () => {
+    let logins = 0
+    const upstreamFetch = vi
+      .fn()
+      .mockImplementation((url: URL, init: RequestInit) => {
+        const path = new URL(String(url)).pathname
+        if (path.endsWith('/auth/login'))
+          return loginResponse(`user-${++logins}`)
+        const authorization = new Headers(init.headers).get('authorization')
+        if (path.endsWith('/announcements'))
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              data: {
+                items: [
+                  {
+                    id: authorization ?? 'public',
+                    title: 'Notice',
+                    body: 'Safe',
+                  },
+                ],
+              },
+            }),
+          )
+        return userResponse(authorization!.slice(7))
+      })
+    vi.stubGlobal('fetch', upstreamFetch)
     const jar = new Map<string, string>()
     applyResponse(
       jar,
@@ -770,15 +883,29 @@ describe('fixed-cookie server session protocol', () => {
       await onRequest({ request: request('auth/login', jar, 'POST'), env }),
     )
     const oldJar = new Map(jar)
-    await onRequest({ request: request('auth/logout', jar, 'POST'), env })
+    const logout = await onRequest({
+      request: request('auth/logout', oldJar, 'POST'),
+      env,
+    })
+    applyResponse(
+      jar,
+      await onRequest({ request: request('auth/login', jar, 'POST'), env }),
+    )
+    applyResponse(jar, logout)
+    const current = await onRequest({
+      request: request('announcements', jar),
+      env,
+    })
+    expect((await current.json()).data.items[0].id).toBe('Bearer user-2')
+    const replay = await onRequest({
+      request: request('announcements', oldJar),
+      env,
+    })
+    expect((await replay.json()).data.items[0].id).toBe('public')
     expect(
-      (await onRequest({ request: request('announcements', oldJar), env }))
-        .status,
+      (await onRequest({ request: request('wallet', oldJar), env })).status,
     ).toBe(401)
-    expect(
-      (await onRequest({ request: request('announcements', new Map()), env }))
-        .status,
-    ).toBe(200)
+    expect(logout.headers.getSetCookie()).toEqual([])
   })
 
   it('passes subscription URL credentials through without browser session authorization', async () => {
