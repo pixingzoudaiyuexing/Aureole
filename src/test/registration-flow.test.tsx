@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppProviders } from '@/app/providers/app-providers'
 import { createQueryClient } from '@/app/providers/query-client'
 import { createAppRouter } from '@/app/router/router'
@@ -30,10 +30,26 @@ const currentUser: CurrentUser = {
   status: 'active',
 }
 
+let registered = false
+
+beforeEach(() => {
+  registered = false
+})
+
 function createAuthApi(overrides: Partial<AuthApi> = {}): AuthApi {
   return {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue(currentUser),
+    getCurrentUser: vi.fn(() =>
+      registered
+        ? Promise.resolve(currentUser)
+        : Promise.reject(
+            new ApiError({
+              status: 401,
+              code: 'AUTH_REQUIRED',
+              message: 'Authentication required',
+            }),
+          ),
+    ),
     ...overrides,
   }
 }
@@ -42,7 +58,18 @@ function renderRegistration(
   config: OnboardingConfig,
   authApi = createAuthApi(),
 ) {
+  registered = false
   vi.spyOn(publicAccountApi, 'getOnboardingConfig').mockResolvedValue(config)
+  const register = publicAccountApi.register
+  if (vi.isMockFunction(register)) {
+    register.mockImplementationOnce(
+      async (...args: Parameters<typeof register>) => {
+        const result = await register.getMockImplementation()?.(...args)
+        registered = true
+        return result ?? currentUser
+      },
+    )
+  }
   const router = createAppRouter({ initialEntries: ['/register'] })
   render(
     <AppProviders
@@ -92,12 +119,19 @@ describe('Registration flow', () => {
   it('registers without optional requirements and reuses Session Core', async () => {
     const registerUser = vi
       .spyOn(publicAccountApi, 'register')
-      .mockResolvedValue({
-        accessToken: 'registered-token',
-        tokenType: 'Bearer',
-      })
+      .mockResolvedValue(currentUser)
     vi.spyOn(publicAccountApi, 'sendEmailCode')
-    const getCurrentUser = vi.fn().mockResolvedValue(currentUser)
+    const getCurrentUser = vi.fn(() =>
+      registered
+        ? Promise.resolve(currentUser)
+        : Promise.reject(
+            new ApiError({
+              status: 401,
+              code: 'AUTH_REQUIRED',
+              message: 'Authentication required',
+            }),
+          ),
+    )
     const router = renderRegistration(
       disabledConfig,
       createAuthApi({ getCurrentUser }),
@@ -114,20 +148,15 @@ describe('Registration flow', () => {
       email: 'member@example.com',
       password: 'password123',
     })
-    expect(getCurrentUser).toHaveBeenCalledWith('registered-token')
-    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-      'registered-token',
-    )
+    expect(getCurrentUser).toHaveBeenCalledWith('')
+    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
     expect(document.getElementById('aureole-recaptcha-v2-script')).toBeNull()
   })
 
   it('sends an optional invite code without making it required', async () => {
     const registerUser = vi
       .spyOn(publicAccountApi, 'register')
-      .mockResolvedValue({
-        accessToken: 'registered-token',
-        tokenType: 'Bearer',
-      })
+      .mockResolvedValue(currentUser)
     const router = renderRegistration(disabledConfig)
     const user = userEvent.setup()
 
@@ -149,10 +178,7 @@ describe('Registration flow', () => {
   it('requires configured invite and local terms confirmation without sending terms state', async () => {
     const registerUser = vi
       .spyOn(publicAccountApi, 'register')
-      .mockResolvedValue({
-        accessToken: 'registered-token',
-        tokenType: 'Bearer',
-      })
+      .mockResolvedValue(currentUser)
     const config: OnboardingConfig = {
       ...disabledConfig,
       termsUrl: 'https://legal.example/terms',
@@ -251,10 +277,7 @@ describe('Registration flow', () => {
       .mockResolvedValue({ sent: true as const })
     const registerUser = vi
       .spyOn(publicAccountApi, 'register')
-      .mockResolvedValue({
-        accessToken: 'registered-token',
-        tokenType: 'Bearer',
-      })
+      .mockResolvedValue(currentUser)
     const router = renderRegistration({
       ...disabledConfig,
       emailVerificationRequired: true,
@@ -384,7 +407,13 @@ describe('Registration flow', () => {
           requestId: 'req-register',
         }),
       )
-    const getCurrentUser = vi.fn()
+    const getCurrentUser = vi.fn().mockRejectedValue(
+      new ApiError({
+        status: 401,
+        code: 'AUTH_REQUIRED',
+        message: 'Authentication required',
+      }),
+    )
     renderRegistration(disabledConfig, createAuthApi({ getCurrentUser }))
     const user = userEvent.setup()
 
@@ -398,15 +427,12 @@ describe('Registration flow', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('请求编号：req-register')).toBeInTheDocument()
     expect(registerUser).toHaveBeenCalledOnce()
-    expect(getCurrentUser).not.toHaveBeenCalled()
+    expect(getCurrentUser).toHaveBeenCalledTimes(1)
     expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
   })
 
   it('prevents duplicate Register submission while pending', async () => {
-    let resolveRegister!: (value: {
-      accessToken: string
-      tokenType: 'Bearer'
-    }) => void
+    let resolveRegister!: (value: CurrentUser) => void
     const registerUser = vi
       .spyOn(publicAccountApi, 'register')
       .mockImplementation(
@@ -426,15 +452,12 @@ describe('Registration flow', () => {
     await user.click(pending)
     expect(registerUser).toHaveBeenCalledOnce()
 
-    resolveRegister({ accessToken: 'registered-token', tokenType: 'Bearer' })
+    resolveRegister(currentUser)
     await screen.findAllByRole('heading', { name: 'Overview' })
   })
 
   it('starts only one Register request for same-tick submissions', async () => {
-    const deferred = createDeferred<{
-      accessToken: string
-      tokenType: 'Bearer'
-    }>()
+    const deferred = createDeferred<CurrentUser>()
     const registerUser = vi
       .spyOn(publicAccountApi, 'register')
       .mockImplementation(() => deferred.promise)
@@ -451,7 +474,7 @@ describe('Registration flow', () => {
     })
 
     await waitFor(() => expect(registerUser).toHaveBeenCalledTimes(1))
-    deferred.resolve({ accessToken: 'registered-token', tokenType: 'Bearer' })
+    deferred.resolve(currentUser)
   })
 
   it('starts only one email-code request for same-tick actions', async () => {
@@ -479,10 +502,7 @@ describe('Registration flow', () => {
   it('allows only one same-tick cross-action to consume a challenge', async () => {
     const { api, getOptions } = installRecaptchaMock()
     const emailDeferred = createDeferred<{ sent: true }>()
-    const registerDeferred = createDeferred<{
-      accessToken: string
-      tokenType: 'Bearer'
-    }>()
+    const registerDeferred = createDeferred<CurrentUser>()
     const sendEmailCode = vi
       .spyOn(publicAccountApi, 'sendEmailCode')
       .mockImplementation(() => emailDeferred.promise)
@@ -527,9 +547,6 @@ describe('Registration flow', () => {
     expect(tokens).toEqual(['same-tick-challenge'])
 
     emailDeferred.resolve({ sent: true })
-    registerDeferred.resolve({
-      accessToken: 'registered-token',
-      tokenType: 'Bearer',
-    })
+    registerDeferred.resolve(currentUser)
   })
 })

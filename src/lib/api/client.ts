@@ -80,10 +80,13 @@ export function createApiClient({
     options: ApiRequestOptions,
     accessToken?: string,
   ) {
-    // Optionally retain raw check
     assertPublicApiPath(path)
 
-    if (!resolvedBaseUrl) {
+    if (
+      !resolvedBaseUrl ||
+      (typeof window !== 'undefined' &&
+        resolvedBaseUrl !== window.location.origin)
+    ) {
       throw new ApiError({
         status: 0,
         code: 'API_BASE_URL_MISSING',
@@ -137,7 +140,6 @@ export function createApiClient({
           message: 'Authentication required',
         })
       }
-      headers.set('authorization', `Bearer ${accessToken}`)
     }
 
     let body: BodyInit | undefined
@@ -153,6 +155,7 @@ export function createApiClient({
         headers,
         body,
         redirect: 'error',
+        credentials: 'same-origin',
       })
     } catch (cause) {
       throw new ApiError({
@@ -210,10 +213,32 @@ export function createApiClient({
       ...captureAuthSessionIdentity(),
       accessToken,
     }
-    return executeRequest<T>(path, options, accessToken).catch((error) => {
-      tagErrorWithAuthSession(error, identity)
-      throw error
-    })
+    const assertCurrent = () => {
+      const current = captureAuthSessionIdentity()
+      if (
+        identity.generation !== current.generation ||
+        identity.accessToken !== current.accessToken
+      ) {
+        const stale = new ApiError({
+          status: 0,
+          code: 'STALE_SESSION',
+          message: 'Session changed during request',
+        })
+        tagErrorWithAuthSession(stale, identity)
+        throw stale
+      }
+    }
+    return executeRequest<T>(path, options, accessToken).then(
+      (data) => {
+        assertCurrent()
+        return data
+      },
+      (error) => {
+        assertCurrent()
+        tagErrorWithAuthSession(error, identity)
+        throw error
+      },
+    )
   }
 
   return { authenticatedRequest, request }

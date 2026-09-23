@@ -56,16 +56,28 @@ function installMocks() {
   return { create, getDetail, getList }
 }
 
-function renderSupport(queryClient: QueryClient = createQueryClient()) {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'ticket-token')
+function renderSupport(
+  queryClient: QueryClient = createQueryClient(),
+  session = { current: true },
+) {
   queryClient.setQueryData(['private-state'], 'clear-me')
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue({
-      email: 'member@example.com',
-      expiresAt: null,
-      status: 'active',
-    }),
+    getCurrentUser: vi.fn().mockImplementation(() =>
+      session.current
+        ? Promise.resolve({
+            email: 'member@example.com',
+            expiresAt: null,
+            status: 'active',
+          })
+        : Promise.reject(
+            new ApiError({
+              status: 401,
+              code: 'AUTH_REQUIRED',
+              message: 'private auth',
+            }),
+          ),
+    ),
   }
   const router = createAppRouter({ initialEntries: ['/support'] })
   const rendered = render(
@@ -186,9 +198,9 @@ describe('Create Support Ticket form', () => {
     const mocks = installMocks()
     const list = deferred<(typeof ticket)[]>()
     mocks.getList.mockReturnValue(list.promise)
-    const queryClient = createQueryClient()
+    const { queryClient } = renderSupport()
+    await screen.findByRole('button', { name: '新建工单' })
     queryClient.setQueryData(ticketsQueryKeys.list, [ticket], { updatedAt: 0 })
-    renderSupport(queryClient)
 
     expect(await screen.findByText('Existing ticket')).toBeInTheDocument()
     const createButton = screen.getByRole('button', { name: '新建工单' })
@@ -207,9 +219,9 @@ describe('Create Support Ticket form', () => {
       message: 'private list error',
     })
     mocks.getList.mockRejectedValue(listError)
-    const queryClient = createQueryClient()
+    const { queryClient } = renderSupport()
+    await screen.findByRole('button', { name: '新建工单' })
     queryClient.setQueryData(ticketsQueryKeys.list, [ticket], { updatedAt: 0 })
-    renderSupport(queryClient)
 
     expect(await screen.findByText('Existing ticket')).toBeInTheDocument()
     const createButton = screen.getByRole('button', { name: '新建工单' })
@@ -396,9 +408,7 @@ describe('Create Support Ticket definitive errors', () => {
     expect(screen.queryByText(/一定|已有未关闭工单/)).toBeNull()
     expect(mocks.create).toHaveBeenCalledOnce()
     expect(mocks.getList).toHaveBeenCalledTimes(2)
-    expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-      'ticket-token',
-    )
+    expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
     expect(screen.getByRole('button', { name: '新建工单' })).toBeEnabled()
   })
 
@@ -499,9 +509,7 @@ describe('Create Support Ticket definitive errors', () => {
     expect(form.message).toBeEnabled()
     expect(mocks.create).toHaveBeenCalledOnce()
     expect(mocks.getList).toHaveBeenCalledOnce()
-    expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-      'ticket-token',
-    )
+    expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
 
     await form.user.type(form.subject, ' corrected')
     expect(mocks.create).toHaveBeenCalledOnce()
@@ -775,10 +783,17 @@ describe('Create Support Ticket Auth invalidation', () => {
     'exits the session after Create POST %s',
     async (code) => {
       const mocks = installMocks()
-      mocks.create.mockRejectedValue(
-        new ApiError({ status: 401, code, message: 'private auth' }),
+      const session = { current: true }
+      mocks.create.mockImplementation(() => {
+        session.current = false
+        return Promise.reject(
+          new ApiError({ status: 401, code, message: 'private auth' }),
+        )
+      })
+      const { queryClient, router } = renderSupport(
+        createQueryClient(),
+        session,
       )
-      const { queryClient, router } = renderSupport()
       const form = await openCreate()
       await fillCreate(form)
       await submitCreate(form)
@@ -795,6 +810,7 @@ describe('Create Support Ticket Auth invalidation', () => {
     'exits the session when %s reconciliation List returns AUTH_FAILED',
     async (kind) => {
       const mocks = installMocks()
+      const session = { current: true }
       if (kind === 'unavailable') {
         mocks.create.mockRejectedValue(
           new ApiError({
@@ -809,14 +825,20 @@ describe('Create Support Ticket Auth invalidation', () => {
       mocks.getList
         .mockReset()
         .mockResolvedValueOnce([ticket])
-        .mockRejectedValueOnce(
-          new ApiError({
-            status: 401,
-            code: 'AUTH_FAILED',
-            message: 'private auth',
-          }),
-        )
-      const { queryClient, router } = renderSupport()
+        .mockImplementationOnce(() => {
+          session.current = false
+          return Promise.reject(
+            new ApiError({
+              status: 401,
+              code: 'AUTH_FAILED',
+              message: 'private auth',
+            }),
+          )
+        })
+      const { queryClient, router } = renderSupport(
+        createQueryClient(),
+        session,
+      )
       const form = await openCreate()
       await fillCreate(form)
       await submitCreate(form)
@@ -831,6 +853,7 @@ describe('Create Support Ticket Auth invalidation', () => {
 
   it('exits the session when manual List recovery returns AUTH_REQUIRED', async () => {
     const mocks = installMocks()
+    const session = { current: true }
     const recoveryError = new ApiError({
       status: 502,
       code: 'UPSTREAM_ERROR',
@@ -842,14 +865,17 @@ describe('Create Support Ticket Auth invalidation', () => {
       .mockResolvedValueOnce([ticket])
       .mockRejectedValueOnce(recoveryError)
       .mockRejectedValueOnce(recoveryError)
-      .mockRejectedValueOnce(
-        new ApiError({
-          status: 401,
-          code: 'AUTH_REQUIRED',
-          message: 'private auth',
-        }),
-      )
-    const { queryClient, router } = renderSupport()
+      .mockImplementationOnce(() => {
+        session.current = false
+        return Promise.reject(
+          new ApiError({
+            status: 401,
+            code: 'AUTH_REQUIRED',
+            message: 'private auth',
+          }),
+        )
+      })
+    const { queryClient, router } = renderSupport(createQueryClient(), session)
     const form = await openCreate()
     await fillCreate(form)
     await submitCreate(form)

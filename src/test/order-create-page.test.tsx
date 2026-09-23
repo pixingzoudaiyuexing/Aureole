@@ -18,6 +18,7 @@ import { ordersApi } from '@/features/orders/orders-api'
 import { promotionsApi } from '@/features/orders/promotions-api'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
+import { useAuthSessionStore } from '@/lib/auth/session-store'
 
 const product: Product = {
   id: '7',
@@ -52,13 +53,24 @@ function deferred<T>() {
   return { promise, reject, resolve }
 }
 
-function createAuthApi(): AuthApi {
+function createAuthApi(valid: { current: boolean }): AuthApi {
   return {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue({
-      email: 'member@example.com',
-      expiresAt: null,
-      status: 'active',
+    getCurrentUser: vi.fn(async () => {
+      if (!valid.current)
+        throw new ApiError({
+          status: 401,
+          code: 'AUTH_FAILED',
+          message: 'Authentication failed',
+        })
+      return {
+        email: 'member@example.com',
+        expiresAt: null,
+        status: 'active' as const,
+      }
+    }),
+    logout: vi.fn(async () => {
+      valid.current = false
     }),
   }
 }
@@ -85,16 +97,22 @@ function installMocks() {
 }
 
 function renderPlans(queryClient: QueryClient = createQueryClient()) {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'token')
+  const valid = { current: true }
   const router = createAppRouter({ initialEntries: ['/plans'] })
   render(
     <AppProviders
       router={router}
-      authApi={createAuthApi()}
+      authApi={createAuthApi(valid)}
       queryClient={queryClient}
     />,
   )
-  return { queryClient, router }
+  return {
+    queryClient,
+    router,
+    invalidateSession: () => {
+      valid.current = false
+    },
+  }
 }
 
 async function openCreateDialog(user = userEvent.setup(), waitForForm = true) {
@@ -124,7 +142,10 @@ describe('Order Create flow', () => {
     expect(await within(dialog).findByText('暂不可用')).toBeInTheDocument()
     expect(within(dialog).getByText('100 GB')).toBeInTheDocument()
     expect(within(dialog).getByText('未提供')).toBeInTheDocument()
-    expect(mocks.getProduct).toHaveBeenCalledWith('token', '7')
+    expect(mocks.getProduct).toHaveBeenCalledWith(
+      useAuthSessionStore.getState().accessToken,
+      '7',
+    )
     for (const label of [
       '月付',
       '季付',
@@ -215,10 +236,13 @@ describe('Order Create flow', () => {
     expect(
       await within(dialog).findByText('优惠预览：固定金额优惠 ¥5.00 CNY'),
     ).toBeInTheDocument()
-    expect(mocks.validate).toHaveBeenCalledWith('token', {
-      code: 'Mixed-Code',
-      productId: 7,
-    })
+    expect(mocks.validate).toHaveBeenCalledWith(
+      useAuthSessionStore.getState().accessToken,
+      {
+        code: 'Mixed-Code',
+        productId: 7,
+      },
+    )
     expect(
       within(dialog).getByText(
         '优惠验证仅供预览；具体能否应用及最终订单金额以下单结果为准。',
@@ -321,11 +345,14 @@ describe('Order Create flow', () => {
     expect(
       within(dialog).getByRole('link', { name: '查看订单' }),
     ).toHaveAttribute('href', '/orders')
-    expect(mocks.create).toHaveBeenCalledWith('token', {
-      productId: '7',
-      billingPeriod: 'month',
-      promotionCode: 'DIRECT',
-    })
+    expect(mocks.create).toHaveBeenCalledWith(
+      useAuthSessionStore.getState().accessToken,
+      {
+        productId: '7',
+        billingPeriod: 'month',
+        promotionCode: 'DIRECT',
+      },
+    )
     expect(mocks.getOrders).toHaveBeenCalledOnce()
     expect(screen.queryByText(/支付方式|二维码|继续支付/)).toBeNull()
   })
@@ -493,7 +520,15 @@ describe('Order Create flow', () => {
         )
         mocks.getOrders.mockRejectedValue(authError)
       }
-      const { router } = renderPlans()
+      const { router, invalidateSession } = renderPlans()
+      const failAuth = async () => {
+        invalidateSession()
+        throw authError
+      }
+      if (source === 'product') mocks.getProduct.mockImplementation(failAuth)
+      if (source === 'promotion') mocks.validate.mockImplementation(failAuth)
+      if (source === 'create') mocks.create.mockImplementation(failAuth)
+      if (source === 'recovery') mocks.getOrders.mockImplementation(failAuth)
       if (source === 'product') {
         const user = userEvent.setup()
         await user.click(

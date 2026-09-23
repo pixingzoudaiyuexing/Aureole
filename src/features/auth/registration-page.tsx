@@ -133,7 +133,7 @@ function RegistrationForm({ config }: { config: OnboardingConfig }) {
       input: Parameters<typeof publicAccountApi.register>[0],
     ) => {
       const result = await publicAccountApi.register(input)
-      return establishSession(result.accessToken)
+      return establishSession(result)
     },
     retry: false,
     gcTime: 0,

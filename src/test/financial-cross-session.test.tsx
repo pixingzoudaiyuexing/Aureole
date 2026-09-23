@@ -25,12 +25,12 @@ import { referralsQueryKeys } from '@/features/referrals/referrals-queries'
 import { walletApi } from '@/features/wallet/wallet-api'
 import { walletQueryKeys } from '@/features/wallet/wallet-queries'
 import { ApiError } from '@/lib/api/errors'
-import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
 import { sessionSafetyStorageKeys } from '@/lib/auth/session-safety-storage'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
 
-const sessionAToken = 'session-a-token'
-const sessionBToken = 'session-b-token'
+let currentSession: 'a' | 'b' | null = 'a'
+let sessionAToken: string | null = null
+let sessionBToken: string | null = null
 const commissionSafetyKey =
   sessionSafetyStorageKeys.commissionTransferUncertainty
 const withdrawalSafetyKey =
@@ -112,28 +112,39 @@ function installMocks() {
 
 function createAuthApi(): AuthApi {
   return {
-    login: vi.fn().mockResolvedValue({
-      accessToken: sessionBToken,
-      tokenType: 'Bearer',
+    login: vi.fn().mockImplementation(async () => {
+      currentSession = 'b'
+      return {
+        email: 'session-b@example.com',
+        expiresAt: null,
+        status: 'active' as const,
+        sessionVersion: 'session-b',
+      }
     }),
-    getCurrentUser: vi.fn().mockImplementation(async (token) => ({
-      email:
-        token === sessionBToken
-          ? 'session-b@example.com'
-          : 'session-a@example.com',
-      expiresAt: null,
-      status: 'active' as const,
-    })),
+    logout: vi.fn().mockImplementation(async () => {
+      currentSession = null
+    }),
+    getCurrentUser: vi.fn().mockImplementation(async () => {
+      if (!currentSession)
+        throw new ApiError({
+          status: 401,
+          code: 'AUTH_REQUIRED',
+          message: 'Authentication required',
+        })
+      return {
+        email: `session-${currentSession}@example.com`,
+        expiresAt: null,
+        status: 'active' as const,
+        sessionVersion: `session-${currentSession}`,
+      }
+    }),
   }
 }
 
 function renderSessionA(queryClient: QueryClient = createQueryClient()) {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, sessionAToken)
-  useAuthSessionStore.setState({
-    accessToken: sessionAToken,
-    generation: 0,
-    hydrated: true,
-  })
+  currentSession = 'a'
+  sessionAToken = null
+  sessionBToken = null
   const router = createAppRouter({ initialEntries: ['/referrals'] })
   const rendered = render(
     <AppProviders
@@ -146,6 +157,7 @@ function renderSessionA(queryClient: QueryClient = createQueryClient()) {
 }
 
 async function logoutSessionA() {
+  sessionAToken = useAuthSessionStore.getState().accessToken
   const logout = [...document.querySelectorAll('button')].find(
     (button) => button.textContent?.trim() === '退出登录',
   )
@@ -162,6 +174,7 @@ async function loginSessionB(
   await user.type(screen.getByLabelText('密码'), 'password123')
   await user.click(screen.getByRole('button', { name: '登录' }))
   await waitFor(() => expect(router.state.location.pathname).toBe('/dashboard'))
+  sessionBToken = useAuthSessionStore.getState().accessToken
   await act(async () => {
     await router.navigate({ to: '/referrals' })
   })
@@ -212,7 +225,7 @@ async function startCommissionA(
 
 function countTokenCalls(
   mock: { mock: { calls: unknown[][] } },
-  token: string,
+  token: string | null,
 ) {
   return mock.mock.calls.filter(([calledToken]) => calledToken === token).length
 }
@@ -291,7 +304,7 @@ describe('Withdrawal cross-session continuation isolation', () => {
 
       expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe('active')
       expect(useAuthSessionStore.getState().accessToken).toBe(sessionBToken)
-      expect(useAuthSessionStore.getState().generation).toBe(2)
+      expect(useAuthSessionStore.getState().accessToken).not.toBe(sessionAToken)
       expect(queryClient.getQueryData(authQueryKeys.me)).toMatchObject({
         email: 'session-b@example.com',
       })
@@ -395,7 +408,7 @@ describe('Commission cross-session continuation isolation', () => {
 
       expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
       expect(useAuthSessionStore.getState().accessToken).toBe(sessionBToken)
-      expect(useAuthSessionStore.getState().generation).toBe(2)
+      expect(useAuthSessionStore.getState().accessToken).not.toBe(sessionAToken)
       expect(queryClient.getQueryData(authQueryKeys.me)).toMatchObject({
         email: 'session-b@example.com',
       })
@@ -436,6 +449,7 @@ describe('Financial uncertainty after logout and full runtime replacement', () =
       accessToken: null,
       generation: 0,
       hydrated: false,
+      validated: false,
     })
     const nextQueryClient = createQueryClient()
     const nextRouter = createAppRouter({ initialEntries: ['/login'] })

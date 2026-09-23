@@ -14,6 +14,7 @@ import { subscriptionQueryKeys } from '@/features/subscription/subscription-quer
 import { trafficApi } from '@/features/traffic/traffic-api'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
+import { useAuthSessionStore } from '@/lib/auth/session-store'
 
 const credentialUrl =
   'https://gateway.example/api/v1/access/subscription?token=opaque-token'
@@ -62,14 +63,22 @@ function installSubscriptionMocks() {
 function renderProtectedRoute(
   path: '/dashboard' | '/subscription',
   queryClient: QueryClient = createQueryClient(),
+  valid = { current: true },
 ) {
-  window.sessionStorage.setItem(
-    AUTH_SESSION_STORAGE_KEY,
-    'opaque-session-token',
-  )
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue(currentUser),
+    getCurrentUser: vi.fn(async () => {
+      if (!valid.current)
+        throw new ApiError({
+          status: 401,
+          code: 'AUTH_FAILED',
+          message: 'Authentication failed',
+        })
+      return currentUser
+    }),
+    logout: vi.fn(async () => {
+      valid.current = false
+    }),
   }
   const router = createAppRouter({ initialEntries: [path] })
   render(
@@ -79,7 +88,13 @@ function renderProtectedRoute(
       queryClient={queryClient}
     />,
   )
-  return { queryClient, router }
+  return {
+    queryClient,
+    router,
+    invalidateSession: () => {
+      valid.current = false
+    },
+  }
 }
 
 function installClipboard(writeText: (value: string) => Promise<void>) {
@@ -157,7 +172,7 @@ describe('Subscription page', () => {
     expect(screen.queryByRole('button', { name: '显示' })).toBeNull()
     expect(screen.queryByRole('button', { name: '隐藏' })).toBeNull()
     expect(mocks.getEntryAccess).toHaveBeenCalledWith(
-      'opaque-session-token',
+      useAuthSessionStore.getState().accessToken,
       {
         entryId: 'primary',
         profileId: 'default',
@@ -373,7 +388,20 @@ describe('Subscription page', () => {
       )
       const queryClient = createQueryClient()
       queryClient.setQueryData(['private-data'], { sensitive: true })
-      const { router } = renderProtectedRoute('/subscription', queryClient)
+      const valid = { current: true }
+      mocks.getTraffic.mockImplementation(async () => {
+        valid.current = false
+        throw new ApiError({
+          status: 401,
+          code,
+          message: 'Authentication failed',
+        })
+      })
+      const { router } = renderProtectedRoute(
+        '/subscription',
+        queryClient,
+        valid,
+      )
 
       expect(
         await screen.findByRole('heading', { name: '登录 Aureole' }),
@@ -406,7 +434,20 @@ describe('Subscription page', () => {
       } else mocks.getOverview.mockRejectedValue(error)
       const queryClient = createQueryClient()
       queryClient.setQueryData(['private-data'], { sensitive: true })
-      const { router } = renderProtectedRoute('/subscription', queryClient)
+      const valid = { current: true }
+      const failAuth = async () => {
+        valid.current = false
+        throw error
+      }
+      if (source === 'entries') mocks.getEntries.mockImplementation(failAuth)
+      else if (source === 'entry-access')
+        mocks.getEntryAccess.mockImplementation(failAuth)
+      else mocks.getOverview.mockImplementation(failAuth)
+      const { router } = renderProtectedRoute(
+        '/subscription',
+        queryClient,
+        valid,
+      )
 
       expect(
         await screen.findByRole('heading', { name: '登录 Aureole' }),
@@ -479,9 +520,7 @@ describe('Dashboard subscription core', () => {
       await screen.findByText('暂时无法读取订阅概览。'),
     ).toBeInTheDocument()
     expect(screen.getByText('请求编号：req-dashboard')).toBeInTheDocument()
-    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-      'opaque-session-token',
-    )
+    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
     await user.click(screen.getByRole('button', { name: '重试' }))
     expect(await screen.findByText('Pro Plan')).toBeInTheDocument()
   })
@@ -495,7 +534,20 @@ describe('Dashboard subscription core', () => {
         message: 'Authentication failed',
       }),
     )
-    const { router } = renderProtectedRoute('/dashboard')
+    const valid = { current: true }
+    mocks.getOverview.mockImplementation(async () => {
+      valid.current = false
+      throw new ApiError({
+        status: 401,
+        code: 'AUTH_FAILED',
+        message: 'Authentication failed',
+      })
+    })
+    const { router } = renderProtectedRoute(
+      '/dashboard',
+      createQueryClient(),
+      valid,
+    )
 
     expect(
       await screen.findByRole('heading', { name: '登录 Aureole' }),

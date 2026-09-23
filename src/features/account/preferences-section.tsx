@@ -6,6 +6,7 @@ import { isInvalidSessionError } from '@/features/auth/auth-errors'
 import { useAuth } from '@/features/auth/auth-context'
 import { MutationFeedback } from '@/features/auth/form-feedback'
 import { useSynchronousActionLock } from '@/features/auth/use-synchronous-action-lock'
+import { isErrorFromCurrentAuthSession } from '@/lib/auth/session-store'
 import {
   accountApi,
   type AccountPreferences,
@@ -39,7 +40,7 @@ function getChanges(
 }
 
 export function PreferencesSection({ accessToken }: { accessToken: string }) {
-  const { logout } = useAuth()
+  const { sessionInvalidated } = useAuth()
   const actionLock = useSynchronousActionLock()
   const preferences = useAccountPreferences(accessToken)
   const [edits, setEdits] = useState<AccountPreferencesUpdate>({})
@@ -51,10 +52,14 @@ export function PreferencesSection({ accessToken }: { accessToken: string }) {
   })
 
   useEffect(() => {
-    if (preferences.isError && isInvalidSessionError(preferences.error)) {
-      logout()
+    if (
+      preferences.isError &&
+      isInvalidSessionError(preferences.error) &&
+      isErrorFromCurrentAuthSession(preferences.error)
+    ) {
+      sessionInvalidated()
     }
-  }, [logout, preferences.error, preferences.isError])
+  }, [sessionInvalidated, preferences.error, preferences.isError])
 
   const reconcile = async () => {
     const result = await preferences.refetch()
@@ -62,8 +67,11 @@ export function PreferencesSection({ accessToken }: { accessToken: string }) {
       setEdits({})
       return 'confirmed' as const
     }
-    if (isInvalidSessionError(result.error)) {
-      logout()
+    if (
+      isInvalidSessionError(result.error) &&
+      isErrorFromCurrentAuthSession(result.error)
+    ) {
+      sessionInvalidated()
       return 'invalid-session' as const
     }
     return 'failed' as const
@@ -92,8 +100,11 @@ export function PreferencesSection({ accessToken }: { accessToken: string }) {
             },
       )
     } catch (error) {
-      if (isInvalidSessionError(error)) {
-        logout()
+      if (
+        isInvalidSessionError(error) &&
+        isErrorFromCurrentAuthSession(error)
+      ) {
+        sessionInvalidated()
         return
       }
       if (isAmbiguousAccountMutationError(error)) {

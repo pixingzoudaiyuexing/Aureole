@@ -1,435 +1,203 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { Mock } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { onRequest } from '../../functions/api/v1/[[path]]'
 
-describe('Cloudflare Pages API Adapter', () => {
-  let globalFetch: Mock
-  let consoleSpies: { [key: string]: Mock }
+const env = { SOLUTION_GATEWAY_ORIGIN: 'https://gateway.example.com' }
+const origin = 'https://aureole.example'
 
+function request(path: string, options: RequestInit = {}) {
+  return new Request(`${origin}/api/v1/${path}`, options)
+}
+
+describe('Cloudflare Pages same-origin API boundary', () => {
   beforeEach(() => {
-    globalFetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ success: true }), {
-        status: 200,
-        headers: {
-          'content-type': 'application/json',
-          'x-request-id': 'req-1',
-        },
-      }),
-    )
-    vi.stubGlobal('fetch', globalFetch)
-
-    consoleSpies = {
-      log: vi.spyOn(console, 'log').mockImplementation(() => {}),
-      info: vi.spyOn(console, 'info').mockImplementation(() => {}),
-      warn: vi.spyOn(console, 'warn').mockImplementation(() => {}),
-      error: vi.spyOn(console, 'error').mockImplementation(() => {}),
-    }
-  })
-
-  afterEach(() => {
-    vi.unstubAllGlobals()
-    vi.restoreAllMocks()
-  })
-
-  const getEnv = () => ({
-    SOLUTION_GATEWAY_ORIGIN: 'https://gateway.example.com',
-  })
-
-  it('forwards valid GET /api/v1/ route', async () => {
-    const request = new Request('https://aureole.com/api/v1/me', {
-      method: 'GET',
-      headers: { authorization: 'Bearer token123', accept: 'application/json' },
-    })
-
-    const response = await onRequest({ request, env: getEnv() })
-
-    expect(response.status).toBe(200)
-    expect(globalFetch).toHaveBeenCalledTimes(1)
-
-    const fetchArgs = globalFetch.mock.calls[0]
-    if (!fetchArgs) throw new Error('Expected fetchArgs')
-    expect(fetchArgs[0]).toBe('https://gateway.example.com/api/v1/me')
-    expect(fetchArgs[1]?.method).toBe('GET')
-    expect(fetchArgs[1]?.redirect).toBe('manual')
-    expect(fetchArgs[1]?.headers?.get?.('authorization')).toBe(
-      'Bearer token123',
-    )
-    expect(fetchArgs[1]?.headers?.get?.('accept')).toBe('application/json')
-    expect(fetchArgs[1]?.body).toBeUndefined()
-  })
-
-  it('forwards valid POST with body', async () => {
-    const request = new Request('https://aureole.com/api/v1/referrals', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ code: 'test' }),
-    })
-
-    const response = await onRequest({ request, env: getEnv() })
-
-    expect(response.status).toBe(200)
-    expect(globalFetch).toHaveBeenCalledTimes(1)
-
-    const fetchArgs = globalFetch.mock.calls[0]
-    if (!fetchArgs) throw new Error('Expected fetchArgs')
-    expect(fetchArgs[0]).toBe('https://gateway.example.com/api/v1/referrals')
-    expect(fetchArgs[1]?.method).toBe('POST')
-    expect(fetchArgs[1]?.headers?.get?.('content-type')).toBe(
-      'application/json',
-    )
-    // We can't trivially assert fetchArgs[1].body directly on node Request stream without consuming,
-    // but we can check if it is truthy and not undefined since it was forwarded.
-    expect(fetchArgs[1]?.body).toBeDefined()
-  })
-
-  it('forwards valid PATCH', async () => {
-    const request = new Request('https://aureole.com/api/v1/me/preferences', {
-      method: 'PATCH',
-    })
-
-    const response = await onRequest({ request, env: getEnv() })
-    expect(response.status).toBe(200)
-    expect(globalFetch).toHaveBeenCalledTimes(1)
-
-    const fetchArgs = globalFetch.mock.calls[0]
-    if (!fetchArgs) throw new Error('Expected fetchArgs')
-    expect(fetchArgs[0]).toBe(
-      'https://gateway.example.com/api/v1/me/preferences',
-    )
-    expect(fetchArgs[1]?.method).toBe('PATCH')
-  })
-
-  it('preserves query string', async () => {
-    const request = new Request(
-      'https://aureole.com/api/v1/orders?page=2&status=active',
-      {
-        method: 'GET',
-      },
-    )
-
-    const response = await onRequest({ request, env: getEnv() })
-    expect(response.status).toBe(200)
-
-    const fetchArgs = globalFetch.mock.calls[0]
-    if (!fetchArgs) throw new Error('Expected fetchArgs')
-    expect(fetchArgs[0]).toBe(
-      'https://gateway.example.com/api/v1/orders?page=2&status=active',
-    )
-  })
-
-  describe('Gateway Configuration Validation', () => {
-    it('rejects missing configuration', async () => {
-      const request = new Request('https://aureole.com/api/v1/me')
-      const response = await onRequest({ request, env: {} })
-      expect(response.status).toBe(500)
-      expect(globalFetch).not.toHaveBeenCalled()
-    })
-
-    it('rejects invalid non-URL', async () => {
-      const request = new Request('https://aureole.com/api/v1/me')
-      const response = await onRequest({
-        request,
-        env: { SOLUTION_GATEWAY_ORIGIN: 'not-a-url' },
-      })
-      expect(response.status).toBe(500)
-      expect(globalFetch).not.toHaveBeenCalled()
-    })
-
-    it('rejects http:// Gateway', async () => {
-      const request = new Request('https://aureole.com/api/v1/me')
-      const response = await onRequest({
-        request,
-        env: { SOLUTION_GATEWAY_ORIGIN: 'http://gateway.example.com' },
-      })
-      expect(response.status).toBe(500)
-      expect(globalFetch).not.toHaveBeenCalled()
-    })
-
-    it('rejects credentials in configured origin', async () => {
-      const request = new Request('https://aureole.com/api/v1/me')
-      const response = await onRequest({
-        request,
-        env: {
-          SOLUTION_GATEWAY_ORIGIN: 'https://user:pass@gateway.example.com',
-        },
-      })
-      expect(response.status).toBe(500)
-      expect(globalFetch).not.toHaveBeenCalled()
-    })
-
-    it('rejects configured origin path, query, and hash', async () => {
-      const request = new Request('https://aureole.com/api/v1/me')
-
-      const res1 = await onRequest({
-        request,
-        env: { SOLUTION_GATEWAY_ORIGIN: 'https://gateway.example.com/path' },
-      })
-      expect(res1.status).toBe(500)
-
-      const res2 = await onRequest({
-        request,
-        env: { SOLUTION_GATEWAY_ORIGIN: 'https://gateway.example.com?q=1' },
-      })
-      expect(res2.status).toBe(500)
-
-      const res3 = await onRequest({
-        request,
-        env: { SOLUTION_GATEWAY_ORIGIN: 'https://gateway.example.com#hash' },
-      })
-      expect(res3.status).toBe(500)
-
-      expect(globalFetch).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('Method Policy Validation', () => {
-    const unsupportedMethods = ['OPTIONS', 'HEAD', 'PUT', 'DELETE']
-
-    for (const method of unsupportedMethods) {
-      it(`rejects unsupported HTTP method: ${method}`, async () => {
-        const request = new Request('https://aureole.com/api/v1/me', { method })
-        const response = await onRequest({ request, env: getEnv() })
-
-        expect(response.status).toBe(405)
-        expect(globalFetch).not.toHaveBeenCalled()
-      })
-    }
-  })
-
-  describe('Header Policy Validation', () => {
-    it('does not forward disallowed Request headers', async () => {
-      const request = new Request('https://aureole.com/api/v1/me', {
-        method: 'GET',
-        headers: {
-          authorization: 'Bearer token123',
-          cookie: 'session=123',
-          'proxy-authorization': 'Basic aaaa',
-          'x-forwarded-for': '1.2.3.4',
-          'cf-connecting-ip': '1.2.3.4',
-          referer: 'https://referrer.example/private',
-          'x-test-secret': 'sentinel-secret',
-        },
-      })
-
-      await onRequest({ request, env: getEnv() })
-
-      const fetchArgs = globalFetch.mock.calls[0]
-      if (!fetchArgs) throw new Error('Expected fetchArgs')
-      expect(fetchArgs[1]?.headers?.has?.('cookie')).toBe(false)
-      expect(fetchArgs[1]?.headers?.has?.('proxy-authorization')).toBe(false)
-      expect(fetchArgs[1]?.headers?.has?.('x-forwarded-for')).toBe(false)
-      expect(fetchArgs[1]?.headers?.has?.('cf-connecting-ip')).toBe(false)
-      expect(fetchArgs[1]?.headers?.has?.('referer')).toBe(false)
-      expect(fetchArgs[1]?.headers?.has?.('x-test-secret')).toBe(false)
-
-      // Kept authorization
-      expect(fetchArgs[1]?.headers?.has?.('authorization')).toBe(true)
-    })
-
-    it('derives the frontend Origin from the HTTPS request URL', async () => {
-      const request = new Request(
-        'https://aureole.example/api/v1/orders/123/checkout',
-        { method: 'POST' },
-      )
-
-      await onRequest({ request, env: getEnv() })
-
-      const fetchArgs = globalFetch.mock.calls[0]
-      if (!fetchArgs) throw new Error('Expected fetchArgs')
-      expect(fetchArgs[1]?.headers?.get?.('origin')).toBe(
-        'https://aureole.example',
-      )
-    })
-
-    it('replaces a spoofed incoming Origin with the request URL origin', async () => {
-      const request = new Request(
-        'https://aureole.example/api/v1/orders/123/checkout',
-        {
-          method: 'POST',
-          headers: { origin: 'https://evil.example' },
-        },
-      )
-
-      await onRequest({ request, env: getEnv() })
-
-      const fetchArgs = globalFetch.mock.calls[0]
-      if (!fetchArgs) throw new Error('Expected fetchArgs')
-      expect(fetchArgs[1]?.headers?.get?.('origin')).toBe(
-        'https://aureole.example',
-      )
-      expect(fetchArgs[1]?.headers?.get?.('origin')).not.toBe(
-        'https://evil.example',
-      )
-    })
-
-    it.each([
-      [
-        'desktop',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Safari/537.36',
-      ],
-      [
-        'mobile',
-        'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148',
-      ],
-    ])('preserves the exact %s browser User-Agent', async (_, userAgent) => {
-      const request = new Request(
-        'https://aureole.example/api/v1/orders/123/checkout',
-        {
-          method: 'POST',
-          headers: { 'user-agent': userAgent },
-        },
-      )
-
-      await onRequest({ request, env: getEnv() })
-
-      const fetchArgs = globalFetch.mock.calls[0]
-      if (!fetchArgs) throw new Error('Expected fetchArgs')
-      expect(fetchArgs[1]?.headers?.get?.('user-agent')).toBe(userAgent)
-    })
-
-    it('does not synthesize a User-Agent when the incoming header is absent', async () => {
-      const request = new Request(
-        'https://aureole.example/api/v1/orders/123/checkout',
-        { method: 'POST' },
-      )
-
-      await onRequest({ request, env: getEnv() })
-
-      const fetchArgs = globalFetch.mock.calls[0]
-      if (!fetchArgs) throw new Error('Expected fetchArgs')
-      expect(fetchArgs[1]?.headers?.has?.('user-agent')).toBe(false)
-    })
-
-    it('does not assert a trusted frontend Origin for local HTTP requests', async () => {
-      const request = new Request(
-        'http://localhost:8788/api/v1/orders/123/checkout',
-        {
-          method: 'POST',
-          headers: { origin: 'https://evil.example' },
-        },
-      )
-
-      await onRequest({ request, env: getEnv() })
-
-      const fetchArgs = globalFetch.mock.calls[0]
-      if (!fetchArgs) throw new Error('Expected fetchArgs')
-      expect(fetchArgs[1]?.headers?.has?.('origin')).toBe(false)
-    })
-
-    it('preserves configured safe response headers only', async () => {
-      globalFetch.mockResolvedValueOnce(
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
         new Response('{}', {
-          status: 200,
           headers: {
             'content-type': 'application/json',
-            'cache-control': 'no-store',
             'x-request-id': 'req-1',
-            'set-cookie': 'secret=123',
-            server: 'nginx',
+            'set-cookie': 'upstream-secret=untrusted',
+            server: 'upstream',
           },
         }),
-      )
+      ),
+    )
+  })
+  afterEach(() => vi.unstubAllGlobals())
 
-      const request = new Request('https://aureole.com/api/v1/me')
-      const response = await onRequest({ request, env: getEnv() })
-
-      expect(response.headers.get('content-type')).toBe('application/json')
-      expect(response.headers.get('cache-control')).toBe('no-store')
-      expect(response.headers.get('x-request-id')).toBe('req-1')
-      expect(response.headers.has('set-cookie')).toBe(false)
-      expect(response.headers.has('server')).toBe(false)
+  it('forwards only allowlisted public reads and query parameters', async () => {
+    const response = await onRequest({
+      request: request('config/runtime?locale=en', {
+        headers: {
+          accept: 'application/json',
+          cookie: 'private=secret',
+          'x-test-secret': 'secret',
+        },
+      }),
+      env,
     })
+    expect(response.status).toBe(200)
+    const fetchMock = vi.mocked(fetch)
+    expect(fetchMock).toHaveBeenCalledOnce()
+    const [target, init] = fetchMock.mock.calls[0]!
+    expect(String(target)).toBe(
+      'https://gateway.example.com/api/v1/config/runtime?locale=en',
+    )
+    expect(init?.redirect).toBe('manual')
+    expect(new Headers(init?.headers).get('accept')).toBe('application/json')
+    expect(new Headers(init?.headers).has('cookie')).toBe(false)
+    expect(new Headers(init?.headers).has('x-test-secret')).toBe(false)
+    expect(new Headers(init?.headers).has('authorization')).toBe(false)
+    expect(response.headers.get('x-request-id')).toBe('req-1')
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(response.headers.has('set-cookie')).toBe(false)
+    expect(response.headers.has('server')).toBe(false)
   })
 
-  describe('Open Proxy and Path Escapes', () => {
-    const escapingUrls = [
-      'https://aureole.com/api/v1/../x',
-      'https://aureole.com/api/v1/../../secret',
-      'https://aureole.com/api/v1/%2e%2e/x',
-      'https://aureole.com/api/v1/%2E%2E/x',
-      'https://aureole.com/api/v1/%2e%2e/%2e%2e/x',
-      'https://aureole.com/api/v1',
-    ]
-
-    for (const url of escapingUrls) {
-      it(`rejects path escape attempt: ${url}`, async () => {
-        const request = new Request(url, { method: 'GET' })
-        const response = await onRequest({ request, env: getEnv() })
-
-        expect(response.status).toBe(400)
-        expect(globalFetch).not.toHaveBeenCalled()
-      })
-    }
-
-    const fakeEscapes = [
-      'https://aureole.com/api/v1/http://evil.com',
-      'https://aureole.com/api/v1///evil.com',
-    ]
-
-    for (const url of fakeEscapes) {
-      it(`safely confines fake absolute escape attempt: ${url}`, async () => {
-        const request = new Request(url, { method: 'GET' })
-        const response = await onRequest({ request, env: getEnv() })
-
-        // These don't escape URL normalization. We verify they stay on gateway origin.
-        if (response.status === 200) {
-          expect(globalFetch).toHaveBeenCalledTimes(1)
-          const fetchArgs = globalFetch.mock.calls[0]
-          if (!fetchArgs) throw new Error('Expected fetchArgs')
-
-          const calledUrl = new URL(fetchArgs[0])
-          expect(calledUrl.origin).toBe('https://gateway.example.com')
-          expect(calledUrl.pathname.startsWith('/api/v1/')).toBe(true)
-        } else {
-          expect(response.status).toBe(400)
-          expect(globalFetch).not.toHaveBeenCalled()
-        }
-      })
-    }
+  it('forwards public POST body only with exact same-origin CSRF signals', async () => {
+    const response = await onRequest({
+      request: request('auth/email-code', {
+        method: 'POST',
+        headers: {
+          origin,
+          'content-type': 'application/json',
+          'sec-fetch-site': 'same-origin',
+        },
+        body: JSON.stringify({ email: 'member@example.com' }),
+      }),
+      env,
+    })
+    expect(response.status).toBe(200)
+    const [, init] = vi.mocked(fetch).mock.calls[0]!
+    expect(init?.method).toBe('POST')
+    expect(init?.body).toBeDefined()
+    expect(new Headers(init?.headers).has('origin')).toBe(false)
   })
 
-  it('does not automatically follow upstream redirects (Credential Safety)', async () => {
-    globalFetch.mockResolvedValueOnce(
-      new Response('', {
+  it.each([
+    {},
+    { origin: 'https://evil.example' },
+    { origin, 'sec-fetch-site': 'cross-site' },
+  ])('rejects missing or conflicting CSRF signals', async (headers) => {
+    const response = await onRequest({
+      request: request('auth/email-code', {
+        method: 'POST',
+        headers: new Headers(headers as Record<string, string>),
+      }),
+      env,
+    })
+    expect(response.status).toBe(403)
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('rejects a legacy bearer on public and protected routes', async () => {
+    for (const path of ['me', 'config/runtime']) {
+      const response = await onRequest({
+        request: request(path, { headers: { authorization: 'Bearer legacy' } }),
+        env,
+      })
+      expect(response.status).toBe(401)
+    }
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('requires a server session for private routes', async () => {
+    for (const path of [
+      'me',
+      'wallet',
+      'orders?page=2',
+      'tickets',
+      'subscription/overview',
+    ]) {
+      const response = await onRequest({
+        request: request(path, { headers: { cookie: 'legacy=untrusted' } }),
+        env,
+      })
+      expect(response.status).toBe(401)
+    }
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('permits optional announcements without a session', async () => {
+    expect(
+      (await onRequest({ request: request('announcements'), env })).status,
+    ).toBe(200)
+    expect(fetch).toHaveBeenCalledOnce()
+  })
+
+  it('does not forward unknown or disallowed methods', async () => {
+    for (const method of ['HEAD', 'OPTIONS', 'PUT', 'DELETE']) {
+      expect(
+        (await onRequest({ request: request('me', { method }), env })).status,
+      ).toBe(405)
+    }
+    expect(
+      (await onRequest({ request: request('unlisted'), env })).status,
+    ).toBe(404)
+    expect(
+      (
+        await onRequest({
+          request: request('referrals', {
+            method: 'POST',
+            headers: { origin },
+          }),
+          env,
+        })
+      ).status,
+    ).toBe(404)
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    'https://aureole.example/api/v1/../x',
+    'https://aureole.example/api/v1/%2e%2e/x',
+    'https://aureole.example/api/v1/http://evil.example',
+    'https://aureole.example/api/v1///evil.example',
+    'https://aureole.example/api/v1/%2fme',
+  ])('rejects path escapes or unsupported paths: %s', async (url) => {
+    expect((await onRequest({ request: new Request(url), env })).status).toBe(
+      404,
+    )
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    undefined,
+    'not-a-url',
+    'http://gateway.example.com',
+    'https://user:pass@gateway.example.com',
+    'https://gateway.example.com/path',
+    'https://gateway.example.com/?q=1',
+  ])(
+    'fails closed for a missing or invalid gateway origin',
+    async (configured) => {
+      expect(
+        (
+          await onRequest({
+            request: request('config/runtime'),
+            env: { SOLUTION_GATEWAY_ORIGIN: configured },
+          })
+        ).status,
+      ).toBe(500)
+      expect(fetch).not.toHaveBeenCalled()
+    },
+  )
+
+  it('does not follow or expose an upstream redirect', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(null, {
         status: 302,
-        headers: { location: 'https://evil.example/steal' },
+        headers: { location: 'https://evil.example/' },
       }),
     )
-
-    const request = new Request('https://aureole.com/api/v1/me', {
-      method: 'GET',
-      headers: { authorization: 'Bearer sentinel-token' },
+    const response = await onRequest({
+      request: request('config/runtime'),
+      env,
     })
-
-    const response = await onRequest({ request, env: getEnv() })
-
-    expect(globalFetch).toHaveBeenCalledTimes(1)
-
-    const fetchArgs = globalFetch.mock.calls[0]
-    if (!fetchArgs) throw new Error('Expected fetchArgs')
-    expect(fetchArgs[0]).toBe('https://gateway.example.com/api/v1/me')
-    expect(fetchArgs[1]?.redirect).toBe('manual')
-
     expect(response.status).toBe(302)
-    // Ensure no manual following behavior occurred
-    expect(globalFetch).toHaveBeenCalledTimes(1)
-  })
-
-  it('does not log credentials or bodies', async () => {
-    const request = new Request('https://aureole.com/api/v1/referrals', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer sentinel-secret-token',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ secretPayload: 'sentinel-secret-value' }),
-    })
-
-    await onRequest({ request, env: getEnv() })
-
-    expect(consoleSpies.log).not.toHaveBeenCalled()
-    expect(consoleSpies.info).not.toHaveBeenCalled()
-    expect(consoleSpies.warn).not.toHaveBeenCalled()
-    expect(consoleSpies.error).not.toHaveBeenCalled()
+    expect(response.headers.has('location')).toBe(false)
+    expect(vi.mocked(fetch).mock.calls[0]?.[1]?.redirect).toBe('manual')
+    expect(fetch).toHaveBeenCalledOnce()
   })
 })

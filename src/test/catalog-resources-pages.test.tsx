@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AppProviders } from '@/app/providers/app-providers'
@@ -48,10 +48,21 @@ const products: Product[] = [
   },
 ]
 
-function createAuthApi(): AuthApi {
+function createAuthApi(valid: { current: boolean }): AuthApi {
   return {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue(currentUser),
+    getCurrentUser: vi.fn(async () => {
+      if (!valid.current)
+        throw new ApiError({
+          status: 401,
+          code: 'AUTH_FAILED',
+          message: 'Authentication failed',
+        })
+      return currentUser
+    }),
+    logout: vi.fn(async () => {
+      valid.current = false
+    }),
   }
 }
 
@@ -59,19 +70,22 @@ function renderProtectedRoute(
   path: '/plans' | '/resources',
   queryClient: QueryClient = createQueryClient(),
 ) {
-  window.sessionStorage.setItem(
-    AUTH_SESSION_STORAGE_KEY,
-    'opaque-session-token',
-  )
   const router = createAppRouter({ initialEntries: [path] })
+  const valid = { current: true }
   render(
     <AppProviders
       router={router}
-      authApi={createAuthApi()}
+      authApi={createAuthApi(valid)}
       queryClient={queryClient}
     />,
   )
-  return { queryClient, router }
+  return {
+    queryClient,
+    router,
+    invalidateSession: () => {
+      valid.current = false
+    },
+  }
 }
 
 function installPlansMocks() {
@@ -173,15 +187,17 @@ describe('Plans page', () => {
   it('reuses the canonical Account Config cache', async () => {
     const mocks = installPlansMocks()
     const queryClient = createQueryClient()
+    renderProtectedRoute('/plans', queryClient)
+    await screen.findByText('Pro Plan')
     queryClient.setQueryData(
       accountQueryKeys.config,
       { currency: 'JPY', currencySymbol: '¥' },
       { updatedAt: Date.now() },
     )
-    renderProtectedRoute('/plans', queryClient)
-
-    expect(await screen.findByText('¥990 JPY')).toBeInTheDocument()
-    expect(mocks.getConfig).not.toHaveBeenCalled()
+    await waitFor(() =>
+      expect(screen.getByText('¥990 JPY')).toBeInTheDocument(),
+    )
+    expect(mocks.getConfig).toHaveBeenCalledOnce()
   })
 
   it('shows an ordinary catalog error and retries without logging out', async () => {
@@ -201,9 +217,7 @@ describe('Plans page', () => {
 
     expect(await screen.findByText('暂时无法读取套餐。')).toBeInTheDocument()
     expect(screen.getByText('请求编号：req-products')).toBeInTheDocument()
-    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-      'opaque-session-token',
-    )
+    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
     await user.click(screen.getByRole('button', { name: '重试' }))
     expect(await screen.findByText('Pro Plan')).toBeInTheDocument()
   })
@@ -222,7 +236,8 @@ describe('Plans page', () => {
       ].mockRejectedValue(
         new ApiError({ status: 401, code, message: 'Authentication failed' }),
       )
-      const { router } = renderProtectedRoute('/plans')
+      const { router, invalidateSession } = renderProtectedRoute('/plans')
+      invalidateSession()
 
       expect(
         await screen.findByRole('heading', { name: '登录 Aureole' }),
@@ -307,11 +322,11 @@ describe('Resources page', () => {
         },
       ])
     const queryClient = createQueryClient()
-    queryClient.setQueryData(['unrelated-subscription'], { kept: true })
     renderProtectedRoute('/resources', queryClient)
     const user = userEvent.setup()
 
     expect(await screen.findByText('暂时无法读取资源。')).toBeInTheDocument()
+    queryClient.setQueryData(['unrelated-subscription'], { kept: true })
     expect(queryClient.getQueryData(['unrelated-subscription'])).toEqual({
       kept: true,
     })
@@ -326,7 +341,8 @@ describe('Resources page', () => {
       getResources.mockRejectedValue(
         new ApiError({ status: 401, code, message: 'Authentication failed' }),
       )
-      const { router } = renderProtectedRoute('/resources')
+      const { router, invalidateSession } = renderProtectedRoute('/resources')
+      invalidateSession()
 
       expect(
         await screen.findByRole('heading', { name: '登录 Aureole' }),

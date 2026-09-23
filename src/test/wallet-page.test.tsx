@@ -28,13 +28,24 @@ function installMocks() {
 }
 
 function renderWallet(queryClient: QueryClient = createQueryClient()) {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'wallet-token')
+  const valid = { current: true }
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue({
-      email: 'member@example.com',
-      expiresAt: null,
-      status: 'active',
+    getCurrentUser: vi.fn(async () => {
+      if (!valid.current)
+        throw new ApiError({
+          status: 401,
+          code: 'AUTH_FAILED',
+          message: 'Authentication failed',
+        })
+      return {
+        email: 'member@example.com',
+        expiresAt: null,
+        status: 'active' as const,
+      }
+    }),
+    logout: vi.fn(async () => {
+      valid.current = false
     }),
   }
   const router = createAppRouter({ initialEntries: ['/wallet'] })
@@ -45,7 +56,13 @@ function renderWallet(queryClient: QueryClient = createQueryClient()) {
       queryClient={queryClient}
     />,
   )
-  return { queryClient, router }
+  return {
+    queryClient,
+    router,
+    invalidateSession: () => {
+      valid.current = false
+    },
+  }
 }
 
 describe('Wallet page', () => {
@@ -152,9 +169,7 @@ describe('Wallet page', () => {
       await screen.findByText('暂时无法读取站内余额。', {}, { timeout: 3_000 }),
     ).toBeInTheDocument()
     expect(screen.getByText('请求编号：req-wallet')).toBeInTheDocument()
-    expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-      'wallet-token',
-    )
+    expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
     await user.click(screen.getByRole('button', { name: '重试' }))
     expect(await screen.findByText('¥123.45 CNY')).toBeInTheDocument()
   })
@@ -172,8 +187,8 @@ describe('Wallet page', () => {
         new ApiError({ status: 401, code, message: 'Authentication failed' }),
       )
       const queryClient = createQueryClient()
-      queryClient.setQueryData(['sensitive-server-state'], { private: true })
-      const { router } = renderWallet(queryClient)
+      const { router, invalidateSession } = renderWallet(queryClient)
+      invalidateSession()
 
       expect(
         await screen.findByRole('heading', { name: '登录 Aureole' }),

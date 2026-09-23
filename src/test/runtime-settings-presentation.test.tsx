@@ -77,10 +77,20 @@ function renderRuntime(queryClient: QueryClient = createNoRetryQueryClient()) {
   return { ...result, queryClient }
 }
 
-function createAuthApi(): AuthApi {
+function createAuthApi(authenticated: boolean): AuthApi {
   return {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue(currentUser),
+    getCurrentUser: vi.fn().mockImplementation(() =>
+      authenticated
+        ? Promise.resolve(currentUser)
+        : Promise.reject(
+            new ApiError({
+              status: 401,
+              code: 'AUTH_REQUIRED',
+              message: 'Authentication required',
+            }),
+          ),
+    ),
   }
 }
 
@@ -92,7 +102,7 @@ function renderRoute(
   render(
     <AppProviders
       router={router}
-      authApi={createAuthApi()}
+      authApi={createAuthApi(path === '/dashboard')}
       queryClient={queryClient}
     />,
   )
@@ -320,7 +330,10 @@ describe('Runtime Settings presentation', () => {
       await screen.findByRole('heading', { name: 'Overview' }),
     ).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/dashboard')
-    expect(useAuthSessionStore.getState().accessToken).toBe(
+    expect(useAuthSessionStore.getState().accessToken).toEqual(
+      expect.any(String),
+    )
+    expect(useAuthSessionStore.getState().accessToken).not.toBe(
       'stored-session-token',
     )
     expect(queryClient.getQueryData(authQueryKeys.me)).toEqual(currentUser)

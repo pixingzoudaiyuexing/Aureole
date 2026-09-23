@@ -56,13 +56,24 @@ function installMocks(status: OrderStatus = 'pending') {
 }
 
 function renderOrders() {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'token')
+  const valid = { current: true }
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue({
-      email: 'member@example.com',
-      expiresAt: null,
-      status: 'active',
+    getCurrentUser: vi.fn(async () => {
+      if (!valid.current)
+        throw new ApiError({
+          status: 401,
+          code: 'AUTH_FAILED',
+          message: 'Authentication failed',
+        })
+      return {
+        email: 'member@example.com',
+        expiresAt: null,
+        status: 'active' as const,
+      }
+    }),
+    logout: vi.fn(async () => {
+      valid.current = false
     }),
   }
   const router = createAppRouter({ initialEntries: ['/orders'] })
@@ -73,7 +84,12 @@ function renderOrders() {
       queryClient={createQueryClient()}
     />,
   )
-  return router
+  return {
+    router,
+    invalidateSession: () => {
+      valid.current = false
+    },
+  }
 }
 
 async function openDetail(user = userEvent.setup()) {
@@ -193,7 +209,7 @@ describe('Order Cancel flow', () => {
     expect(
       await within(dialog).findByText('该订单不存在或已不可用。'),
     ).toBeInTheDocument()
-    expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe('token')
+    expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
     expect(mocks.getDetail).toHaveBeenCalledOnce()
     expect(mocks.getList).toHaveBeenCalledTimes(2)
   })
@@ -331,7 +347,22 @@ describe('Order Cancel flow', () => {
           .mockResolvedValueOnce([pendingOrder])
           .mockRejectedValue(authError)
       }
-      const router = renderOrders()
+      const { router, invalidateSession } = renderOrders()
+      const failAuth = async () => {
+        invalidateSession()
+        throw authError
+      }
+      if (source === 'cancel') mocks.cancel.mockImplementation(failAuth)
+      if (source === 'detail-recovery')
+        mocks.getDetail
+          .mockReset()
+          .mockResolvedValueOnce(pendingOrder)
+          .mockImplementation(failAuth)
+      if (source === 'list-recovery')
+        mocks.getList
+          .mockReset()
+          .mockResolvedValueOnce([pendingOrder])
+          .mockImplementation(failAuth)
       const { user } = await openDetail()
       await confirmCancel(user)
       expect(

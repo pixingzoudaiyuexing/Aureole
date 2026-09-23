@@ -8,6 +8,7 @@ import type { AuthApi } from '@/features/auth/auth-api'
 import { ticketsApi } from '@/features/tickets/tickets-api'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
+import { useAuthSessionStore } from '@/lib/auth/session-store'
 
 const firstTicket = {
   id: '7',
@@ -68,13 +69,24 @@ function installMocks() {
 }
 
 function renderSupport() {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'token')
+  const valid = { current: true }
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue({
-      email: 'member@example.com',
-      expiresAt: null,
-      status: 'active',
+    getCurrentUser: vi.fn(async () => {
+      if (!valid.current)
+        throw new ApiError({
+          status: 401,
+          code: 'AUTH_FAILED',
+          message: 'Authentication failed',
+        })
+      return {
+        email: 'member@example.com',
+        expiresAt: null,
+        status: 'active' as const,
+      }
+    }),
+    logout: vi.fn(async () => {
+      valid.current = false
     }),
   }
   const router = createAppRouter({ initialEntries: ['/support'] })
@@ -87,7 +99,13 @@ function renderSupport() {
       queryClient={queryClient}
     />,
   )
-  return { queryClient, router }
+  return {
+    queryClient,
+    router,
+    invalidateSession: () => {
+      valid.current = false
+    },
+  }
 }
 
 describe('Support tickets page', () => {
@@ -125,7 +143,9 @@ describe('Support tickets page', () => {
         name: /High priority ticket.*高.*处理中/,
       }),
     ).toBeInTheDocument()
-    expect(mocks.getList).toHaveBeenCalledWith('token')
+    expect(mocks.getList).toHaveBeenCalledWith(
+      useAuthSessionStore.getState().accessToken,
+    )
     expect(mocks.getDetail).not.toHaveBeenCalled()
 
     expect(screen.getByRole('button', { name: '新建工单' })).toBeInTheDocument()
@@ -157,7 +177,10 @@ describe('Support tickets page', () => {
       await screen.findByRole('heading', { name: 'Connection issue' }),
     ).toBeInTheDocument()
     expect(mocks.getDetail).toHaveBeenCalledTimes(1)
-    expect(mocks.getDetail).toHaveBeenLastCalledWith('token', '7')
+    expect(mocks.getDetail).toHaveBeenLastCalledWith(
+      useAuthSessionStore.getState().accessToken,
+      '7',
+    )
 
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
@@ -171,7 +194,10 @@ describe('Support tickets page', () => {
       await screen.findByRole('heading', { name: 'Billing question' }),
     ).toBeInTheDocument()
     expect(mocks.getDetail).toHaveBeenCalledTimes(2)
-    expect(mocks.getDetail).toHaveBeenLastCalledWith('token', '8')
+    expect(mocks.getDetail).toHaveBeenLastCalledWith(
+      useAuthSessionStore.getState().accessToken,
+      '8',
+    )
 
     await user.click(screen.getByRole('button', { name: '关闭工单详情' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
@@ -314,7 +340,8 @@ describe('Support tickets page', () => {
       mocks.getList.mockRejectedValue(
         new ApiError({ status: 401, code, message: 'auth' }),
       )
-      const { queryClient, router } = renderSupport()
+      const { queryClient, router, invalidateSession } = renderSupport()
+      invalidateSession()
 
       expect(
         await screen.findByRole('heading', { name: '登录 Aureole' }),
@@ -332,11 +359,13 @@ describe('Support tickets page', () => {
       mocks.getDetail.mockRejectedValue(
         new ApiError({ status: 401, code, message: 'auth' }),
       )
-      const { queryClient, router } = renderSupport()
+      const { queryClient, router, invalidateSession } = renderSupport()
       const user = userEvent.setup()
-      await user.click(
-        await screen.findByRole('button', { name: /Connection issue/ }),
-      )
+      const detailButton = await screen.findByRole('button', {
+        name: /Connection issue/,
+      })
+      invalidateSession()
+      await user.click(detailButton)
 
       expect(
         await screen.findByRole('heading', { name: '登录 Aureole' }),

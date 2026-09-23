@@ -85,18 +85,23 @@ function installMocks() {
   }
 }
 
-function renderReferrals(queryClient: QueryClient = createQueryClient()) {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'transfer-token')
-  useAuthSessionStore.setState({
-    accessToken: 'transfer-token',
-    hydrated: true,
-  })
+function renderReferrals(
+  queryClient: QueryClient = createQueryClient(),
+  session = { current: true },
+) {
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue({
-      email: 'member@example.com',
-      expiresAt: null,
-      status: 'active',
+    getCurrentUser: vi.fn().mockImplementation(() =>
+      session.current
+        ? Promise.resolve({
+            email: 'member@example.com',
+            expiresAt: null,
+            status: 'active',
+          })
+        : Promise.reject(apiError('AUTH_REQUIRED', 401)),
+    ),
+    logout: vi.fn().mockImplementation(async () => {
+      session.current = false
     }),
   }
   const router = createAppRouter({ initialEntries: ['/referrals'] })
@@ -107,7 +112,7 @@ function renderReferrals(queryClient: QueryClient = createQueryClient()) {
       queryClient={queryClient}
     />,
   )
-  return { queryClient, router, unmount: rendered.unmount }
+  return { queryClient, router, session, unmount: rendered.unmount }
 }
 
 function renderFullRuntime(queryClient: QueryClient = createQueryClient()) {
@@ -254,7 +259,7 @@ describe('Commission Transfer authority and confirmation', () => {
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /全部/ })).toBeNull()
     await confirmTransfer(form)
-    expect(mocks.transferCommission).toHaveBeenCalledWith('transfer-token', {
+    expect(mocks.transferCommission).toHaveBeenCalledWith(expect.any(String), {
       amountMinor: 2_147_483_647,
     })
   })
@@ -297,7 +302,7 @@ describe('Commission Transfer authority and confirmation', () => {
     fireEvent.click(confirm)
     await waitFor(() => expect(mocks.transferCommission).toHaveBeenCalledOnce())
     expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
-    expect(mocks.transferCommission).toHaveBeenCalledWith('transfer-token', {
+    expect(mocks.transferCommission).toHaveBeenCalledWith(expect.any(String), {
       amountMinor: 1_000,
     })
     expect(
@@ -490,9 +495,7 @@ describe('Commission Transfer outcomes and reconciliation', () => {
       expect(mocks.transferCommission).toHaveBeenCalledOnce()
       expect(mocks.getOverview).toHaveBeenCalledTimes(2)
       expect(mocks.getWallet).toHaveBeenCalledTimes(2)
-      expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-        'transfer-token',
-      )
+      expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
       expect(window.sessionStorage.getItem(commissionSafetyKey)).toBeNull()
     },
   )
@@ -945,16 +948,26 @@ describe('Commission Transfer UNKNOWN safety', () => {
     async (source) => {
       const mocks = installMocks()
       mocks.transferCommission.mockRejectedValue(apiError('NETWORK_ERROR', 0))
+      const session = { current: true }
       if (source === 'overview') {
         mocks.getOverview
           .mockResolvedValueOnce(overview)
-          .mockRejectedValueOnce(apiError('AUTH_FAILED', 401))
+          .mockImplementationOnce(() => {
+            session.current = false
+            return Promise.reject(apiError('AUTH_FAILED', 401))
+          })
       } else {
         mocks.getWallet
           .mockResolvedValueOnce(wallet)
-          .mockRejectedValueOnce(apiError('AUTH_FAILED', 401))
+          .mockImplementationOnce(() => {
+            session.current = false
+            return Promise.reject(apiError('AUTH_FAILED', 401))
+          })
       }
-      const { queryClient, router } = renderReferrals()
+      const { queryClient, router } = renderReferrals(
+        createQueryClient(),
+        session,
+      )
       const form = await openConfirmation()
       await confirmTransfer(form)
 
@@ -974,8 +987,15 @@ describe('Commission Transfer UNKNOWN safety', () => {
     'clears Session Core when Transfer returns %s',
     async (code) => {
       const mocks = installMocks()
-      mocks.transferCommission.mockRejectedValue(apiError(code, 401))
-      const { queryClient, router } = renderReferrals()
+      const session = { current: true }
+      mocks.transferCommission.mockImplementation(() => {
+        session.current = false
+        return Promise.reject(apiError(code, 401))
+      })
+      const { queryClient, router } = renderReferrals(
+        createQueryClient(),
+        session,
+      )
       const form = await openConfirmation()
       await confirmTransfer(form)
 

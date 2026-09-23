@@ -19,11 +19,7 @@ import { referralsApi } from '@/features/referrals/referrals-api'
 import { referralsQueryKeys } from '@/features/referrals/referrals-queries'
 import { walletApi } from '@/features/wallet/wallet-api'
 import { ApiError } from '@/lib/api/errors'
-import {
-  AUTH_SESSION_STORAGE_KEY,
-  AUTH_SESSION_VERSION_STORAGE_KEY,
-} from '@/lib/auth/credential-storage'
-import { AUTH_SHARED_STATE_KEY } from '@/lib/auth/cross-tab-session'
+import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
 
 const overview = {
   codes: [{ code: 'OLD1', createdAt: '2026-09-14T01:00:00.000Z' }],
@@ -71,24 +67,25 @@ function installMocks() {
   return { createCode, getCommissions, getOverview, getWithdrawalOptions }
 }
 
-function renderReferrals(queryClient: QueryClient = createQueryClient()) {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'referral-token')
-  window.sessionStorage.setItem(
-    AUTH_SESSION_VERSION_STORAGE_KEY,
-    'referral-session',
-  )
-  window.localStorage.setItem(
-    AUTH_SHARED_STATE_KEY,
-    JSON.stringify({ version: 'referral-session', status: 'active' }),
-  )
+function renderReferrals(
+  queryClient: QueryClient = createQueryClient(),
+  session = { current: true },
+) {
   queryClient.setQueryData(['private-state'], 'clear-me')
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue({
-      email: 'member@example.com',
-      expiresAt: null,
-      status: 'active',
+    logout: vi.fn().mockImplementation(async () => {
+      session.current = false
     }),
+    getCurrentUser: vi.fn().mockImplementation(() =>
+      session.current
+        ? Promise.resolve({
+            email: 'member@example.com',
+            expiresAt: null,
+            status: 'active',
+          })
+        : Promise.reject(apiError('AUTH_REQUIRED', 401)),
+    ),
   }
   const router = createAppRouter({ initialEntries: ['/referrals'] })
   const rendered = render(
@@ -98,7 +95,7 @@ function renderReferrals(queryClient: QueryClient = createQueryClient()) {
       queryClient={queryClient}
     />,
   )
-  return { queryClient, router, unmount: rendered.unmount }
+  return { queryClient, router, session, unmount: rendered.unmount }
 }
 
 async function openConfirmation(user = userEvent.setup()) {
@@ -158,25 +155,33 @@ describe('Create Referral Code', () => {
   it('requires a fresh authoritative read when mounting with cached Overview', async () => {
     const mocks = installMocks()
     const fresh = deferred<typeof overview>()
-    mocks.getOverview.mockReturnValue(fresh.promise)
-    const queryClient = createQueryClient()
+    const { queryClient } = renderReferrals()
+    await screen.findByText('OLD1')
     queryClient.setQueryData(referralsQueryKeys.overview, overview)
-    renderReferrals(queryClient)
+    mocks.getOverview.mockReturnValue(fresh.promise)
+    void queryClient.refetchQueries({
+      queryKey: referralsQueryKeys.overview,
+      exact: true,
+    })
 
     expect(await screen.findByText('OLD1')).toBeInTheDocument()
     const trigger = screen.getByRole('button', { name: '创建邀请码' })
     expect(trigger).toBeDisabled()
-    expect(mocks.getOverview).toHaveBeenCalledOnce()
+    expect(mocks.getOverview).toHaveBeenCalledTimes(2)
     act(() => fresh.resolve(overview))
     await waitFor(() => expect(trigger).toBeEnabled())
   })
 
   it('keeps stale cached Overview fail closed when the fresh read fails', async () => {
     const mocks = installMocks()
-    mocks.getOverview.mockRejectedValue(apiError('UPSTREAM_ERROR'))
-    const queryClient = createQueryClient()
+    const { queryClient } = renderReferrals()
+    await screen.findByText('OLD1')
     queryClient.setQueryData(referralsQueryKeys.overview, overview)
-    renderReferrals(queryClient)
+    mocks.getOverview.mockRejectedValue(apiError('UPSTREAM_ERROR'))
+    void queryClient.refetchQueries({
+      queryKey: referralsQueryKeys.overview,
+      exact: true,
+    })
 
     expect(await screen.findByText('OLD1')).toBeInTheDocument()
     const trigger = screen.getByRole('button', { name: '创建邀请码' })
@@ -352,9 +357,7 @@ describe('Create Referral Code', () => {
     expect(
       queryClient.getQueryData(referralCreateLocalGuardKeys.uncertainty),
     ).not.toBe('active')
-    expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-      'referral-token',
-    )
+    expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
   })
 
   it('keeps a limit result fail closed when Overview recovery fails', async () => {
@@ -481,14 +484,16 @@ describe('Create Referral Code', () => {
       .mockRejectedValueOnce(apiError('NETWORK_ERROR', 0))
       .mockResolvedValueOnce({ created: true })
     const queryClient = createQueryClient()
-    const first = renderReferrals(queryClient)
+    const { router } = renderReferrals(queryClient)
     const form = await openConfirmation()
     await confirmCreate(form)
     await screen.findByText('邀请码创建结果暂时无法确认。')
     expect(mocks.createCode).toHaveBeenCalledOnce()
 
-    first.unmount()
-    renderReferrals(queryClient)
+    await act(async () => {
+      await router.navigate({ to: '/dashboard' })
+      await router.navigate({ to: '/referrals' })
+    })
     await screen.findByText('OLD1')
     const trigger = screen.getByRole('button', { name: '创建邀请码' })
     expect(trigger).toBeDisabled()
@@ -514,7 +519,7 @@ describe('Create Referral Code', () => {
     const mocks = installMocks()
     mocks.createCode.mockRejectedValueOnce(apiError('NETWORK_ERROR', 0))
     const queryClient = createQueryClient()
-    const first = renderReferrals(queryClient)
+    const { router } = renderReferrals(queryClient)
     const form = await openConfirmation()
     await confirmCreate(form)
     const acknowledgement = await screen.findByRole('checkbox', {
@@ -538,8 +543,10 @@ describe('Create Referral Code', () => {
 
     await form.user.click(acknowledgement)
     expect(trigger).toBeEnabled()
-    first.unmount()
-    renderReferrals(queryClient)
+    await act(async () => {
+      await router.navigate({ to: '/dashboard' })
+      await router.navigate({ to: '/referrals' })
+    })
     await waitFor(() =>
       expect(screen.getByRole('button', { name: '创建邀请码' })).toBeEnabled(),
     )
@@ -599,7 +606,7 @@ describe('Create Referral Code', () => {
       .mockResolvedValueOnce(overview)
       .mockRejectedValue(apiError('UPSTREAM_ERROR'))
     const queryClient = createQueryClient()
-    const first = renderReferrals(queryClient)
+    const { router } = renderReferrals(queryClient)
     const form = await openConfirmation()
     await confirmCreate(form)
     expect(
@@ -611,10 +618,14 @@ describe('Create Referral Code', () => {
     ).toBeInTheDocument()
     expect(mocks.createCode).toHaveBeenCalledOnce()
 
-    first.unmount()
+    await act(async () => {
+      await router.navigate({ to: '/dashboard' })
+    })
     const remountRead = deferred<typeof overview>()
     mocks.getOverview.mockReturnValue(remountRead.promise)
-    renderReferrals(queryClient)
+    await act(async () => {
+      await router.navigate({ to: '/referrals' })
+    })
     const trigger = await screen.findByRole('button', { name: '创建邀请码' })
     expect(trigger).toBeDisabled()
     fireEvent.click(trigger)
@@ -635,8 +646,15 @@ describe('Create Referral Code', () => {
     'clears the sealed session when Create returns %s',
     async (code) => {
       const mocks = installMocks()
-      mocks.createCode.mockRejectedValue(apiError(code, 401))
-      const { queryClient, router } = renderReferrals()
+      const session = { current: true }
+      mocks.createCode.mockImplementation(() => {
+        session.current = false
+        return Promise.reject(apiError(code, 401))
+      })
+      const { queryClient, router } = renderReferrals(
+        createQueryClient(),
+        session,
+      )
       const form = await openConfirmation()
       await confirmCreate(form)
 
@@ -651,6 +669,7 @@ describe('Create Referral Code', () => {
     'clears the sealed session when %s reconciliation returns AUTH_FAILED',
     async (outcome) => {
       const mocks = installMocks()
+      const session = { current: true }
       if (outcome === 'limit') {
         mocks.createCode.mockRejectedValue(
           apiError('REFERRAL_CODE_LIMIT_REACHED', 409),
@@ -660,8 +679,14 @@ describe('Create Referral Code', () => {
       }
       mocks.getOverview
         .mockResolvedValueOnce(overview)
-        .mockRejectedValue(apiError('AUTH_FAILED', 401))
-      const { queryClient, router } = renderReferrals()
+        .mockImplementation(() => {
+          session.current = false
+          return Promise.reject(apiError('AUTH_FAILED', 401))
+        })
+      const { queryClient, router } = renderReferrals(
+        createQueryClient(),
+        session,
+      )
       const form = await openConfirmation()
       await confirmCreate(form)
 
@@ -674,11 +699,15 @@ describe('Create Referral Code', () => {
 
   it('clears the sealed session when manual Overview recovery returns AUTH_REQUIRED', async () => {
     const mocks = installMocks()
+    const session = { current: true }
     mocks.createCode.mockRejectedValue(apiError('NETWORK_ERROR', 0))
     mocks.getOverview
       .mockResolvedValueOnce(overview)
       .mockRejectedValue(apiError('UPSTREAM_ERROR'))
-    const { queryClient, router } = renderReferrals()
+    const { queryClient, router } = renderReferrals(
+      createQueryClient(),
+      session,
+    )
     const form = await openConfirmation()
     await confirmCreate(form)
     const retry = await screen.findByRole(
@@ -687,7 +716,10 @@ describe('Create Referral Code', () => {
       { timeout: 3_000 },
     )
 
-    mocks.getOverview.mockRejectedValue(apiError('AUTH_REQUIRED', 401))
+    mocks.getOverview.mockImplementation(() => {
+      session.current = false
+      return Promise.reject(apiError('AUTH_REQUIRED', 401))
+    })
     await userEvent.setup().click(retry)
     expect(
       await screen.findByRole('heading', { name: '登录 Aureole' }),

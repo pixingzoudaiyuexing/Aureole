@@ -87,14 +87,24 @@ function installMocks() {
   return { advancePeriod, getAccess, getEntries, rotateAccess }
 }
 
-function renderSubscription(queryClient: QueryClient = createQueryClient()) {
-  window.sessionStorage.setItem(
-    AUTH_SESSION_STORAGE_KEY,
-    'opaque-session-token',
-  )
+function renderSubscription(
+  queryClient: QueryClient = createQueryClient(),
+  valid = { current: true },
+) {
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue(currentUser),
+    getCurrentUser: vi.fn(async () => {
+      if (!valid.current)
+        throw new ApiError({
+          status: 401,
+          code: 'AUTH_FAILED',
+          message: 'Authentication failed',
+        })
+      return currentUser
+    }),
+    logout: vi.fn(async () => {
+      valid.current = false
+    }),
   }
   const router = createAppRouter({ initialEntries: ['/subscription'] })
   render(
@@ -289,9 +299,7 @@ describe('Subscription access rotation', () => {
     expect(screen.queryByText('private upstream detail')).toBeNull()
     expect(mocks.rotateAccess).toHaveBeenCalledOnce()
     expect(mocks.getAccess).toHaveBeenCalledTimes(2)
-    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-      'opaque-session-token',
-    )
+    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
     expect(JSON.stringify(queryClient.getQueryCache().getAll())).not.toContain(
       oldCredentialUrl,
     )
@@ -318,9 +326,7 @@ describe('Subscription access rotation', () => {
     expect(
       screen.getByRole('button', { name: '重置订阅地址' }),
     ).toBeInTheDocument()
-    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-      'opaque-session-token',
-    )
+    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
 
     const second = await openConfirmation()
     expect(mocks.rotateAccess).toHaveBeenCalledOnce()
@@ -895,15 +901,23 @@ describe('Subscription access rotation', () => {
     'clears the session and exits protected UI after %s rejects authentication',
     async (_name, mutationError, recoveryError) => {
       const mocks = installMocks()
-      if (mutationError) mocks.rotateAccess.mockRejectedValue(mutationError)
+      const valid = { current: true }
+      if (mutationError)
+        mocks.rotateAccess.mockImplementation(async () => {
+          if (mutationError.status === 401) valid.current = false
+          throw mutationError
+        })
       if (recoveryError) {
         mocks.getAccess
           .mockResolvedValueOnce({ accessUrl: oldCredentialUrl })
-          .mockRejectedValueOnce(recoveryError)
+          .mockImplementationOnce(async () => {
+            valid.current = false
+            throw recoveryError
+          })
       }
       const queryClient = createQueryClient()
       queryClient.setQueryData(['private-data'], { sensitive: true })
-      const { router } = renderSubscription(queryClient)
+      const { router } = renderSubscription(queryClient, valid)
       const { dialog, user } = await openConfirmation()
       await acknowledgeAndConfirm(dialog, user)
 

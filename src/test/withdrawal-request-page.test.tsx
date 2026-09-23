@@ -96,32 +96,37 @@ function installMocks() {
   }
 }
 
-function authApi(): AuthApi {
+function authApi(session: { current: boolean }): AuthApi {
   return {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue({
-      email: 'member@example.com',
-      expiresAt: null,
-      status: 'active',
+    getCurrentUser: vi.fn().mockImplementation(() =>
+      session.current
+        ? Promise.resolve({
+            email: 'member@example.com',
+            expiresAt: null,
+            status: 'active',
+          })
+        : Promise.reject(apiError('AUTH_REQUIRED', 401)),
+    ),
+    logout: vi.fn().mockImplementation(async () => {
+      session.current = false
     }),
   }
 }
 
-function renderReferrals(queryClient: QueryClient = createQueryClient()) {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'withdrawal-token')
-  useAuthSessionStore.setState({
-    accessToken: 'withdrawal-token',
-    hydrated: true,
-  })
+function renderReferrals(
+  queryClient: QueryClient = createQueryClient(),
+  session = { current: true },
+) {
   const router = createAppRouter({ initialEntries: ['/referrals'] })
   const rendered = render(
     <AppProviders
       router={router}
-      authApi={authApi()}
+      authApi={authApi(session)}
       queryClient={queryClient}
     />,
   )
-  return { queryClient, router, unmount: rendered.unmount }
+  return { queryClient, router, session, unmount: rendered.unmount }
 }
 
 function renderFullRuntime(queryClient: QueryClient = createQueryClient()) {
@@ -132,14 +137,15 @@ function renderFullRuntime(queryClient: QueryClient = createQueryClient()) {
     hydrated: false,
   })
   const router = createAppRouter({ initialEntries: ['/referrals'] })
+  const session = { current: true }
   const rendered = render(
     <AppProviders
       router={router}
-      authApi={authApi()}
+      authApi={authApi(session)}
       queryClient={queryClient}
     />,
   )
-  return { queryClient, router, unmount: rendered.unmount }
+  return { queryClient, router, session, unmount: rendered.unmount }
 }
 
 async function withdrawalSection() {
@@ -307,12 +313,19 @@ describe('Withdrawal Request authority and confirmation', () => {
     const mocks = installMocks()
     const pendingOptions = deferred<{ enabled: true; methods: string[] }>()
     const queryClient = createQueryClient()
+    renderReferrals(queryClient)
+    await waitFor(() =>
+      expect(useAuthSessionStore.getState().validated).toBe(true),
+    )
     queryClient.setQueryData(referralsQueryKeys.withdrawalOptions, {
       enabled: true,
       methods: [methodOne],
     })
     mocks.getWithdrawalOptions.mockReturnValue(pendingOptions.promise)
-    renderReferrals(queryClient)
+    void queryClient.refetchQueries({
+      queryKey: referralsQueryKeys.withdrawalOptions,
+      exact: true,
+    })
     const section = await withdrawalSection()
 
     expect(section.queryByLabelText('提现账户')).toBeNull()
@@ -379,7 +392,7 @@ describe('Withdrawal Request authority and confirmation', () => {
     fireEvent.click(confirm)
     fireEvent.click(confirm)
     await waitFor(() => expect(mocks.requestWithdrawal).toHaveBeenCalledOnce())
-    expect(mocks.requestWithdrawal).toHaveBeenCalledWith('withdrawal-token', {
+    expect(mocks.requestWithdrawal).toHaveBeenCalledWith(expect.any(String), {
       method: methodOne,
       account: rawAccount,
     })
@@ -499,9 +512,7 @@ describe('Withdrawal Request outcomes and exact reconciliation', () => {
       expect(form.input).toHaveValue('')
       expect(form.select).toHaveValue('')
       expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBeNull()
-      expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-        'withdrawal-token',
-      )
+      expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
     },
   )
 })
@@ -754,8 +765,11 @@ describe('Withdrawal Request full-runtime and session safety', () => {
     window.sessionStorage.setItem(withdrawalSafetyKey, 'active')
     window.sessionStorage.setItem(commissionSafetyKey, 'acknowledged')
     const queryClient = createQueryClient()
-    queryClient.setQueryData(referralCreateLocalGuardKeys.uncertainty, 'active')
     renderReferrals(queryClient)
+    await waitFor(() =>
+      expect(useAuthSessionStore.getState().validated).toBe(true),
+    )
+    queryClient.setQueryData(referralCreateLocalGuardKeys.uncertainty, 'active')
 
     await userEvent
       .setup()
@@ -775,8 +789,11 @@ describe('Withdrawal Request full-runtime and session safety', () => {
     mocks.requestWithdrawal.mockRejectedValue(apiError('NETWORK_ERROR', 0))
     window.sessionStorage.setItem(commissionSafetyKey, 'acknowledged')
     const queryClient = createQueryClient()
-    queryClient.setQueryData(referralCreateLocalGuardKeys.uncertainty, 'active')
     renderReferrals(queryClient)
+    await waitFor(() =>
+      expect(useAuthSessionStore.getState().validated).toBe(true),
+    )
+    queryClient.setQueryData(referralCreateLocalGuardKeys.uncertainty, 'active')
     const form = await openConfirmation()
     await confirmWithdrawal(form)
 
@@ -1075,9 +1092,16 @@ describe('Withdrawal Request storage and Auth failure handling', () => {
     'clears Session Core when Withdrawal returns %s',
     async (code) => {
       const mocks = installMocks()
-      mocks.requestWithdrawal.mockRejectedValue(apiError(code, 401))
+      const session = { current: true }
+      mocks.requestWithdrawal.mockImplementation(() => {
+        session.current = false
+        return Promise.reject(apiError(code, 401))
+      })
       window.sessionStorage.setItem(commissionSafetyKey, 'active')
-      const { queryClient, router } = renderReferrals()
+      const { queryClient, router } = renderReferrals(
+        createQueryClient(),
+        session,
+      )
       const form = await openConfirmation()
       await confirmWithdrawal(form)
 
@@ -1099,11 +1123,18 @@ describe('Withdrawal Request storage and Auth failure handling', () => {
 
   it('clears Session Core when UNKNOWN Options recovery returns AUTH_FAILED', async () => {
     const mocks = installMocks()
+    const session = { current: true }
     mocks.requestWithdrawal.mockRejectedValue(apiError('NETWORK_ERROR', 0))
     mocks.getWithdrawalOptions
       .mockResolvedValueOnce({ enabled: true, methods: [methodOne] })
-      .mockRejectedValueOnce(apiError('AUTH_FAILED', 401))
-    const { queryClient, router } = renderReferrals()
+      .mockImplementationOnce(() => {
+        session.current = false
+        return Promise.reject(apiError('AUTH_FAILED', 401))
+      })
+    const { queryClient, router } = renderReferrals(
+      createQueryClient(),
+      session,
+    )
     const form = await openConfirmation()
     await confirmWithdrawal(form)
 

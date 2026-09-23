@@ -21,6 +21,7 @@ import { walletApi } from '@/features/wallet/wallet-api'
 import { walletQueryKeys } from '@/features/wallet/wallet-queries'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
+import { useAuthSessionStore } from '@/lib/auth/session-store'
 
 const recoveredOrder = {
   id: 'same-looking-order',
@@ -71,14 +72,27 @@ function installMocks() {
   }
 }
 
-function renderWallet(queryClient: QueryClient = createQueryClient()) {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'wallet-token')
+function renderWallet(
+  queryClient: QueryClient = createQueryClient(),
+  valid = { current: true },
+) {
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue({
-      email: 'member@example.com',
-      expiresAt: null,
-      status: 'active',
+    getCurrentUser: vi.fn(async () => {
+      if (!valid.current)
+        throw new ApiError({
+          status: 401,
+          code: 'AUTH_FAILED',
+          message: 'Authentication failed',
+        })
+      return {
+        email: 'member@example.com',
+        expiresAt: null,
+        status: 'active' as const,
+      }
+    }),
+    logout: vi.fn(async () => {
+      valid.current = false
     }),
   }
   const router = createAppRouter({ initialEntries: ['/wallet'] })
@@ -223,9 +237,12 @@ describe('Wallet deposit creation', () => {
     act(() => created.resolve({ id: 'deposit-order-001' }))
     expect(await screen.findByText('充值订单已创建')).toBeInTheDocument()
     expect(mocks.createDeposit).toHaveBeenCalledOnce()
-    expect(mocks.createDeposit).toHaveBeenCalledWith('wallet-token', {
-      amountMinor: 10_000,
-    })
+    expect(mocks.createDeposit).toHaveBeenCalledWith(
+      useAuthSessionStore.getState().accessToken,
+      {
+        amountMinor: 10_000,
+      },
+    )
     void user
   })
 
@@ -280,9 +297,7 @@ describe('Wallet deposit creation', () => {
     ).toBeInTheDocument()
     expect(mocks.createDeposit).toHaveBeenCalledOnce()
     expect(mocks.getList).toHaveBeenCalledOnce()
-    expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-      'wallet-token',
-    )
+    expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
   })
 
   it('preserves an invalid amount and requires a new confirmation before another POST', async () => {
@@ -464,7 +479,25 @@ describe('Wallet deposit authentication and read boundaries', () => {
       }
       const queryClient = createQueryClient()
       queryClient.setQueryData(['private-state'], { private: true })
-      const { router } = renderWallet(queryClient)
+      const valid = { current: true }
+      const failAuth = async () => {
+        valid.current = false
+        throw authError
+      }
+      if (source === 'deposit') mocks.createDeposit.mockImplementation(failAuth)
+      else if (source === 'recovery') mocks.getList.mockImplementation(failAuth)
+      else
+        mocks.getList
+          .mockReset()
+          .mockRejectedValueOnce(
+            new ApiError({
+              status: 0,
+              code: 'NETWORK_ERROR',
+              message: 'offline',
+            }),
+          )
+          .mockImplementation(failAuth)
+      const { router } = renderWallet(queryClient, valid)
       const { dialog, user } = await openConfirmation()
       await confirmDeposit(dialog, user)
       if (source === 'manual') {

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { apiClient } from '@/lib/api/client'
 import { ApiError } from '@/lib/api/errors'
-import { loginResponseSchema, parsePublicData } from './auth-api'
+import { parsePublicData, parseSessionUser } from './auth-api'
 
 export const accountEmailSchema = z
   .string()
@@ -210,11 +210,12 @@ export const publicAccountApi = {
 
   async register(input: RegisterInput) {
     const request = registerRequestSchema.parse(input)
+    await apiClient.request('/api/v1/auth/browser')
     const data = await apiClient.request<unknown>('/api/v1/auth/register', {
       method: 'POST',
       body: request,
     })
-    return parsePublicData(loginResponseSchema, data)
+    return parseSessionUser(data)
   },
 
   async resetPassword(input: PasswordResetInput) {

@@ -9,6 +9,7 @@ import type { AuthApi } from '@/features/auth/auth-api'
 import { ordersApi } from '@/features/orders/orders-api'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
+import { useAuthSessionStore } from '@/lib/auth/session-store'
 
 const baseOrder = {
   id: 'order-pending',
@@ -39,13 +40,24 @@ function installMocks() {
 }
 
 function renderOrders() {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'token')
+  const valid = { current: true }
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue({
-      email: 'member@example.com',
-      expiresAt: null,
-      status: 'active',
+    getCurrentUser: vi.fn(async () => {
+      if (!valid.current)
+        throw new ApiError({
+          status: 401,
+          code: 'AUTH_FAILED',
+          message: 'Authentication failed',
+        })
+      return {
+        email: 'member@example.com',
+        expiresAt: null,
+        status: 'active' as const,
+      }
+    }),
+    logout: vi.fn(async () => {
+      valid.current = false
     }),
   }
   const router = createAppRouter({ initialEntries: ['/orders'] })
@@ -56,7 +68,12 @@ function renderOrders() {
       queryClient={createQueryClient()}
     />,
   )
-  return router
+  return {
+    router,
+    invalidateSession: () => {
+      valid.current = false
+    },
+  }
 }
 
 describe('Orders page', () => {
@@ -163,7 +180,10 @@ describe('Orders page', () => {
     expect(within(dialog).getByText(/2026年9月13日/)).toBeInTheDocument()
     expect(within(dialog).getByText('暂无更新时间')).toBeInTheDocument()
     expect(within(dialog).getByText('未提供订单过期时间')).toBeInTheDocument()
-    expect(mocks.getDetail).toHaveBeenCalledWith('token', 'order-pending')
+    expect(mocks.getDetail).toHaveBeenCalledWith(
+      useAuthSessionStore.getState().accessToken,
+      'order-pending',
+    )
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(trigger).toHaveFocus()
@@ -263,7 +283,8 @@ describe('Orders page', () => {
       mocks.getList.mockRejectedValue(
         new ApiError({ status: 401, code, message: 'auth' }),
       )
-      const router = renderOrders()
+      const { router, invalidateSession } = renderOrders()
+      invalidateSession()
       expect(
         await screen.findByRole('heading', { name: '登录 Aureole' }),
       ).toBeInTheDocument()
@@ -279,11 +300,13 @@ describe('Orders page', () => {
       mocks.getDetail.mockRejectedValue(
         new ApiError({ status: 401, code, message: 'auth' }),
       )
-      const router = renderOrders()
+      const { router, invalidateSession } = renderOrders()
       const user = userEvent.setup()
-      await user.click(
-        await screen.findByRole('button', { name: /order-pending/ }),
-      )
+      const detailButton = await screen.findByRole('button', {
+        name: /order-pending/,
+      })
+      invalidateSession()
+      await user.click(detailButton)
       expect(
         await screen.findByRole('heading', { name: '登录 Aureole' }),
       ).toBeInTheDocument()
@@ -298,7 +321,8 @@ describe('Orders page', () => {
     mocks.getConfig.mockRejectedValue(
       new ApiError({ status: 401, code: 'AUTH_FAILED', message: 'auth' }),
     )
-    const router = renderOrders()
+    const { router, invalidateSession } = renderOrders()
+    invalidateSession()
     expect(
       await screen.findByRole('heading', { name: '登录 Aureole' }),
     ).toBeInTheDocument()

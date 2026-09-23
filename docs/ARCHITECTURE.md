@@ -97,21 +97,21 @@ fallback。跨域 iframe 的 X-Frame-Options、frame-ancestors、DNS 和 remote 
 
 `src/lib/api` 使用 native `fetch` typed wrapper，集中处理 base URL、JSON、public envelope、HTTP status、requestId、network error 与 malformed response。路径必须以 `/api/v1/` 开头。业务分类只能依据 `ApiError.code`，禁止 `message.includes(...)`。
 
-`VITE_API_BASE_URL` 是公开 solution Origin，不是 Secret。Auth session 只在 memory + `sessionStorage` 保存 opaque bearer，不解析、不写入 `localStorage`，也不持久化 Query cache。API Client 只通过显式 authenticated request boundary 添加 `Authorization: Bearer <opaque-token>`，并拒绝调用方手工注入 Authorization header。
+当前 Cloudflare Pages 会话模式只允许同源 `/api/v1`；未配置时 API Client 使用页面 Origin，显式 `VITE_API_BASE_URL` 也必须等于页面 Origin。浏览器不再接收 solution Bearer，拒绝手工 Authorization。Pages Function 以服务端 `SOLUTION_GATEWAY_ORIGIN` 代理 solution Public API，并以 D1 保存当前会话、加密保存上游 Bearer。固定名 `__Host-aureole_session` 与浏览器 family Cookie 均为 Secure、HttpOnly、SameSite=Lax；旧 `sessionStorage` Bearer 在启动及身份清理时删除，不用于恢复认证。
 
-`sessionStorage` 是正常的 tab-session persistence。如果浏览器因 privacy/security/quota 限制拒绝写入，登录可降级为当前 document lifetime 内的 memory-only session；页面刷新后无法恢复时按 unauthenticated 处理，禁止降级到 `localStorage`、IndexedDB、cookie 或 URL。
+`features/auth` 独占 Login、Register、Logout 和 `/api/v1/auth/session` 验证。Zustand 中的 `accessToken` 是仅存在内存的随机身份标记，**不是**上游 Bearer；`sessionVersion` 也仅用于区分当前已验证身份。登录或注册收到安全字段后，必须再次从服务端核对相同的 `sessionVersion` 才渲染私有 UI。刷新、新标签页和重新打开网站均通过 Cookie 向服务端验证，不依赖标签页间的 Token 交接。跨标签页通知不含凭据，只触发重新核对；聚焦和恢复可见也会核对身份。
 
-`features/auth` 独占 Login、session bootstrap 和 `/me` query 的前端 ownership。Zustand 只保存 access token 与 hydration 状态；`/me` DTO 只存在于 TanStack Query server state，不复制进 Zustand。Login mutation 明确不 retry，收到 token 后必须完成 `/me` bootstrap 才建立 authenticated UI。
+每次身份变化先递增 generation、清理私有 Query 并保守处理财务不确定性标记；旧业务响应和旧认证错误不得回填新身份。固定 Cookie 在重叠登录响应乱序时可能被旧值覆盖：D1 只授权当前会话，此时旧 Cookie 被拒绝，私有数据隔离，用户需要正常重新登录。退出仅撤销请求携带的会话，**不**发送迟到的 Cookie 清除响应，以免擦除较新的登录；旧 Cookie 仍由服务端拒绝。
 
 Auth response parser 对 solution 的 additive unknown fields 保持兼容，同时 strip 未知字段，只把 Aureole 当前认识且已强校验的白名单字段交给应用层。Login 等 request schema 不因此放宽。
 
-`AUTH_REQUIRED` / `AUTH_FAILED` 证明 credential 无效时，前端清除 memory、sessionStorage 和完整 Query cache 并回到 Login。`NETWORK_ERROR`、`UPSTREAM_ERROR`、`UPSTREAM_TIMEOUT` 不证明 credential 无效：保留 token，隐藏受保护 UI，并提供重试或 local logout。由于 solution 没有 Public logout endpoint，当前 Logout 只清理本地 credential 与 Query cache，不声明服务器撤销。
+`AUTH_REQUIRED` / `AUTH_FAILED` 确认会话不可用时，前端隔离内存身份及完整私有 Query，返回 Login。暂时网络、数据库或上游故障不证明认证失效：隐藏私有 UI 并提供重试，服务端 Cookie 不因这一失败被清除。主动退出调用 Pages `/api/v1/auth/logout` 撤销当前服务端会话；调用失败时不声称撤销成功，保持私有 UI 隔离并再次核对。
 
 ## Public onboarding and challenge
 
 Active Public Contract baseline 是 re-frozen solution
 `3cc0de610b8e748b5d88d2ab3444e08461ab91ef`。Solution Public API 使用 wildcard
-non-credentialed CORS；Bearer 仍是显式认证机制，Origin 不参与身份或授权。Onboarding config 属于 TanStack
+non-credentialed CORS；Bearer 只由 Pages 服务端发给 solution，Origin 不参与上游身份或授权。Onboarding config 属于 TanStack
 Query server state，不进入 Zustand 或持久化缓存；requirements 未知时 Registration
 与 Recovery fail closed，不猜测 registration availability。
 

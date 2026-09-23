@@ -9,6 +9,7 @@ import { noticesApi } from '@/features/notices/notices-api'
 import { subscriptionApi } from '@/features/subscription/subscription-api'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
+import { useAuthSessionStore } from '@/lib/auth/session-store'
 
 const summary = {
   id: '7',
@@ -43,14 +44,27 @@ function installMocks() {
   return { getList, getDetail }
 }
 
-function renderRoute(path: '/notices' | '/dashboard') {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'token')
+function renderRoute(
+  path: '/notices' | '/dashboard',
+  valid = { current: true },
+) {
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue({
-      email: 'member@example.com',
-      expiresAt: null,
-      status: 'active',
+    getCurrentUser: vi.fn(async () => {
+      if (!valid.current)
+        throw new ApiError({
+          status: 401,
+          code: 'AUTH_FAILED',
+          message: 'Authentication failed',
+        })
+      return {
+        email: 'member@example.com',
+        expiresAt: null,
+        status: 'active' as const,
+      }
+    }),
+    logout: vi.fn(async () => {
+      valid.current = false
     }),
   }
   const router = createAppRouter({ initialEntries: [path] })
@@ -87,7 +101,11 @@ describe('Notices page', () => {
     await user.click(screen.getByRole('button', { name: '下一页' }))
     expect(await screen.findByText('第 2 / 2 页')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '下一页' })).toBeDisabled()
-    expect(mocks.getList).toHaveBeenLastCalledWith('token', 2, 20)
+    expect(mocks.getList).toHaveBeenLastCalledWith(
+      useAuthSessionStore.getState().accessToken,
+      2,
+      20,
+    )
   })
 
   it('shows honest empty state', async () => {
@@ -186,10 +204,12 @@ describe('Notices page', () => {
     'exits after detail %s',
     async (code) => {
       const mocks = installMocks()
-      mocks.getDetail.mockRejectedValue(
-        new ApiError({ status: 401, code, message: 'auth' }),
-      )
-      const router = renderRoute('/notices')
+      const valid = { current: true }
+      mocks.getDetail.mockImplementation(async () => {
+        valid.current = false
+        throw new ApiError({ status: 401, code, message: 'auth' })
+      })
+      const router = renderRoute('/notices', valid)
       const user = userEvent.setup()
       await user.click(
         await screen.findByRole('button', { name: /First Notice/ }),
@@ -207,10 +227,12 @@ describe('Notices page', () => {
     'exits after list %s',
     async (code) => {
       const mocks = installMocks()
-      mocks.getList.mockRejectedValue(
-        new ApiError({ status: 401, code, message: 'auth' }),
-      )
-      const router = renderRoute('/notices')
+      const valid = { current: true }
+      mocks.getList.mockImplementation(async () => {
+        valid.current = false
+        throw new ApiError({ status: 401, code, message: 'auth' })
+      })
+      const router = renderRoute('/notices', valid)
       expect(
         await screen.findByRole('heading', { name: '登录 Aureole' }),
       ).toBeInTheDocument()
@@ -230,7 +252,11 @@ describe('Dashboard latest notice', () => {
       'href',
       '/notices',
     )
-    expect(mocks.getList).toHaveBeenCalledWith('token', 1, 1)
+    expect(mocks.getList).toHaveBeenCalledWith(
+      useAuthSessionStore.getState().accessToken,
+      1,
+      1,
+    )
     expect(mocks.getDetail).not.toHaveBeenCalled()
     expect(screen.queryByText(/未读|重要/)).toBeNull()
   })
@@ -275,10 +301,12 @@ describe('Dashboard latest notice', () => {
     'exits Dashboard after notice %s',
     async (code) => {
       const mocks = installMocks()
-      mocks.getList.mockRejectedValue(
-        new ApiError({ status: 401, code, message: 'auth' }),
-      )
-      const router = renderRoute('/dashboard')
+      const valid = { current: true }
+      mocks.getList.mockImplementation(async () => {
+        valid.current = false
+        throw new ApiError({ status: 401, code, message: 'auth' })
+      })
+      const router = renderRoute('/dashboard', valid)
       expect(
         await screen.findByRole('heading', { name: '登录 Aureole' }),
       ).toBeInTheDocument()

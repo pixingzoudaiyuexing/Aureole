@@ -9,7 +9,7 @@ The default production architecture uses a **same-origin** model:
 
 - Browser requests the frontend origin (e.g. `https://frontend.example.com`).
 - API requests default to the same origin under `/api/v1/*`.
-- The deployment edge/reverse proxy routes `/api/v1/*` to the solution Gateway.
+- The Cloudflare Pages Function owns `/api/v1/*`, validates the browser session against D1, and proxies allowlisted routes to the solution Gateway.
 - Aureole itself never knows or exposes the backend/V2Board origin.
 
 ## 2. Same-Origin `/api/v1` Default
@@ -18,23 +18,11 @@ By default, the Aureole artifact requires no build-time configuration to locate 
 If `VITE_API_BASE_URL` is absent during build, the API client falls back to the browser's `window.location.origin` at runtime.
 This ensures a standard build succeeds and produces a valid same-origin artifact.
 
-## 3. Cross-Origin Exception
+## 3. Server Session Bindings
 
-The `VITE_API_BASE_URL` variable may be provided to override the API origin.
-When set, it must be an HTTPS origin (e.g., `VITE_API_BASE_URL=https://api.example.com`). It validates the protocol, rejects credential-bearing URLs, and rejects any pathname, query, or hash.
-HTTP is only permitted for loopback addresses (`localhost`, `127.0.0.1`, `[::1]`) to support local development if required.
+The current Cookie Session build requires a same-origin Pages Function and `AUREOLE_SESSION_DB` D1 binding, `AUREOLE_SESSION_ENCRYPTION_KEY` secret, and `SOLUTION_GATEWAY_ORIGIN` server binding. Do not put the Gateway origin, encryption key, or upstream Bearer in `VITE_API_BASE_URL` or the static artifact. An explicit `VITE_API_BASE_URL` must match the browser origin exactly; cross-origin browser API mode is not supported by this build. Any future non-Pages production target needs a separately reviewed implementation of the same session boundary.
 
-This is an **exception mode**. For cross-origin production:
-
-- The override origin MUST be HTTPS.
-- The re-frozen solution Public API returns `Access-Control-Allow-Origin: *` without `Access-Control-Allow-Credentials`; frontend domains are replaceable clients and require no solution origin configuration.
-- Bearer authentication remains explicit. Origin, Referer, and cookies are not authentication or authorization inputs.
-- CSP `connect-src` must permit ONLY the exact approved HTTPS solution API origin required for fetch connectivity. Do not weaken `script-src`, `img-src`, or `frame-src` merely because `connect-src` needs another origin.
-- For normal same-origin production, `connect-src` should remain constrained to the allowed origin requirements without broadly using `*`.
-- Bearer authentication semantics remain unchanged.
-- Aureole still only calls solution `/api/v1` and must never call V2Board directly.
-
-For same-origin Pages deployments, the Function derives the current exact HTTPS frontend `Origin` from the request URL and forwards it only as Checkout return-URL protocol metadata. It also preserves the browser `User-Agent` for V2Board payment presentation. Neither value is persisted or treated as identity.
+The Function forwards the current exact HTTPS frontend `Origin` only as Checkout return-URL protocol metadata and preserves the browser `User-Agent` for payment presentation. Neither value is persisted or treated as identity.
 
 ## 4. Multi-Domain Artifact Portability
 
