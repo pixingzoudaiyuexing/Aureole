@@ -18,7 +18,7 @@ describe('Auth session isolation', () => {
   it('marks a late 401 from session A as stale after session B becomes current', async () => {
     const response = deferred<Response>()
     const client = createApiClient({
-      baseUrl: 'https://gateway.example',
+      baseUrl: window.location.origin,
       fetchImpl: vi.fn(() => response.promise),
     })
     useAuthSessionStore.setState({
@@ -50,14 +50,14 @@ describe('Auth session isolation', () => {
     )
 
     const error = await request.catch((caught) => caught)
-    expect(error).toMatchObject({ code: 'AUTH_FAILED' })
+    expect(error).toMatchObject({ code: 'STALE_SESSION' })
     expect(isErrorFromCurrentAuthSession(error)).toBe(false)
     expect(useAuthSessionStore.getState().accessToken).toBe('session-b-token')
   })
 
   it('does not attribute a newly-started old-token request to the current session', async () => {
     const client = createApiClient({
-      baseUrl: 'https://gateway.example',
+      baseUrl: window.location.origin,
       fetchImpl: vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
@@ -83,7 +83,7 @@ describe('Auth session isolation', () => {
       })
       .catch((caught) => caught)
 
-    expect(error).toMatchObject({ code: 'AUTH_FAILED' })
+    expect(error).toMatchObject({ code: 'STALE_SESSION' })
     expect(isErrorFromCurrentAuthSession(error)).toBe(false)
     expect(useAuthSessionStore.getState().accessToken).toBe('session-b-token')
   })

@@ -2,10 +2,6 @@ import { create } from 'zustand'
 import {
   clearSessionCredential,
   clearSessionVersion,
-  readSessionCredential,
-  readSessionVersion,
-  writeSessionCredential,
-  writeSessionVersion,
 } from './credential-storage'
 
 interface AuthSessionState {
@@ -27,15 +23,17 @@ export const useAuthSessionStore = create<AuthSessionState>((set) => ({
   hydrated: false,
   validated: false,
   hydrate: () =>
-    set({
-      accessToken: readSessionCredential(),
-      sessionVersion: readSessionVersion(),
-      hydrated: true,
-      validated: false,
+    set(() => {
+      clearSessionCredential()
+      clearSessionVersion()
+      return {
+        accessToken: null,
+        sessionVersion: null,
+        hydrated: true,
+        validated: false,
+      }
     }),
   setAccessToken: (accessToken, sessionVersion) => {
-    writeSessionCredential(accessToken)
-    if (sessionVersion) writeSessionVersion(sessionVersion)
     set({
       accessToken,
       sessionVersion: sessionVersion ?? null,

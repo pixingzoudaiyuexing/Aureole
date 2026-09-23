@@ -38,12 +38,12 @@ export function getBootstrapErrorMessage(error: unknown) {
 
   switch (error.code) {
     case 'NETWORK_ERROR':
-      return '无法连接服务，登录凭据仍保留在此浏览器会话中。'
+      return '无法连接服务。服务端会话未被确认为失效，请稍后重试。'
     case 'UPSTREAM_TIMEOUT':
-      return '服务响应超时，登录凭据仍保留在此浏览器会话中。'
+      return '服务响应超时。服务端会话未被确认为失效，请稍后重试。'
     case 'UPSTREAM_ERROR':
-      return '服务暂时不可用，登录凭据仍保留在此浏览器会话中。'
+      return '服务暂时不可用。服务端会话未被确认为失效，请稍后重试。'
     default:
-      return '暂时无法验证登录状态，登录凭据仍保留在此浏览器会话中。'
+      return '暂时无法验证登录状态。请稍后重试。'
   }
 }

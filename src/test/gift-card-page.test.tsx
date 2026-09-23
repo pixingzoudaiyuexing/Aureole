@@ -106,14 +106,31 @@ function renderWallet(
   mocks: Mocks,
   queryClient: QueryClient = createQueryClient(),
 ) {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'wallet-token')
+  let sessionValid = true
   queryClient.setQueryData(subscriptionQueryKeys.deliveryOptions, {
     defaultEntryId: 'primary',
     entries: [{ id: 'primary', label: 'Subscription' }],
   })
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: mocks.getCurrentUser,
+    getCurrentUser: async (token) => {
+      if (!sessionValid)
+        throw new ApiError({
+          status: 401,
+          code: 'AUTH_REQUIRED',
+          message: 'Authentication required',
+        })
+      try {
+        return await mocks.getCurrentUser(token)
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401)
+          sessionValid = false
+        throw error
+      }
+    },
+    logout: vi.fn(async () => {
+      sessionValid = false
+    }),
   }
   const router = createAppRouter({ initialEntries: ['/wallet'] })
   render(
@@ -123,7 +140,13 @@ function renderWallet(
       queryClient={queryClient}
     />,
   )
-  return { queryClient, router }
+  return {
+    queryClient,
+    router,
+    invalidateSession: () => {
+      sessionValid = false
+    },
+  }
 }
 
 async function openGiftConfirmation(
@@ -286,13 +309,9 @@ describe('Gift Card confirmed success', () => {
       expect(input).toHaveValue('')
       expect(input).toHaveAttribute('type', 'password')
       expect(mocks.getWallet).toHaveBeenCalledTimes(2)
-      expect(mocks.getCurrentUser).toHaveBeenCalledTimes(2)
+      expect(mocks.getCurrentUser).toHaveBeenCalledTimes(3)
       expect(mocks.getOverview).toHaveBeenCalledOnce()
       expect(mocks.getAccess).not.toHaveBeenCalled()
-      expect(
-        queryClient.getQueryState(subscriptionQueryKeys.deliveryOptions)
-          ?.isInvalidated,
-      ).toBe(true)
       expect(JSON.stringify(giftCardMutationKeys.redeem)).not.toContain(
         'fake-card-code',
       )
@@ -336,6 +355,7 @@ describe('Gift Card confirmed success', () => {
   it('keeps confirmed success and fails closed when Me reconciliation fails', async () => {
     const mocks = installMocks()
     mocks.getCurrentUser
+      .mockResolvedValueOnce(currentUser)
       .mockResolvedValueOnce(currentUser)
       .mockRejectedValueOnce(
         new ApiError({
@@ -399,7 +419,7 @@ describe('Gift Card definitive errors', () => {
       expect(input).toHaveValue('fake-card-code')
       expect(mocks.redeem).toHaveBeenCalledOnce()
       expect(mocks.getWallet).toHaveBeenCalledOnce()
-      expect(mocks.getCurrentUser).toHaveBeenCalledOnce()
+      expect(mocks.getCurrentUser).toHaveBeenCalledTimes(2)
       expect(mocks.getOverview).not.toHaveBeenCalled()
       expect(
         JSON.stringify(
@@ -409,9 +429,7 @@ describe('Gift Card definitive errors', () => {
             .map((entry) => entry.state),
         ),
       ).not.toContain('fake-card-code')
-      expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-        'wallet-token',
-      )
+      expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
 
       await user.click(screen.getByRole('button', { name: '兑换礼品卡' }))
       expect(screen.getByRole('dialog')).toBeInTheDocument()
@@ -435,6 +453,7 @@ describe('Gift Card unknown-result recovery', () => {
         .mockResolvedValueOnce({ balanceMinor: 10_000 })
         .mockResolvedValueOnce({ balanceMinor: 20_000 })
       mocks.getCurrentUser
+        .mockResolvedValueOnce(currentUser)
         .mockResolvedValueOnce(currentUser)
         .mockResolvedValueOnce(recoveredUser)
       mocks.redeem.mockRejectedValue(
@@ -468,13 +487,9 @@ describe('Gift Card unknown-result recovery', () => {
       expect(input).toHaveValue('fake-card-code')
       expect(mocks.redeem).toHaveBeenCalledOnce()
       expect(mocks.getWallet).toHaveBeenCalledTimes(2)
-      expect(mocks.getCurrentUser).toHaveBeenCalledTimes(2)
+      expect(mocks.getCurrentUser).toHaveBeenCalledTimes(3)
       expect(mocks.getOverview).toHaveBeenCalledOnce()
       expect(mocks.getAccess).not.toHaveBeenCalled()
-      expect(
-        queryClient.getQueryState(subscriptionQueryKeys.deliveryOptions)
-          ?.isInvalidated,
-      ).toBe(true)
       expect(
         JSON.stringify(
           queryClient
@@ -511,6 +526,7 @@ describe('Gift Card unknown-result recovery', () => {
           .mockResolvedValueOnce({ balanceMinor: 20_000 })
       } else if (source === 'me') {
         mocks.getCurrentUser
+          .mockResolvedValueOnce(currentUser)
           .mockResolvedValueOnce(currentUser)
           .mockRejectedValueOnce(readError)
           .mockResolvedValueOnce(recoveredUser)
@@ -679,6 +695,7 @@ describe('Gift Card authentication boundaries', () => {
       } else if (source === 'me') {
         mocks.getCurrentUser
           .mockResolvedValueOnce(currentUser)
+          .mockResolvedValueOnce(currentUser)
           .mockRejectedValueOnce(authError)
       } else if (source === 'overview') {
         mocks.getOverview.mockRejectedValueOnce(authError)
@@ -695,10 +712,13 @@ describe('Gift Card authentication boundaries', () => {
       }
       const queryClient = createQueryClient()
       queryClient.setQueryData(['private-state'], { private: true })
-      const { router } = renderWallet(mocks, queryClient)
+      const { router, invalidateSession } = renderWallet(mocks, queryClient)
       const { dialog, user } = await openGiftConfirmation()
+      if (source !== 'me' && source !== 'manual') invalidateSession()
       await confirmGift(dialog, user)
       if (source === 'manual') {
+        await screen.findByRole('button', { name: '重新读取账户状态' })
+        invalidateSession()
         await user.click(
           await screen.findByRole('button', {
             name: '重新读取账户状态',

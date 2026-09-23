@@ -92,7 +92,10 @@ describe('AnnouncementsSurface', () => {
 
   it('reuses invalid-session behavior only for authenticated auth errors', async () => {
     const logout = vi.fn()
-    mockedUseAuth.mockReturnValue({ status: 'authenticated', logout } as never)
+    mockedUseAuth.mockReturnValue({
+      status: 'authenticated',
+      sessionInvalidated: logout,
+    } as never)
     useAuthSessionStore.setState({
       accessToken: 'session-token',
       hydrated: true,

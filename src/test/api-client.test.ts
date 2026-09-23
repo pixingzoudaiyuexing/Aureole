@@ -1,10 +1,40 @@
 import { createApiClient } from '@/lib/api/client'
 import { ApiError } from '@/lib/api/errors'
+import {
+  advanceAuthSessionGeneration,
+  useAuthSessionStore,
+} from '@/lib/auth/session-store'
 import { describe, expect, it, vi } from 'vitest'
 
-const baseUrl = 'https://gateway.example.com'
+const baseUrl = window.location.origin
 
 describe('API client', () => {
+  it('does not expose an old authentication error to a newer identity', async () => {
+    let resolve!: (response: Response) => void
+    const fetchImpl = vi.fn<typeof fetch>().mockImplementation(
+      () =>
+        new Promise<Response>((done) => {
+          resolve = done
+        }),
+    )
+    const client = createApiClient({ baseUrl, fetchImpl })
+    useAuthSessionStore.setState({ accessToken: 'identity-a', validated: true })
+    const pending = client.authenticatedRequest('/api/v1/wallet', {
+      accessToken: 'identity-a',
+    })
+    advanceAuthSessionGeneration()
+    useAuthSessionStore.setState({ accessToken: 'identity-b', validated: true })
+    resolve(
+      new Response(
+        JSON.stringify({
+          ok: false,
+          error: { code: 'AUTH_FAILED', message: 'Expired' },
+        }),
+        { status: 401 },
+      ),
+    )
+    await expect(pending).rejects.toMatchObject({ code: 'STALE_SESSION' })
+  })
   it('falls back to window.location.origin when baseUrl is absent', async () => {
     const originalWindow = globalThis.window
     globalThis.window = {
@@ -73,7 +103,7 @@ describe('API client', () => {
       client.request<{ email: string }>('/api/v1/me'),
     ).resolves.toEqual({ email: 'user@example.com' })
     expect(fetchImpl).toHaveBeenCalledWith(
-      new URL('https://gateway.example.com/api/v1/me'),
+      new URL('/api/v1/me', baseUrl),
       expect.objectContaining({ headers: expect.any(Headers) }),
     )
     const headers = new Headers(fetchImpl.mock.calls[0]?.[1]?.headers)
@@ -81,7 +111,7 @@ describe('API client', () => {
     expect(fetchImpl.mock.calls[0]?.[1]?.redirect).toBe('error')
   })
 
-  it('adds a bearer only through the authenticated request boundary', async () => {
+  it('uses a same-origin cookie without forwarding the memory identity marker', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(JSON.stringify({ ok: true, data: { status: 'active' } }), {
         status: 200,
@@ -89,14 +119,20 @@ describe('API client', () => {
     )
     const client = createApiClient({ baseUrl, fetchImpl })
 
+    useAuthSessionStore.setState({
+      accessToken: 'opaque-session-token',
+      validated: true,
+    })
+
     await client.authenticatedRequest('/api/v1/me', {
       accessToken: 'opaque-session-token',
     })
 
     const [url, init] = fetchImpl.mock.calls[0] ?? []
     const headers = new Headers(init?.headers)
-    expect(url).toEqual(new URL('https://gateway.example.com/api/v1/me'))
-    expect(headers.get('authorization')).toBe('Bearer opaque-session-token')
+    expect(url).toEqual(new URL('/api/v1/me', baseUrl))
+    expect(headers.has('authorization')).toBe(false)
+    expect(init?.credentials).toBe('same-origin')
     expect(init?.redirect).toBe('error')
   })
 
@@ -116,9 +152,15 @@ describe('API client', () => {
     })
     expect(fetchImpl).not.toHaveBeenCalled()
 
-    // Also prove authenticated requests don't leak the token before path escape checks
+    // The identity marker is never sent, even before path escape checks.
+    useAuthSessionStore.setState({
+      accessToken: 'identity-current',
+      validated: true,
+    })
     await expect(
-      client.authenticatedRequest(escapePath, { accessToken: 'secret' }),
+      client.authenticatedRequest(escapePath, {
+        accessToken: 'identity-current',
+      }),
     ).rejects.toMatchObject({
       code: 'INVALID_API_PATH',
       status: 0,
@@ -141,27 +183,17 @@ describe('API client', () => {
     expect(fetchImpl).not.toHaveBeenCalled()
   })
 
-  it.each([
-    ['https://api.example.com', 'https://api.example.com/api/v1/me'],
-    ['https://api.example.com/', 'https://api.example.com/api/v1/me'],
-    ['http://localhost:8080', 'http://localhost:8080/api/v1/me'],
-    ['http://127.0.0.1:3000', 'http://127.0.0.1:3000/api/v1/me'],
-  ])(
-    'accepts valid baseUrl overrides: %s',
-    async (validUrl, expectedTarget) => {
-      const fetchImpl = vi
-        .fn<typeof fetch>()
-        .mockResolvedValue(
-          new Response(JSON.stringify({ ok: true, data: {} }), { status: 200 }),
-        )
-      const client = createApiClient({ baseUrl: validUrl, fetchImpl })
-      await client.request('/api/v1/me')
-      expect(fetchImpl).toHaveBeenCalledWith(
-        new URL(expectedTarget),
-        expect.anything(),
-      )
-    },
-  )
+  it('rejects a cross-origin baseUrl even when the URL itself is valid', async () => {
+    const fetchImpl = vi.fn<typeof fetch>()
+    const client = createApiClient({
+      baseUrl: 'https://gateway.example.com',
+      fetchImpl,
+    })
+    await expect(client.request('/api/v1/me')).rejects.toMatchObject({
+      code: 'API_BASE_URL_MISSING',
+    })
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
 
   it.each([
     [401, 'AUTH_REQUIRED', 'Authentication required', 'req-auth'],

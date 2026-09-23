@@ -138,8 +138,10 @@ describe('Public account API', () => {
 
   it('strips additive Register response fields', async () => {
     vi.spyOn(apiClient, 'request').mockResolvedValue({
-      accessToken: 'opaque-token',
-      tokenType: 'Bearer',
+      email: 'member@example.com',
+      expiresAt: null,
+      status: 'active',
+      sessionVersion: '11111111-1111-4111-8111-111111111111',
       futureUnknownField: 'ignored',
     })
 
@@ -148,7 +150,27 @@ describe('Public account API', () => {
         email: 'member@example.com',
         password: 'password123',
       }),
-    ).resolves.toEqual({ accessToken: 'opaque-token', tokenType: 'Bearer' })
+    ).resolves.toEqual({
+      email: 'member@example.com',
+      expiresAt: null,
+      status: 'active',
+      sessionVersion: '11111111-1111-4111-8111-111111111111',
+    })
+  })
+
+  it('rejects a Register response without a verifiable session version', async () => {
+    vi.spyOn(apiClient, 'request').mockResolvedValue({
+      email: 'member@example.com',
+      expiresAt: null,
+      status: 'active',
+    })
+
+    await expect(
+      publicAccountApi.register({
+        email: 'member@example.com',
+        password: 'password123',
+      }),
+    ).rejects.toMatchObject({ code: 'MALFORMED_RESPONSE' })
   })
 
   it('sends an exact Password Reset payload without challengeToken', async () => {

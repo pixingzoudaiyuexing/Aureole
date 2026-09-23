@@ -37,14 +37,21 @@ const currentUser: CurrentUser = {
 function renderRoute(
   path: string,
   queryClient: QueryClient = createQueryClient(),
+  session = { current: true },
 ) {
-  window.sessionStorage.setItem(
-    AUTH_SESSION_STORAGE_KEY,
-    'opaque-session-token',
-  )
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue(currentUser),
+    getCurrentUser: vi.fn().mockImplementation(() =>
+      session.current
+        ? Promise.resolve(currentUser)
+        : Promise.reject(
+            new ApiError({
+              status: 401,
+              code: 'AUTH_REQUIRED',
+              message: 'Authentication required',
+            }),
+          ),
+    ),
   }
   const router = createAppRouter({ initialEntries: [path] })
   render(
@@ -54,7 +61,7 @@ function renderRoute(
       queryClient={queryClient}
     />,
   )
-  return { authApi, queryClient, router }
+  return { authApi, queryClient, router, session }
 }
 
 function primaryNavigation() {
@@ -425,14 +432,18 @@ describe('Dynamic Custom Page navigation and routing', () => {
   })
 
   it('reuses the sealed invalid-session exit path', async () => {
-    vi.mocked(customPagesApi.getList).mockRejectedValue(
-      new ApiError({
-        status: 401,
-        code: 'AUTH_REQUIRED',
-        message: 'private auth detail',
-      }),
-    )
-    renderRoute('/custom/notice-6')
+    const session = { current: true }
+    vi.mocked(customPagesApi.getList).mockImplementation(() => {
+      session.current = false
+      return Promise.reject(
+        new ApiError({
+          status: 401,
+          code: 'AUTH_REQUIRED',
+          message: 'private auth detail',
+        }),
+      )
+    })
+    renderRoute('/custom/notice-6', createQueryClient(), session)
 
     expect(
       await screen.findByRole('heading', { name: '登录 Aureole' }),

@@ -14,6 +14,7 @@ import type { AuthApi, CurrentUser } from '@/features/auth/auth-api'
 import { publicAccountApi } from '@/features/auth/public-account-api'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
+import { useAuthSessionStore } from '@/lib/auth/session-store'
 
 const currentUser: CurrentUser = {
   email: 'member@example.com',
@@ -59,13 +60,22 @@ function renderAccount(
   user: CurrentUser = currentUser,
   queryClient: QueryClient = createQueryClient(),
 ) {
-  window.sessionStorage.setItem(
-    AUTH_SESSION_STORAGE_KEY,
-    'opaque-account-token',
-  )
+  let serverSessionValid = true
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue(user),
+    getCurrentUser: vi.fn(async () => {
+      if (!serverSessionValid) {
+        throw new ApiError({
+          status: 401,
+          code: 'AUTH_FAILED',
+          message: 'Authentication failed',
+        })
+      }
+      return user
+    }),
+    logout: vi.fn(async () => {
+      serverSessionValid = false
+    }),
   }
   const router = createAppRouter({ initialEntries: ['/settings'] })
   render(
@@ -75,7 +85,14 @@ function renderAccount(
       queryClient={queryClient}
     />,
   )
-  return { authApi, queryClient, router }
+  return {
+    authApi,
+    queryClient,
+    router,
+    invalidateSession: () => {
+      serverSessionValid = false
+    },
+  }
 }
 
 async function fillPasswordForm(
@@ -185,10 +202,9 @@ describe('Account self-service', () => {
 
     expect(await screen.findByText('偏好设置已保存。')).toBeInTheDocument()
     expect(mocks.updatePreferences).toHaveBeenCalledOnce()
-    expect(mocks.updatePreferences).toHaveBeenCalledWith(
-      'opaque-account-token',
-      { remindTraffic: false },
-    )
+    expect(mocks.updatePreferences).toHaveBeenCalledWith(expect.any(String), {
+      remindTraffic: false,
+    })
     expect(mocks.getPreferences).toHaveBeenCalledTimes(2)
     expect(screen.getByRole('checkbox', { name: '流量提醒' })).not.toBeChecked()
   })
@@ -237,9 +253,8 @@ describe('Account self-service', () => {
     expect(screen.queryByText('Raw upstream detail')).toBeNull()
     expect(screen.getByText('请求编号：req-preferences')).toBeInTheDocument()
     expect(mocks.updatePreferences).toHaveBeenCalledOnce()
-    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-      'opaque-account-token',
-    )
+    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
+    expect(useAuthSessionStore.getState().accessToken).not.toBeNull()
   })
 
   it.each([
@@ -319,10 +334,11 @@ describe('Account self-service', () => {
         message: 'Unknown outcome',
       }),
     )
-    const { router } = renderAccount()
+    const { router, invalidateSession } = renderAccount()
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('checkbox', { name: '自动续费' }))
+    invalidateSession()
     await user.click(screen.getByRole('button', { name: '保存偏好' }))
 
     expect(
@@ -342,7 +358,11 @@ describe('Account self-service', () => {
       )
       const queryClient = createQueryClient()
       queryClient.setQueryData(['private-account-data'], { secret: 'cached' })
-      const { router } = renderAccount(currentUser, queryClient)
+      const { router, invalidateSession } = renderAccount(
+        currentUser,
+        queryClient,
+      )
+      invalidateSession()
 
       expect(
         await screen.findByRole('heading', { name: '登录 Aureole' }),
@@ -364,7 +384,8 @@ describe('Account self-service', () => {
           message: 'Authentication failed',
         }),
       )
-      const { router } = renderAccount()
+      const { router, invalidateSession } = renderAccount()
+      invalidateSession()
 
       expect(
         await screen.findByRole('heading', { name: '登录 Aureole' }),
@@ -383,10 +404,11 @@ describe('Account self-service', () => {
         message: 'Authentication failed',
       }),
     )
-    const { router } = renderAccount()
+    const { router, invalidateSession } = renderAccount()
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('checkbox', { name: '自动续费' }))
+    invalidateSession()
     await user.click(screen.getByRole('button', { name: '保存偏好' }))
 
     expect(
@@ -431,16 +453,15 @@ describe('Account self-service', () => {
     expect(
       await screen.findByText('无法修改密码，请确认当前密码后重试。'),
     ).toBeInTheDocument()
-    expect(mocks.changePassword).toHaveBeenCalledWith('opaque-account-token', {
+    expect(mocks.changePassword).toHaveBeenCalledWith(expect.any(String), {
       currentPassword: 'current-password',
       newPassword,
     })
     expect(mocks.changePassword.mock.calls[0]?.[1]).not.toHaveProperty(
       'confirmNewPassword',
     )
-    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-      'opaque-account-token',
-    )
+    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
+    expect(useAuthSessionStore.getState().accessToken).not.toBeNull()
   })
 
   it('rejects a 1025-character new password locally', async () => {

@@ -445,5 +445,5 @@ footer defaults。Runtime Settings 不控制 API origin、Authorization、CSP、
 - 保留 HTTP status 与 requestId，向用户提供可理解的恢复路径。
 - malformed JSON/envelope、network failure 与 public error 分开处理。
 - Mutation 默认不 retry；非幂等操作 timeout 后先刷新权威读取接口。
-- API origin 来自 `VITE_API_BASE_URL`；请求路径必须属于 `/api/v1`。
+- Pages 会话模式的 API origin 必须与页面同源（可省略 `VITE_API_BASE_URL`）；请求路径必须属于 `/api/v1`。浏览器不发送上游 Bearer。
 - 不发送或记录 V2Board Secret、raw DTO、Authorization Header 或完整敏感 payload。

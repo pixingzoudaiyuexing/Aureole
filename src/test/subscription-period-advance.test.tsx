@@ -85,14 +85,24 @@ function installMocks(initialOverview: SubscriptionOverview = overview) {
   return { advancePeriod, getOverview, getTraffic, rotateAccess }
 }
 
-function renderSubscription(queryClient: QueryClient = createQueryClient()) {
-  window.sessionStorage.setItem(
-    AUTH_SESSION_STORAGE_KEY,
-    'opaque-session-token',
-  )
+function renderSubscription(
+  queryClient: QueryClient = createQueryClient(),
+  valid = { current: true },
+) {
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue(currentUser),
+    getCurrentUser: vi.fn(async () => {
+      if (!valid.current)
+        throw new ApiError({
+          status: 401,
+          code: 'AUTH_FAILED',
+          message: 'Authentication failed',
+        })
+      return currentUser
+    }),
+    logout: vi.fn(async () => {
+      valid.current = false
+    }),
   }
   const router = createAppRouter({ initialEntries: ['/subscription'] })
   render(
@@ -333,9 +343,7 @@ describe('Subscription period advance', () => {
       expect(screen.getByText('已重新读取当前订阅状态。')).toBeInTheDocument()
       expect(mocks.advancePeriod).toHaveBeenCalledOnce()
       expect(mocks.getOverview).toHaveBeenCalledTimes(2)
-      expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-        'opaque-session-token',
-      )
+      expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
     },
   )
 
@@ -582,15 +590,23 @@ describe('Subscription period advance', () => {
     'clears session and protected cache after %s',
     async (_name, mutationError, recoveryError) => {
       const mocks = installMocks()
-      if (mutationError) mocks.advancePeriod.mockRejectedValue(mutationError)
+      const valid = { current: true }
+      if (mutationError)
+        mocks.advancePeriod.mockImplementation(async () => {
+          if (mutationError.status === 401) valid.current = false
+          throw mutationError
+        })
       if (recoveryError) {
         mocks.getOverview
           .mockResolvedValueOnce(overview)
-          .mockRejectedValueOnce(recoveryError)
+          .mockImplementationOnce(async () => {
+            valid.current = false
+            throw recoveryError
+          })
       }
       const queryClient = createQueryClient()
       queryClient.setQueryData(['private-data'], { sensitive: true })
-      const { router } = renderSubscription(queryClient)
+      const { router } = renderSubscription(queryClient, valid)
       const { dialog, user } = await openAdvanceConfirmation()
       await acknowledgeAndConfirm(dialog, user)
 
@@ -604,6 +620,7 @@ describe('Subscription period advance', () => {
 
   it('exits protected UI when manual overview recovery rejects authentication', async () => {
     const mocks = installMocks()
+    const valid = { current: true }
     mocks.advancePeriod.mockRejectedValue(
       new ApiError({ status: 0, code: 'NETWORK_ERROR', message: 'unknown' }),
     )
@@ -612,12 +629,17 @@ describe('Subscription period advance', () => {
       .mockRejectedValueOnce(
         new ApiError({ status: 0, code: 'NETWORK_ERROR', message: 'offline' }),
       )
-      .mockRejectedValueOnce(
-        new ApiError({ status: 401, code: 'AUTH_REQUIRED', message: 'auth' }),
-      )
+      .mockImplementationOnce(async () => {
+        valid.current = false
+        throw new ApiError({
+          status: 401,
+          code: 'AUTH_REQUIRED',
+          message: 'auth',
+        })
+      })
     const queryClient = createQueryClient()
     queryClient.setQueryData(['private-data'], { sensitive: true })
-    const { router } = renderSubscription(queryClient)
+    const { router } = renderSubscription(queryClient, valid)
     const first = await openAdvanceConfirmation()
     await acknowledgeAndConfirm(first.dialog, first.user)
     await screen.findByRole('button', { name: '重新读取订阅状态' })

@@ -14,7 +14,6 @@ import { subscriptionImportNavigation } from '@/features/subscription/subscripti
 import { SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY } from '@/features/subscription/subscription-selection-storage'
 import { trafficApi } from '@/features/traffic/traffic-api'
 import { ApiError } from '@/lib/api/errors'
-import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
 
 vi.mock('qrcode.react', () => ({
@@ -91,7 +90,6 @@ function renderSubscription(
     getCurrentUser: vi.fn().mockResolvedValue(currentUser),
   },
 ) {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'session-a-token')
   const router = createAppRouter({ initialEntries: ['/subscription'] })
   render(
     <AppProviders
@@ -133,7 +131,7 @@ describe('Subscription delivery selection and credential runtime', () => {
       ['primary', 'Primary Subscription'],
     ])
     expect(mocks.getAccessLink).toHaveBeenCalledWith(
-      'session-a-token',
+      expect.any(String),
       {
         entryId: 'backup',
         profileId: 'default',
@@ -186,7 +184,7 @@ describe('Subscription delivery selection and credential runtime', () => {
       await screen.findByRole('combobox', { name: '订阅入口' }),
     ).toHaveValue('regional')
     expect(mocks.getAccessLink).toHaveBeenCalledWith(
-      'session-a-token',
+      expect.any(String),
       expect.objectContaining({ entryId: 'regional' }),
       expect.any(AbortSignal),
     )
@@ -207,7 +205,7 @@ describe('Subscription delivery selection and credential runtime', () => {
       window.sessionStorage.getItem(SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY),
     ).toBe('backup')
     expect(mocks.getAccessLink).toHaveBeenCalledWith(
-      'session-a-token',
+      expect.any(String),
       expect.objectContaining({ entryId: 'backup' }),
       expect.any(AbortSignal),
     )
@@ -299,7 +297,7 @@ describe('Subscription delivery selection and credential runtime', () => {
     expect(screen.queryByRole('button', { name: '显示订阅信息' })).toBeNull()
     expect(screen.queryByRole('button', { name: '隐藏订阅信息' })).toBeNull()
     expect(mocks.getAccessLink).toHaveBeenCalledWith(
-      'session-a-token',
+      expect.any(String),
       expect.objectContaining({ subscriptionInfo: 'show' }),
       expect.any(AbortSignal),
     )
@@ -401,20 +399,39 @@ describe('Subscription delivery selection and credential runtime', () => {
   it('never renders a delayed Session A credential after Session B becomes active', async () => {
     const pendingA = deferred<{ accessUrl: string }>()
     const mocks = installMocks()
-    mocks.getAccessLink.mockImplementation((token) =>
-      token === 'session-a-token'
+    let current: 'a' | 'b' | null = 'a'
+    let firstIdentity: string | null = null
+    mocks.getAccessLink.mockImplementation((token) => {
+      if (firstIdentity === null) firstIdentity = token
+      return token === firstIdentity
         ? pendingA.promise
-        : Promise.resolve({ accessUrl: accessUrls.backup }),
-    )
+        : Promise.resolve({ accessUrl: accessUrls.backup })
+    })
     const authApi: AuthApi = {
-      login: vi.fn().mockResolvedValue({
-        accessToken: 'session-b-token',
-        tokenType: 'Bearer',
+      login: vi.fn().mockImplementation(async () => {
+        current = 'b'
+        return {
+          ...currentUser,
+          email: 'b@example.com',
+          sessionVersion: 'session-b',
+        }
       }),
-      getCurrentUser: vi.fn().mockImplementation(async (token) => ({
-        ...currentUser,
-        email: token === 'session-b-token' ? 'b@example.com' : 'a@example.com',
-      })),
+      logout: vi.fn().mockImplementation(async () => {
+        current = null
+      }),
+      getCurrentUser: vi.fn().mockImplementation(async () => {
+        if (!current)
+          throw new ApiError({
+            status: 401,
+            code: 'AUTH_REQUIRED',
+            message: 'Authentication required',
+          })
+        return {
+          ...currentUser,
+          email: `${current}@example.com`,
+          sessionVersion: `session-${current}`,
+        }
+      }),
     }
     const { router } = renderSubscription(createQueryClient(), authApi)
     const user = userEvent.setup()
@@ -433,10 +450,9 @@ describe('Subscription delivery selection and credential runtime', () => {
 
     act(() => pendingA.resolve({ accessUrl: accessUrls.primary }))
     await waitFor(() =>
-      expect(useAuthSessionStore.getState().accessToken).toBe(
-        'session-b-token',
-      ),
+      expect(useAuthSessionStore.getState().sessionVersion).toBe('session-b'),
     )
+    expect(useAuthSessionStore.getState().accessToken).not.toBe(firstIdentity)
     expect(screen.queryByText(accessUrls.primary)).toBeNull()
   })
 })

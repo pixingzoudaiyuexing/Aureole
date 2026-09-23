@@ -28,7 +28,13 @@ const disabledConfig: OnboardingConfig = {
 function createAuthApi(): AuthApi {
   return {
     login: vi.fn(),
-    getCurrentUser: vi.fn(),
+    getCurrentUser: vi.fn().mockRejectedValue(
+      new ApiError({
+        status: 401,
+        code: 'AUTH_REQUIRED',
+        message: 'Authentication required',
+      }),
+    ),
   }
 }
 
@@ -190,7 +196,7 @@ describe('Password Recovery flow', () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
     expect(authApi.login).not.toHaveBeenCalled()
-    expect(authApi.getCurrentUser).not.toHaveBeenCalled()
+    expect(authApi.getCurrentUser).toHaveBeenCalled()
     expect(useAuthSessionStore.getState().accessToken).toBeNull()
     expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
   })

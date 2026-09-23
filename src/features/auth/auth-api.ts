@@ -15,28 +15,27 @@ export const loginSchema = z.object({
     .max(1024, '密码不能超过 1024 个字符'),
 })
 
-export const loginResponseSchema = z
-  .object({
-    accessToken: z.string().min(1),
-    tokenType: z.literal('Bearer'),
-  })
-  .strip()
-
 const currentUserSchema = z
   .object({
     email: z.string().email(),
     expiresAt: z.string().datetime({ offset: true }).nullable(),
     status: z.enum(['active', 'expired', 'disabled']),
+    sessionVersion: z.string().uuid().optional(),
   })
   .strip()
+const verifiedSessionUserSchema = currentUserSchema.extend({
+  sessionVersion: z.string().uuid(),
+})
 
 export type LoginInput = z.infer<typeof loginSchema>
-export type LoginResponse = z.infer<typeof loginResponseSchema>
+export type LoginResponse = CurrentUser
 export type CurrentUser = z.infer<typeof currentUserSchema>
 
 export interface AuthApi {
   login: (input: LoginInput) => Promise<LoginResponse>
   getCurrentUser: (accessToken: string) => Promise<CurrentUser>
+  prepareBrowser?: () => Promise<void>
+  logout?: () => Promise<void>
 }
 
 export function parsePublicData<T>(schema: z.ZodType<T>, data: unknown) {
@@ -51,19 +50,27 @@ export function parsePublicData<T>(schema: z.ZodType<T>, data: unknown) {
   return parsed.data
 }
 
+export function parseSessionUser(data: unknown): CurrentUser {
+  return parsePublicData(verifiedSessionUserSchema, data)
+}
+
 export const authApi: AuthApi = {
+  async prepareBrowser() {
+    await apiClient.request<unknown>('/api/v1/auth/browser')
+  },
   async login(input) {
+    await this.prepareBrowser?.()
     const data = await apiClient.request<unknown>('/api/v1/auth/login', {
       method: 'POST',
       body: input,
     })
-    return parsePublicData(loginResponseSchema, data)
+    return parseSessionUser(data)
   },
-  async getCurrentUser(accessToken) {
-    const data = await apiClient.authenticatedRequest<unknown>('/api/v1/me', {
-      method: 'GET',
-      accessToken,
-    })
-    return parsePublicData(currentUserSchema, data)
+  async getCurrentUser() {
+    const data = await apiClient.request<unknown>('/api/v1/auth/session')
+    return parseSessionUser(data)
+  },
+  async logout() {
+    await apiClient.request('/api/v1/auth/logout', { method: 'POST' })
   },
 }

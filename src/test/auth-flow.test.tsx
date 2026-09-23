@@ -1,1047 +1,427 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { AppProviders } from '@/app/providers/app-providers'
 import { createQueryClient } from '@/app/providers/query-client'
-import { createAppRouter } from '@/app/router/router'
-import type {
-  AuthApi,
-  CurrentUser,
-  LoginResponse,
-} from '@/features/auth/auth-api'
-import { useAuth } from '@/features/auth/auth-context'
 import { AuthProvider } from '@/features/auth/auth-provider'
+import { useAuth } from '@/features/auth/auth-context'
+import type { AuthApi, CurrentUser } from '@/features/auth/auth-api'
 import { authQueryKeys } from '@/features/auth/auth-query-keys'
 import { ApiError } from '@/lib/api/errors'
-import {
-  AUTH_SESSION_STORAGE_KEY,
-  AUTH_SESSION_VERSION_STORAGE_KEY,
-} from '@/lib/auth/credential-storage'
-import { AUTH_SHARED_STATE_KEY } from '@/lib/auth/cross-tab-session'
+import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
 import { sessionSafetyStorageKeys } from '@/lib/auth/session-safety-storage'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
 
-const commissionSafetyKey =
-  sessionSafetyStorageKeys.commissionTransferUncertainty
-const withdrawalSafetyKey =
-  sessionSafetyStorageKeys.withdrawalRequestUncertainty
-
-const currentUser: CurrentUser = {
+const member: CurrentUser = {
   email: 'member@example.com',
-  expiresAt: '2030-01-01T00:00:00.000Z',
   status: 'active',
+  expiresAt: null,
 }
+const other: CurrentUser = { ...member, email: 'other@example.com' }
+const missing = () =>
+  new ApiError({
+    status: 401,
+    code: 'AUTH_REQUIRED',
+    message: 'Authentication required',
+  })
+const unavailable = () =>
+  new ApiError({
+    status: 504,
+    code: 'UPSTREAM_TIMEOUT',
+    message: 'Temporarily unavailable',
+  })
 
-const loginResponse: LoginResponse = {
-  accessToken: 'opaque-session-token',
-  tokenType: 'Bearer',
-}
-
-function createAuthApi(overrides: Partial<AuthApi> = {}): AuthApi {
-  return {
-    login: vi.fn().mockResolvedValue(loginResponse),
-    getCurrentUser: vi.fn().mockResolvedValue(currentUser),
-    ...overrides,
-  }
-}
-
-function renderRoute(
-  path: string,
-  api: AuthApi = createAuthApi(),
-  queryClient: QueryClient = createQueryClient(),
-) {
-  const router = createAppRouter({ initialEntries: [path] })
-  render(
-    <AppProviders router={router} authApi={api} queryClient={queryClient} />,
-  )
-  return { queryClient, router }
-}
-
-function createDeferred<T>() {
+function deferred<T>() {
   let resolve!: (value: T) => void
   let reject!: (reason: unknown) => void
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise
-    reject = rejectPromise
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done
+    reject = fail
   })
-  return { promise, reject, resolve }
+  return { promise, resolve, reject }
 }
 
-function writeSharedState(
-  version: string,
-  status: 'active' | 'changing' | 'logged-out',
-) {
-  window.localStorage.setItem(
-    AUTH_SHARED_STATE_KEY,
-    JSON.stringify({ version, status }),
-  )
-}
-
-function readSharedState() {
-  return JSON.parse(window.localStorage.getItem(AUTH_SHARED_STATE_KEY)!) as {
-    version: string
-    status: 'active' | 'changing' | 'logged-out'
-  }
-}
-
-class ManualBroadcastChannel {
-  static instance: ManualBroadcastChannel | null = null
-  onmessage: ((event: MessageEvent) => void) | null = null
-
-  constructor() {
-    ManualBroadcastChannel.instance = this
-  }
-
-  postMessage() {}
-  close() {}
-
-  deliver(data: unknown) {
-    this.onmessage?.({ data } as MessageEvent)
-  }
-}
-
-function AuthTransitionHarness() {
-  const {
-    currentUser: user,
-    logout,
-    retryBootstrap,
-    signIn,
-    status,
-  } = useAuth()
-
+function Harness() {
+  const { status, currentUser, signIn, logout, retryBootstrap } = useAuth()
   return (
     <div>
-      <output data-testid="auth-status">{status}</output>
-      <output data-testid="current-user">{user?.email ?? 'none'}</output>
-      <button type="button" onClick={logout}>
-        logout
-      </button>
+      <output data-testid="status">{status}</output>
+      <output data-testid="user">{currentUser?.email ?? 'none'}</output>
       <button
-        type="button"
         onClick={() => {
-          void signIn({
-            email: 'session-b@example.com',
-            password: 'password123',
-          }).catch(() => undefined)
+          void signIn({ email: other.email, password: 'password123' }).catch(
+            () => undefined,
+          )
         }}
       >
-        login session B
+        login
       </button>
-      <button type="button" onClick={retryBootstrap}>
-        retry auth
-      </button>
+      <button onClick={logout}>logout</button>
+      <button onClick={retryBootstrap}>retry</button>
     </div>
   )
 }
 
-function renderAuthTransition(api: AuthApi) {
+function renderSession(api: AuthApi) {
   const queryClient = createQueryClient()
-  render(
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider api={api}>
-        <AuthTransitionHarness />
+        <Harness />
       </AuthProvider>
     </QueryClientProvider>,
   )
-  return queryClient
+  return { queryClient, ...view }
 }
 
-describe('Auth session lifecycle', () => {
-  it('redirects an unauthenticated protected route to login', async () => {
-    const { router } = renderRoute('/dashboard')
-
-    expect(
-      await screen.findByRole('heading', { name: '登录 Aureole' }),
-    ).toBeInTheDocument()
-    expect(router.state.location.pathname).toBe('/login')
-  })
-
-  it('stores a successful login, bootstraps /me, and enters the app', async () => {
-    window.sessionStorage.setItem(commissionSafetyKey, 'active')
-    window.sessionStorage.setItem(withdrawalSafetyKey, 'acknowledged')
-    const login = vi.fn().mockResolvedValue(loginResponse)
-    const getCurrentUser = vi.fn().mockResolvedValue(currentUser)
-    const api = createAuthApi({ login, getCurrentUser })
-    const { router } = renderRoute('/login', api)
-    const user = userEvent.setup()
-
-    await user.type(
-      await screen.findByLabelText('邮箱'),
-      ' member@example.com ',
-    )
-    await user.type(screen.getByLabelText('密码'), 'password123')
-    await user.click(screen.getByRole('button', { name: '登录' }))
-
+describe('Cookie session UI', () => {
+  it('restores an existing server session without reading the legacy bearer', async () => {
+    window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'old-bearer')
+    const getCurrentUser = vi.fn().mockResolvedValue(member)
+    renderSession({ login: vi.fn(), getCurrentUser })
     await waitFor(() =>
-      expect(router.state.location.pathname).toBe('/dashboard'),
+      expect(screen.getByTestId('status')).toHaveTextContent('authenticated'),
     )
-    expect(login).toHaveBeenCalledOnce()
-    expect(login).toHaveBeenCalledWith({
-      email: 'member@example.com',
-      password: 'password123',
-    })
-    expect(getCurrentUser).toHaveBeenCalledWith('opaque-session-token')
-    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-      'opaque-session-token',
-    )
-    expect(useAuthSessionStore.getState().accessToken).toBe(
-      'opaque-session-token',
-    )
-    expect(window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
-    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
-    expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe('active')
-    expect(useAuthSessionStore.getState().generation).toBe(1)
-    expect(screen.getAllByText('member@example.com').length).toBeGreaterThan(0)
-  })
-
-  it('completes login and /me bootstrap with a memory-only credential', async () => {
-    const originalSetItem = Storage.prototype.setItem
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
-      this: Storage,
-      key,
-      value,
-    ) {
-      if (this === window.sessionStorage && key === AUTH_SESSION_STORAGE_KEY) {
-        throw new DOMException('Storage disabled', 'SecurityError')
-      }
-      return originalSetItem.call(this, key, value)
-    })
-    const getCurrentUser = vi.fn().mockResolvedValue(currentUser)
-    const { router } = renderRoute('/login', createAuthApi({ getCurrentUser }))
-    const user = userEvent.setup()
-
-    await user.type(await screen.findByLabelText('邮箱'), 'member@example.com')
-    await user.type(screen.getByLabelText('密码'), 'password123')
-    await user.click(screen.getByRole('button', { name: '登录' }))
-
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe('/dashboard'),
-    )
-    expect(useAuthSessionStore.getState().accessToken).toBe(
-      'opaque-session-token',
-    )
-    expect(getCurrentUser).toHaveBeenCalledWith('opaque-session-token')
+    expect(screen.getByTestId('user')).toHaveTextContent(member.email)
+    expect(getCurrentUser).toHaveBeenCalledWith('')
     expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
-    expect(window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
+    expect(useAuthSessionStore.getState().accessToken).not.toBe('old-bearer')
   })
 
-  it('completes login in local-only mode when Web Locks are unavailable', async () => {
-    vi.stubGlobal('navigator', { locks: undefined })
-    const getCurrentUser = vi.fn().mockResolvedValue(currentUser)
-    renderAuthTransition(createAuthApi({ getCurrentUser }))
-
-    await userEvent
-      .setup()
-      .click(screen.getByRole('button', { name: 'login session B' }))
-
-    await waitFor(() =>
-      expect(screen.getByTestId('auth-status')).toHaveTextContent(
-        'authenticated',
-      ),
-    )
-    expect(getCurrentUser).toHaveBeenCalledWith('opaque-session-token')
-    expect(useAuthSessionStore.getState().accessToken).toBe(
-      'opaque-session-token',
-    )
-    expect(window.localStorage.getItem(AUTH_SHARED_STATE_KEY)).toBeNull()
-    vi.unstubAllGlobals()
-  })
-
-  it('disables duplicate login submission while the request is pending', async () => {
-    let resolveLogin!: (value: LoginResponse) => void
-    const login = vi.fn(
-      () =>
-        new Promise<LoginResponse>((resolve) => {
-          resolveLogin = resolve
-        }),
-    )
-    const api = createAuthApi({ login })
-    renderRoute('/login', api)
-    const user = userEvent.setup()
-
-    await user.type(await screen.findByLabelText('邮箱'), 'member@example.com')
-    await user.type(screen.getByLabelText('密码'), 'password123')
-    await user.click(screen.getByRole('button', { name: '登录' }))
-
-    const pendingButton = screen.getByRole('button', { name: '正在登录…' })
-    expect(pendingButton).toBeDisabled()
-    await user.click(pendingButton)
-    expect(login).toHaveBeenCalledOnce()
-
-    resolveLogin(loginResponse)
-    await screen.findAllByRole('heading', { name: 'Overview' })
-  })
-
-  it('does not persist or retry a failed login', async () => {
-    const login = vi.fn().mockRejectedValue(
-      new ApiError({
-        status: 401,
-        code: 'AUTH_FAILED',
-        message: 'Authentication failed',
-        requestId: 'req-login',
+  it('isolates private Query and preserves tab-local financial uncertainty on account switch', async () => {
+    let current = member
+    const api: AuthApi = {
+      login: vi.fn().mockImplementation(async () => {
+        current = other
+        return other
       }),
-    )
-    renderRoute('/login', createAuthApi({ login }))
-    const user = userEvent.setup()
-
-    await user.type(await screen.findByLabelText('邮箱'), 'member@example.com')
-    await user.type(screen.getByLabelText('密码'), 'password123')
-    await user.click(screen.getByRole('button', { name: '登录' }))
-
-    expect(
-      await screen.findByText('邮箱或密码错误，或账户当前无法登录。'),
-    ).toBeInTheDocument()
-    expect(screen.getByText('请求编号：req-login')).toBeInTheDocument()
-    expect(login).toHaveBeenCalledOnce()
-    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
-  })
-
-  it('validates login fields on keyboard submit without calling the API', async () => {
-    const login = vi.fn().mockResolvedValue(loginResponse)
-    renderRoute('/login', createAuthApi({ login }))
-    const user = userEvent.setup()
-
-    await user.type(await screen.findByLabelText('邮箱'), 'invalid-email')
-    await user.type(screen.getByLabelText('密码'), 'short')
-    await user.keyboard('{Enter}')
-
-    expect(await screen.findByText('请输入有效的邮箱地址')).toBeInTheDocument()
-    expect(screen.getByText('密码至少需要 8 个字符')).toBeInTheDocument()
-    expect(login).not.toHaveBeenCalled()
-  })
-
-  it('restores a valid session and allows the protected app', async () => {
+      getCurrentUser: vi.fn(async () => current),
+    }
     window.sessionStorage.setItem(
-      AUTH_SESSION_STORAGE_KEY,
-      'stored-session-token',
-    )
-    window.sessionStorage.setItem(commissionSafetyKey, 'active')
-    window.sessionStorage.setItem(withdrawalSafetyKey, 'acknowledged')
-    const getCurrentUser = vi.fn().mockResolvedValue(currentUser)
-    const { router } = renderRoute(
-      '/dashboard',
-      createAuthApi({ getCurrentUser }),
-    )
-
-    await screen.findAllByRole('heading', { name: 'Overview' })
-    expect(router.state.location.pathname).toBe('/dashboard')
-    expect(getCurrentUser).toHaveBeenCalledWith('stored-session-token')
-    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
-    expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe(
+      sessionSafetyStorageKeys.withdrawalRequestUncertainty,
       'acknowledged',
     )
-    expect(useAuthSessionStore.getState().generation).toBe(0)
-  })
-
-  it.each(['AUTH_REQUIRED', 'AUTH_FAILED'])(
-    'clears a stored credential after %s proves it invalid',
-    async (code) => {
-      window.sessionStorage.setItem(
-        AUTH_SESSION_STORAGE_KEY,
-        'invalid-session-token',
-      )
-      window.sessionStorage.setItem(commissionSafetyKey, 'active')
-      window.sessionStorage.setItem(withdrawalSafetyKey, 'acknowledged')
-      const api = createAuthApi({
-        getCurrentUser: vi.fn().mockRejectedValue(
-          new ApiError({
-            status: 401,
-            code,
-            message: 'Authentication failed',
-          }),
-        ),
-      })
-      const queryClient = createQueryClient()
-      queryClient.setQueryData(['private-account-data'], { secret: 'cached' })
-      const { router } = renderRoute('/dashboard', api, queryClient)
-
-      expect(
-        await screen.findByRole('heading', { name: '登录 Aureole' }),
-      ).toBeInTheDocument()
-      expect(router.state.location.pathname).toBe('/login')
-      expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
-      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
-      expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe('active')
-      expect(useAuthSessionStore.getState().generation).toBe(1)
-      expect(queryClient.getQueryData(['private-account-data'])).toBeUndefined()
-    },
-  )
-
-  it.each([
-    [0, 'NETWORK_ERROR'],
-    [502, 'UPSTREAM_ERROR'],
-    [504, 'UPSTREAM_TIMEOUT'],
-  ])(
-    'retains the credential for recoverable %s/%s bootstrap failure',
-    async (status, code) => {
-      window.sessionStorage.setItem(
-        AUTH_SESSION_STORAGE_KEY,
-        'recoverable-session-token',
-      )
-      const api = createAuthApi({
-        getCurrentUser: vi
-          .fn()
-          .mockRejectedValue(
-            new ApiError({ status, code, message: 'Service unavailable' }),
-          ),
-      })
-      renderRoute('/dashboard', api)
-
-      expect(
-        await screen.findByRole(
-          'heading',
-          { name: '暂时无法连接服务' },
-          { timeout: 3_000 },
-        ),
-      ).toBeInTheDocument()
-      expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-        'recoverable-session-token',
-      )
-    },
-  )
-
-  it('does not render protected content while bootstrap is unresolved', async () => {
-    window.sessionStorage.setItem(
-      AUTH_SESSION_STORAGE_KEY,
-      'pending-session-token',
+    const { queryClient } = renderSession(api)
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(member.email),
     )
-    const api = createAuthApi({
-      getCurrentUser: vi.fn(() => new Promise<CurrentUser>(() => undefined)),
-    })
-    renderRoute('/dashboard', api)
-
+    queryClient.setQueryData(['private'], { email: member.email })
+    await userEvent.setup().click(screen.getByRole('button', { name: 'login' }))
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(other.email),
+    )
+    expect(queryClient.getQueryData(['private'])).toBeUndefined()
     expect(
-      await screen.findByRole('heading', { name: '正在验证登录状态' }),
-    ).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Overview' })).toBeNull()
+      window.sessionStorage.getItem(
+        sessionSafetyStorageKeys.withdrawalRequestUncertainty,
+      ),
+    ).toBe('active')
+    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
   })
 
-  it('recovers a retained session when bootstrap retry succeeds', async () => {
-    window.sessionStorage.setItem(
-      AUTH_SESSION_STORAGE_KEY,
-      'recoverable-session-token',
-    )
-    const serviceError = new ApiError({
-      status: 502,
-      code: 'UPSTREAM_ERROR',
-      message: 'Service unavailable',
-    })
+  it('never restores an old /me result after switching identities', async () => {
+    const old = deferred<CurrentUser>()
+    let current = member
     const getCurrentUser = vi
       .fn()
-      .mockRejectedValueOnce(serviceError)
-      .mockRejectedValueOnce(serviceError)
-      .mockResolvedValue(currentUser)
-    const { router } = renderRoute(
-      '/dashboard',
-      createAuthApi({ getCurrentUser }),
-    )
-    const user = userEvent.setup()
-
-    await user.click(
-      await screen.findByRole('button', { name: '重试' }, { timeout: 3_000 }),
-    )
-
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe('/dashboard'),
-    )
-    expect(getCurrentUser).toHaveBeenCalledTimes(3)
-    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-      'recoverable-session-token',
-    )
-  })
-
-  it('resolves the root route to login without a credential', async () => {
-    const { router } = renderRoute('/')
-    await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
-  })
-
-  it('resolves the root route to dashboard with a valid credential', async () => {
-    window.sessionStorage.setItem(
-      AUTH_SESSION_STORAGE_KEY,
-      'stored-session-token',
-    )
-    const { router } = renderRoute('/')
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe('/dashboard'),
-    )
-  })
-
-  it('redirects an authenticated user away from login', async () => {
-    window.sessionStorage.setItem(
-      AUTH_SESSION_STORAGE_KEY,
-      'stored-session-token',
-    )
-    const { router } = renderRoute('/login')
-
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe('/dashboard'),
-    )
-  })
-
-  it('clears the credential and all query cache data on local logout', async () => {
-    window.sessionStorage.setItem(
-      AUTH_SESSION_STORAGE_KEY,
-      'stored-session-token',
-    )
-    window.sessionStorage.setItem(commissionSafetyKey, 'active')
-    window.sessionStorage.setItem(withdrawalSafetyKey, 'acknowledged')
-    const queryClient = createQueryClient()
-    queryClient.setQueryData(['private-account-data'], { secret: 'cached' })
-    const { router } = renderRoute('/dashboard', createAuthApi(), queryClient)
-    const user = userEvent.setup()
-
-    await screen.findAllByText('member@example.com')
-    await user.click(screen.getAllByRole('button', { name: '退出登录' })[0]!)
-
-    await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
-    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
-    expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
-    expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe('active')
-    expect(useAuthSessionStore.getState().generation).toBe(1)
-    expect(queryClient.getQueryData(['private-account-data'])).toBeUndefined()
-  })
-
-  it('does not resurrect session A when its in-flight /me resolves after logout', async () => {
-    window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'session-a-token')
-    const sessionA = createDeferred<CurrentUser>()
-    const getCurrentUser = vi.fn(() => sessionA.promise)
-    const queryClient = renderAuthTransition(createAuthApi({ getCurrentUser }))
-    const user = userEvent.setup()
-
-    await waitFor(() =>
-      expect(getCurrentUser).toHaveBeenCalledWith('session-a-token'),
-    )
-    await user.click(screen.getByRole('button', { name: 'logout' }))
-    expect(screen.getByTestId('auth-status')).toHaveTextContent(
-      'unauthenticated',
-    )
-
-    await act(async () => {
-      sessionA.resolve({ ...currentUser, email: 'session-a@example.com' })
-      await sessionA.promise
-    })
-    expect(screen.getByTestId('current-user')).toHaveTextContent('none')
-    expect(queryClient.getQueryData(authQueryKeys.me)).toBeUndefined()
-    expect(useAuthSessionStore.getState().accessToken).toBeNull()
-    expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
-    expect(useAuthSessionStore.getState().generation).toBe(1)
-  })
-
-  it.each(['resolve', 'reject'] as const)(
-    'keeps session B when stale session A later %ss',
-    async (settlement) => {
-      window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'session-a-token')
-      window.sessionStorage.setItem(commissionSafetyKey, 'active')
-      window.sessionStorage.setItem(withdrawalSafetyKey, 'acknowledged')
-      const sessionA = createDeferred<CurrentUser>()
-      const sessionBUser: CurrentUser = {
-        ...currentUser,
-        email: 'session-b@example.com',
-      }
-      const login = vi.fn().mockResolvedValue({
-        accessToken: 'session-b-token',
-        tokenType: 'Bearer' as const,
-      })
-      const getCurrentUser = vi.fn((accessToken: string) =>
-        accessToken === 'session-a-token'
-          ? sessionA.promise
-          : Promise.resolve(sessionBUser),
-      )
-      const queryClient = renderAuthTransition(
-        createAuthApi({ getCurrentUser, login }),
-      )
-      const user = userEvent.setup()
-
-      await waitFor(() =>
-        expect(getCurrentUser).toHaveBeenCalledWith('session-a-token'),
-      )
-      await user.click(screen.getByRole('button', { name: 'login session B' }))
-      await waitFor(() => {
-        expect(screen.getByTestId('auth-status')).toHaveTextContent(
-          'authenticated',
-        )
-        expect(screen.getByTestId('current-user')).toHaveTextContent(
-          'session-b@example.com',
-        )
-      })
-
-      if (settlement === 'resolve') {
-        await act(async () => {
-          sessionA.resolve({ ...currentUser, email: 'session-a@example.com' })
-          await sessionA.promise
-        })
-      } else {
-        await act(async () => {
-          sessionA.reject(
-            new ApiError({
-              status: 401,
-              code: 'AUTH_FAILED',
-              message: 'Authentication failed',
-            }),
-          )
-          await sessionA.promise.catch(() => undefined)
-        })
-      }
-
-      expect(screen.getByTestId('current-user')).toHaveTextContent(
-        'session-b@example.com',
-      )
-      expect(queryClient.getQueryData(authQueryKeys.me)).toEqual(sessionBUser)
-      expect(useAuthSessionStore.getState().accessToken).toBe('session-b-token')
-      expect(window.sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-        'session-b-token',
-      )
-      expect(window.sessionStorage.getItem(commissionSafetyKey)).toBe('active')
-      expect(window.sessionStorage.getItem(withdrawalSafetyKey)).toBe('active')
-      expect(useAuthSessionStore.getState().generation).toBe(1)
-      expect(readSharedState()).toEqual({
-        version: useAuthSessionStore.getState().sessionVersion,
-        status: 'active',
-      })
-    },
-  )
-
-  it.each(['changing', 'active', 'logged-out'] as const)(
-    'does not let late session A success overwrite remote %s state',
-    async (remoteStatus) => {
-      window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'session-a-token')
-      window.sessionStorage.setItem(
-        AUTH_SESSION_VERSION_STORAGE_KEY,
-        'session-a',
-      )
-      writeSharedState('session-a', 'active')
-      const sessionA = createDeferred<CurrentUser>()
-      const getCurrentUser = vi.fn(() => sessionA.promise)
-      renderAuthTransition(createAuthApi({ getCurrentUser }))
-
-      await waitFor(() =>
-        expect(getCurrentUser).toHaveBeenCalledWith('session-a-token'),
-      )
-      writeSharedState('remote-new', remoteStatus)
-      await act(async () => {
-        sessionA.resolve({ ...currentUser, email: 'session-a@example.com' })
-        await sessionA.promise
-      })
-
-      await waitFor(() =>
-        expect(useAuthSessionStore.getState().accessToken).toBeNull(),
-      )
-      expect(readSharedState()).toEqual({
-        version: 'remote-new',
-        status: remoteStatus,
-      })
-      expect(screen.getByTestId('current-user')).toHaveTextContent('none')
-    },
-  )
-
-  it('does not publish logout when a stale session A /me returns 401', async () => {
-    window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'session-a-token')
-    window.sessionStorage.setItem(AUTH_SESSION_VERSION_STORAGE_KEY, 'session-a')
-    writeSharedState('session-a', 'active')
-    const sessionA = createDeferred<CurrentUser>()
-    const getCurrentUser = vi.fn(() => sessionA.promise)
-    renderAuthTransition(createAuthApi({ getCurrentUser }))
-    await waitFor(() =>
-      expect(getCurrentUser).toHaveBeenCalledWith('session-a-token'),
-    )
-
-    writeSharedState('session-b', 'active')
-    await act(async () => {
-      sessionA.reject(
-        new ApiError({
-          status: 401,
-          code: 'AUTH_FAILED',
-          message: 'Authentication failed',
-        }),
-      )
-      await sessionA.promise.catch(() => undefined)
-    })
-
-    await waitFor(() =>
-      expect(useAuthSessionStore.getState().accessToken).toBeNull(),
-    )
-    expect(readSharedState()).toEqual({
-      version: 'session-b',
-      status: 'active',
-    })
-  })
-
-  it.each([
-    [0, 'NETWORK_ERROR'],
-    [502, 'UPSTREAM_ERROR'],
-    [504, 'UPSTREAM_TIMEOUT'],
-  ])(
-    'keeps a new session recoverable after %s/%s establishment failure',
-    async (status, code) => {
-      const error = new ApiError({
-        status,
-        code,
-        message: 'Temporary failure',
-      })
-      const getCurrentUser = vi.fn().mockRejectedValue(error)
-      renderAuthTransition(createAuthApi({ getCurrentUser }))
-      const user = userEvent.setup()
-
-      await user.click(screen.getByRole('button', { name: 'login session B' }))
-      await waitFor(
-        () =>
-          expect(screen.getByTestId('auth-status')).toHaveTextContent('error'),
-        { timeout: 3_000 },
-      )
-      expect(useAuthSessionStore.getState().accessToken).toBe(
-        'opaque-session-token',
-      )
-      expect(readSharedState()).toEqual({
-        version: useAuthSessionStore.getState().sessionVersion,
-        status: 'changing',
-      })
-
-      getCurrentUser.mockResolvedValue(currentUser)
-      await user.click(screen.getByRole('button', { name: 'retry auth' }))
-      await waitFor(() =>
-        expect(screen.getByTestId('auth-status')).toHaveTextContent(
-          'authenticated',
-        ),
-      )
-      expect(readSharedState()).toEqual({
-        version: useAuthSessionStore.getState().sessionVersion,
-        status: 'active',
-      })
-    },
-  )
-
-  it.each(['AUTH_REQUIRED', 'AUTH_FAILED'])(
-    'logs out a newly established session after current %s',
-    async (code) => {
-      const getCurrentUser = vi.fn().mockRejectedValue(
-        new ApiError({
-          status: 401,
-          code,
-          message: 'Authentication failed',
-        }),
-      )
-      renderAuthTransition(createAuthApi({ getCurrentUser }))
-      await userEvent
-        .setup()
-        .click(screen.getByRole('button', { name: 'login session B' }))
-
-      await waitFor(() =>
-        expect(screen.getByTestId('auth-status')).toHaveTextContent(
-          'unauthenticated',
-        ),
-      )
-      expect(useAuthSessionStore.getState().accessToken).toBeNull()
-      expect(readSharedState().status).toBe('logged-out')
-    },
-  )
-
-  it.each(['initial bootstrap', 'remote active notification'] as const)(
-    'drops a provided candidate when shared state changes before %s installs it',
-    async (path) => {
-      class RaceBroadcastChannel {
-        static instance: RaceBroadcastChannel | null = null
-        onmessage: ((event: MessageEvent) => void) | null = null
-        constructor() {
-          RaceBroadcastChannel.instance = this
-        }
-        postMessage(message: unknown) {
-          const request = message as {
-            type?: string
-            requestId?: string
-            version?: string
-          }
-          if (request.type !== 'REQUEST_SESSION') return
-          this.onmessage?.({
-            data: {
-              type: 'PROVIDE_SESSION',
-              requestId: request.requestId,
-              version: request.version,
-              accessToken: 'stale-provided-token',
-            },
-          } as MessageEvent)
-          writeSharedState('newer-logout', 'logged-out')
-        }
-        close() {}
-      }
-      vi.stubGlobal('BroadcastChannel', RaceBroadcastChannel)
-      const getCurrentUser = vi.fn().mockResolvedValue(currentUser)
-      if (path === 'initial bootstrap') {
-        writeSharedState('provided-version', 'active')
-      }
-      renderAuthTransition(createAuthApi({ getCurrentUser }))
-
-      if (path === 'remote active notification') {
-        await waitFor(() =>
-          expect(screen.getByTestId('auth-status')).toHaveTextContent(
-            'unauthenticated',
-          ),
-        )
-        writeSharedState('provided-version', 'active')
-        RaceBroadcastChannel.instance?.onmessage?.({
-          data: {
-            type: 'SESSION_CHANGED',
-            version: 'provided-version',
-            status: 'active',
-          },
-        } as MessageEvent)
-      }
-
-      await waitFor(() =>
-        expect(readSharedState()).toEqual({
-          version: 'newer-logout',
-          status: 'logged-out',
-        }),
-      )
-      expect(screen.getByTestId('auth-status')).toHaveTextContent(
-        'unauthenticated',
-      )
-      expect(getCurrentUser).not.toHaveBeenCalledWith('stale-provided-token')
-      expect(useAuthSessionStore.getState().accessToken).toBeNull()
-      expect(readSharedState()).toEqual({
-        version: 'newer-logout',
-        status: 'logged-out',
-      })
-      vi.unstubAllGlobals()
-    },
-  )
-
-  it('ignores delayed old logout but still applies the current shared logout', async () => {
-    vi.stubGlobal('BroadcastChannel', ManualBroadcastChannel)
-    window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'session-v2-token')
-    window.sessionStorage.setItem(
-      AUTH_SESSION_VERSION_STORAGE_KEY,
-      'session-v2',
-    )
-    writeSharedState('session-v2', 'active')
-    const sessionV2User = {
-      ...currentUser,
-      email: 'session-v2@example.com',
-    }
-    const queryClient = renderAuthTransition(
-      createAuthApi({
-        getCurrentUser: vi.fn().mockResolvedValue(sessionV2User),
+      .mockImplementationOnce(() => old.promise)
+      .mockImplementation(async () => current)
+    const api: AuthApi = {
+      login: vi.fn().mockImplementation(async () => {
+        current = other
+        return other
       }),
-    )
-
+      getCurrentUser,
+    }
+    const { queryClient } = renderSession(api)
+    await waitFor(() => expect(getCurrentUser).toHaveBeenCalledTimes(1))
+    await userEvent.setup().click(screen.getByRole('button', { name: 'login' }))
     await waitFor(() =>
-      expect(screen.getByTestId('auth-status')).toHaveTextContent(
-        'authenticated',
-      ),
+      expect(screen.getByTestId('user')).toHaveTextContent(other.email),
     )
-    queryClient.setQueryData(['private-session-v2'], { secret: 'cached' })
-
-    act(() => {
-      ManualBroadcastChannel.instance?.deliver({
-        type: 'LOGOUT',
-        version: 'session-v1-logout',
-      })
+    await act(async () => {
+      old.resolve(member)
+      await old.promise
     })
-
-    await waitFor(() =>
-      expect(screen.getByTestId('auth-status')).toHaveTextContent(
-        'authenticated',
-      ),
-    )
-    expect(useAuthSessionStore.getState().accessToken).toBe('session-v2-token')
-    expect(queryClient.getQueryData(['private-session-v2'])).toEqual({
-      secret: 'cached',
-    })
-    expect(readSharedState()).toEqual({
-      version: 'session-v2',
-      status: 'active',
-    })
-
-    writeSharedState('session-v2-logout', 'logged-out')
-    act(() => {
-      ManualBroadcastChannel.instance?.deliver({
-        type: 'LOGOUT',
-        version: 'session-v2-logout',
-      })
-    })
-
-    await waitFor(() =>
-      expect(screen.getByTestId('auth-status')).toHaveTextContent(
-        'unauthenticated',
-      ),
-    )
-    expect(useAuthSessionStore.getState().accessToken).toBeNull()
-    expect(queryClient.getQueryData(['private-session-v2'])).toBeUndefined()
-    vi.unstubAllGlobals()
+    expect(screen.getByTestId('user')).toHaveTextContent(other.email)
+    expect(queryClient.getQueryData(['private'])).toBeUndefined()
   })
 
-  it.each(['changing', 'active'] as const)(
-    'keeps session v2 when delayed session v1 %s notification arrives',
-    async (status) => {
-      vi.stubGlobal('BroadcastChannel', ManualBroadcastChannel)
-      window.sessionStorage.setItem(
-        AUTH_SESSION_STORAGE_KEY,
-        'session-v2-token',
-      )
-      window.sessionStorage.setItem(
-        AUTH_SESSION_VERSION_STORAGE_KEY,
-        'session-v2',
-      )
-      writeSharedState('session-v2', 'active')
-      renderAuthTransition(createAuthApi())
+  it('does not repopulate the active me Query from an old in-flight read', async () => {
+    const oldRead = deferred<CurrentUser>()
+    let current = member
+    const getCurrentUser = vi.fn(async () => current)
+    const { queryClient } = renderSession({
+      login: vi.fn(async () => {
+        current = other
+        return other
+      }),
+      getCurrentUser,
+    })
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(member.email),
+    )
+    getCurrentUser.mockImplementationOnce(() => oldRead.promise)
+    const oldQuery = queryClient.refetchQueries(
+      { queryKey: authQueryKeys.me, exact: true, type: 'active' },
+      { cancelRefetch: false },
+    )
+    await waitFor(() => expect(getCurrentUser).toHaveBeenCalledTimes(3))
+    await userEvent.setup().click(screen.getByRole('button', { name: 'login' }))
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(other.email),
+    )
+    await act(async () => {
+      oldRead.resolve(member)
+      await oldQuery
+    })
+    expect(queryClient.getQueryData(authQueryKeys.me)).toMatchObject({
+      email: other.email,
+    })
+    expect(screen.getByTestId('user')).toHaveTextContent(other.email)
+  })
 
-      await waitFor(() =>
-        expect(screen.getByTestId('auth-status')).toHaveTextContent(
-          'authenticated',
-        ),
-      )
-      act(() => {
-        ManualBroadcastChannel.instance?.deliver({
-          type: 'SESSION_CHANGED',
-          version: 'session-v1',
-          status,
-        })
-      })
+  it('does not interpret a temporary /me failure as confirmed logout', async () => {
+    const getCurrentUser = vi
+      .fn()
+      .mockRejectedValueOnce(unavailable())
+      .mockResolvedValue(member)
+    renderSession({ login: vi.fn(), getCurrentUser })
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('error'),
+    )
+    await userEvent.setup().click(screen.getByRole('button', { name: 'retry' }))
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(member.email),
+    )
+  })
 
-      await waitFor(() =>
-        expect(screen.getByTestId('auth-status')).toHaveTextContent(
-          'authenticated',
-        ),
-      )
-      expect(useAuthSessionStore.getState().accessToken).toBe(
-        'session-v2-token',
-      )
-      expect(readSharedState()).toEqual({
-        version: 'session-v2',
-        status: 'active',
-      })
-      vi.unstubAllGlobals()
-    },
-  )
-
-  it('keeps the current changing session when an old logout arrives', async () => {
-    vi.stubGlobal('BroadcastChannel', ManualBroadcastChannel)
-    const pendingUser = createDeferred<CurrentUser>()
-    const getCurrentUser = vi.fn(() => pendingUser.promise)
-    renderAuthTransition(createAuthApi({ getCurrentUser }))
-
+  it('does not restore a late pre-logout /me response', async () => {
+    const pending = deferred<CurrentUser>()
+    const getCurrentUser = vi
+      .fn()
+      .mockImplementationOnce(() => pending.promise)
+      .mockRejectedValue(missing())
+    const logout = vi.fn().mockResolvedValue(undefined)
+    renderSession({ login: vi.fn(), getCurrentUser, logout })
+    await waitFor(() => expect(getCurrentUser).toHaveBeenCalledTimes(1))
     await userEvent
       .setup()
-      .click(screen.getByRole('button', { name: 'login session B' }))
-    await waitFor(() =>
-      expect(getCurrentUser).toHaveBeenCalledWith('opaque-session-token'),
-    )
-    const changingVersion = useAuthSessionStore.getState().sessionVersion
-    expect(readSharedState()).toEqual({
-      version: changingVersion,
-      status: 'changing',
-    })
-
+      .click(screen.getByRole('button', { name: 'logout' }))
     await act(async () => {
-      ManualBroadcastChannel.instance?.deliver({
-        type: 'LOGOUT',
-        version: 'session-v1-logout',
-      })
-      await Promise.resolve()
-    })
-
-    expect(useAuthSessionStore.getState().accessToken).toBe(
-      'opaque-session-token',
-    )
-    expect(useAuthSessionStore.getState().sessionVersion).toBe(changingVersion)
-    expect(readSharedState()).toEqual({
-      version: changingVersion,
-      status: 'changing',
-    })
-
-    await act(async () => {
-      pendingUser.resolve(currentUser)
-      await pendingUser.promise
+      pending.resolve(member)
+      await pending.promise
     })
     await waitFor(() =>
-      expect(screen.getByTestId('auth-status')).toHaveTextContent(
-        'authenticated',
-      ),
+      expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated'),
     )
-    vi.unstubAllGlobals()
+    expect(screen.getByTestId('user')).toHaveTextContent('none')
+    expect(logout).toHaveBeenCalledOnce()
   })
 
-  it('bootstraps the current shared session despite a delayed old logout', async () => {
-    class BootstrapBroadcastChannel {
-      onmessage: ((event: MessageEvent) => void) | null = null
+  it('does not let an old logout completion override a newer login', async () => {
+    const pendingLogout = deferred<void>()
+    let current: CurrentUser | null = member
+    const api: AuthApi = {
+      login: vi.fn(async () => {
+        current = other
+        return other
+      }),
+      logout: vi.fn(() => pendingLogout.promise),
+      getCurrentUser: vi.fn(async () => {
+        if (!current) throw missing()
+        return current
+      }),
+    }
+    renderSession(api)
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(member.email),
+    )
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'logout' }))
+    await userEvent.setup().click(screen.getByRole('button', { name: 'login' }))
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(other.email),
+    )
+    await act(async () => {
+      pendingLogout.resolve()
+      await pendingLogout.promise
+    })
+    expect(screen.getByTestId('status')).toHaveTextContent('authenticated')
+    expect(screen.getByTestId('user')).toHaveTextContent(other.email)
+  })
 
-      postMessage(message: unknown) {
-        const request = message as {
-          type?: string
-          requestId?: string
-          version?: string
-        }
-        if (request.type !== 'REQUEST_SESSION') return
-        queueMicrotask(() => {
-          this.onmessage?.({
-            data: { type: 'LOGOUT', version: 'session-v1-logout' },
-          } as MessageEvent)
-          this.onmessage?.({
-            data: {
-              type: 'PROVIDE_SESSION',
-              requestId: request.requestId,
-              version: request.version,
-              accessToken: 'session-v2-token',
-            },
-          } as MessageEvent)
-        })
-      }
-
+  it('does not let an old logout completion override a cross-tab identity refresh', async () => {
+    class TestChannel {
+      onmessage: (() => void) | null = null
+      postMessage() {}
       close() {}
     }
-    vi.stubGlobal('BroadcastChannel', BootstrapBroadcastChannel)
-    writeSharedState('session-v2', 'active')
-    const getCurrentUser = vi.fn().mockResolvedValue(currentUser)
-    renderAuthTransition(createAuthApi({ getCurrentUser }))
-
-    await waitFor(() =>
-      expect(screen.getByTestId('auth-status')).toHaveTextContent(
-        'authenticated',
-      ),
+    const channels: TestChannel[] = []
+    vi.stubGlobal(
+      'BroadcastChannel',
+      class extends TestChannel {
+        constructor() {
+          super()
+          channels.push(this)
+        }
+      },
     )
-    expect(getCurrentUser).toHaveBeenCalledWith('session-v2-token')
-    expect(useAuthSessionStore.getState().accessToken).toBe('session-v2-token')
-    expect(useAuthSessionStore.getState().sessionVersion).toBe('session-v2')
+    const pendingLogout = deferred<void>()
+    let current = member
+    const { queryClient } = renderSession({
+      login: vi.fn(),
+      logout: vi.fn(() => pendingLogout.promise),
+      getCurrentUser: vi.fn(async () => current),
+    })
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(member.email),
+    )
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'logout' }))
+    current = other
+    await act(async () => {
+      channels[0]?.onmessage?.()
+    })
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(other.email),
+    )
+    queryClient.setQueryData(['private'], { owner: other.email })
+    await act(async () => {
+      pendingLogout.resolve()
+      await pendingLogout.promise
+    })
+    expect(screen.getByTestId('user')).toHaveTextContent(other.email)
+    expect(queryClient.getQueryData(['private'])).toEqual({
+      owner: other.email,
+    })
     vi.unstubAllGlobals()
   })
 
-  it.each(['resolve', 'reject'] as const)(
-    'does not let a local login %s overwrite a remotely advanced version',
-    async (settlement) => {
-      const sessionB = createDeferred<CurrentUser>()
-      const getCurrentUser = vi.fn(() => sessionB.promise)
-      renderAuthTransition(createAuthApi({ getCurrentUser }))
-      await userEvent
-        .setup()
-        .click(screen.getByRole('button', { name: 'login session B' }))
-      await waitFor(() =>
-        expect(getCurrentUser).toHaveBeenCalledWith('opaque-session-token'),
-      )
-
-      writeSharedState('remote-session-c', 'active')
-      await act(async () => {
-        if (settlement === 'resolve') {
-          sessionB.resolve({ ...currentUser, email: 'session-b@example.com' })
-          await sessionB.promise
-        } else {
-          sessionB.reject(
-            new ApiError({
-              status: 401,
-              code: 'AUTH_FAILED',
-              message: 'Authentication failed',
-            }),
-          )
-          await sessionB.promise.catch(() => undefined)
-        }
+  it('keeps the latest identity when an older login resolves late', async () => {
+    const old = deferred<CurrentUser>()
+    let current = member
+    const login = vi
+      .fn()
+      .mockImplementationOnce(() => old.promise)
+      .mockImplementation(async () => {
+        current = other
+        return other
       })
+    renderSession({ login, getCurrentUser: vi.fn(async () => current) })
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(member.email),
+    )
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'login' }))
+    await user.click(screen.getByRole('button', { name: 'login' }))
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(other.email),
+    )
+    await act(async () => {
+      old.resolve(member)
+      await old.promise
+    })
+    expect(screen.getByTestId('user')).toHaveTextContent(other.email)
+  })
 
-      await waitFor(() =>
-        expect(useAuthSessionStore.getState().accessToken).toBeNull(),
-      )
-      expect(readSharedState()).toEqual({
-        version: 'remote-session-c',
-        status: 'active',
-      })
-    },
-  )
+  it('isolates private data during transient verification errors and recovers on retry', async () => {
+    let fail = false
+    const getCurrentUser = vi.fn(async () => {
+      if (fail) throw unavailable()
+      return member
+    })
+    const { queryClient } = renderSession({ login: vi.fn(), getCurrentUser })
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(member.email),
+    )
+    queryClient.setQueryData(['private'], { email: member.email })
+    fail = true
+    act(() => window.dispatchEvent(new Event('focus')))
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('error'),
+    )
+    expect(screen.getByTestId('user')).toHaveTextContent('none')
+    expect(queryClient.getQueryData(['private'])).toBeUndefined()
+    fail = false
+    await userEvent.setup().click(screen.getByRole('button', { name: 'retry' }))
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(member.email),
+    )
+  })
+
+  it('isolates a changing server session between verification reads and recovers on retry', async () => {
+    const first = {
+      ...member,
+      sessionVersion: '11111111-1111-4111-8111-111111111111',
+    }
+    const second = {
+      ...other,
+      sessionVersion: '22222222-2222-4222-8222-222222222222',
+    }
+    const getCurrentUser = vi
+      .fn()
+      .mockResolvedValueOnce(first)
+      .mockResolvedValue(second)
+    const { queryClient } = renderSession({ login: vi.fn(), getCurrentUser })
+    queryClient.setQueryData(['private'], { owner: first.email })
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('error'),
+    )
+    expect(screen.getByTestId('user')).toHaveTextContent('none')
+    expect(queryClient.getQueryData(['private'])).toBeUndefined()
+    await userEvent.setup().click(screen.getByRole('button', { name: 'retry' }))
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(second.email),
+    )
+  })
+
+  it('revalidates on focus and isolates a switched account', async () => {
+    let current = member
+    const getCurrentUser = vi.fn(async () => current)
+    const { queryClient } = renderSession({ login: vi.fn(), getCurrentUser })
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(member.email),
+    )
+    queryClient.setQueryData(['private'], { email: member.email })
+    current = other
+    act(() => window.dispatchEvent(new Event('focus')))
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(other.email),
+    )
+    expect(queryClient.getQueryData(['private'])).toBeUndefined()
+  })
+
+  it('isolates private Query when the same account changes server session', async () => {
+    let current = {
+      ...member,
+      sessionVersion: '11111111-1111-4111-8111-111111111111',
+    }
+    const { queryClient } = renderSession({
+      login: vi.fn(),
+      getCurrentUser: vi.fn(async () => current),
+    })
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(member.email),
+    )
+    const firstIdentity = useAuthSessionStore.getState().accessToken
+    queryClient.setQueryData(['private'], {
+      email: member.email,
+      version: 'old',
+    })
+    current = {
+      ...member,
+      sessionVersion: '22222222-2222-4222-8222-222222222222',
+    }
+    act(() => window.dispatchEvent(new Event('focus')))
+    await waitFor(() =>
+      expect(useAuthSessionStore.getState().sessionVersion).toBe(
+        current.sessionVersion,
+      ),
+    )
+    expect(useAuthSessionStore.getState().accessToken).not.toBe(firstIdentity)
+    expect(queryClient.getQueryData(['private'])).toBeUndefined()
+  })
 })

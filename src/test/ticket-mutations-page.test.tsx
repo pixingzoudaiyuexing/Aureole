@@ -17,6 +17,7 @@ import { ticketsApi, type TicketDetail } from '@/features/tickets/tickets-api'
 import { ticketsQueryKeys } from '@/features/tickets/tickets-queries'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
+import { useAuthSessionStore } from '@/lib/auth/session-store'
 
 const ticket = {
   id: '7',
@@ -103,16 +104,22 @@ function installMocks() {
   return { close, getDetail, getList, reply }
 }
 
-function renderSupport(queryClient: QueryClient = createQueryClient()) {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'ticket-token')
+function renderSupport(
+  queryClient: QueryClient = createQueryClient(),
+  session = { current: true },
+) {
   queryClient.setQueryData(['private-state'], 'clear-me')
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue({
-      email: 'member@example.com',
-      expiresAt: null,
-      status: 'active',
-    }),
+    getCurrentUser: vi.fn().mockImplementation(() =>
+      session.current
+        ? Promise.resolve({
+            email: 'member@example.com',
+            expiresAt: null,
+            status: 'active',
+          })
+        : Promise.reject(apiError('AUTH_REQUIRED', 401)),
+    ),
   }
   const router = createAppRouter({ initialEntries: ['/support'] })
   const rendered = render(
@@ -337,11 +344,11 @@ describe('Support Ticket Detail authority and actions', () => {
     const mocks = installMocks()
     const pending = deferred<typeof replyableDetail>()
     mocks.getDetail.mockReturnValue(pending.promise)
-    const queryClient = createQueryClient()
+    const { queryClient } = renderSupport()
+    await screen.findByRole('button', { name: /Connection issue/ })
     queryClient.setQueryData(ticketsQueryKeys.detail('7'), replyableDetail, {
       updatedAt: 0,
     })
-    renderSupport(queryClient)
     const user = userEvent.setup()
 
     await user.click(
@@ -364,11 +371,11 @@ describe('Support Ticket Detail authority and actions', () => {
       .mockRejectedValueOnce(apiError('UPSTREAM_ERROR'))
       .mockRejectedValueOnce(apiError('UPSTREAM_ERROR'))
       .mockResolvedValueOnce(replyableDetail)
-    const queryClient = createQueryClient()
+    const { queryClient } = renderSupport()
+    await screen.findByRole('button', { name: /Connection issue/ })
     queryClient.setQueryData(ticketsQueryKeys.detail('7'), replyableDetail, {
       updatedAt: 0,
     })
-    renderSupport(queryClient)
     const user = userEvent.setup()
 
     await user.click(
@@ -432,9 +439,13 @@ describe('Support Ticket Reply mutation', () => {
     fireEvent.submit(form.send.closest('form')!)
     fireEvent.submit(form.send.closest('form')!)
     await waitFor(() => expect(mocks.reply).toHaveBeenCalledOnce())
-    expect(mocks.reply).toHaveBeenCalledWith('ticket-token', '7', {
-      message: raw,
-    })
+    expect(mocks.reply).toHaveBeenCalledWith(
+      useAuthSessionStore.getState().accessToken,
+      '7',
+      {
+        message: raw,
+      },
+    )
     expect(form.reply).toBeDisabled()
     expect(form.close).toBeDisabled()
     expect(screen.getByRole('button', { name: '正在发送…' })).toBeDisabled()
@@ -558,9 +569,7 @@ describe('Support Ticket Reply mutation', () => {
       expect(form.reply).toBeEnabled()
       expect(mocks.reply).toHaveBeenCalledOnce()
       expect(mocks.getDetail).toHaveBeenCalledTimes(testCase.detailCalls)
-      expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe(
-        'ticket-token',
-      )
+      expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
       rendered.unmount()
     }
   })
@@ -747,7 +756,10 @@ describe('Support Ticket Close mutation', () => {
     fireEvent.click(confirm)
     fireEvent.click(confirm)
     await waitFor(() => expect(mocks.close).toHaveBeenCalledOnce())
-    expect(mocks.close).toHaveBeenCalledWith('ticket-token', '7')
+    expect(mocks.close).toHaveBeenCalledWith(
+      useAuthSessionStore.getState().accessToken,
+      '7',
+    )
     expect(form.reply).toBeDisabled()
 
     act(() => post.resolve({ closed: true }))
@@ -929,9 +941,17 @@ describe('Support Ticket mutation Auth invalidation', () => {
     'invalidates the full session after %s %s',
     async (action, code) => {
       const mocks = installMocks()
-      if (action === 'reply') mocks.reply.mockRejectedValue(apiError(code, 401))
-      else mocks.close.mockRejectedValue(apiError(code, 401))
-      const { queryClient, router } = renderSupport()
+      const session = { current: true }
+      const rejectAuth = () => {
+        session.current = false
+        return Promise.reject(apiError(code, 401))
+      }
+      if (action === 'reply') mocks.reply.mockImplementation(rejectAuth)
+      else mocks.close.mockImplementation(rejectAuth)
+      const { queryClient, router } = renderSupport(
+        createQueryClient(),
+        session,
+      )
       const form = await openDetail()
 
       if (action === 'reply') {
@@ -953,11 +973,15 @@ describe('Support Ticket mutation Auth invalidation', () => {
 
   it('invalidates the full session when UNKNOWN Detail recovery rejects auth', async () => {
     const mocks = installMocks()
+    const session = { current: true }
     mocks.reply.mockRejectedValue(apiError('NETWORK_ERROR', 0))
     mocks.getDetail
       .mockResolvedValueOnce(replyableDetail)
-      .mockRejectedValueOnce(apiError('AUTH_FAILED', 401))
-    const { queryClient, router } = renderSupport()
+      .mockImplementationOnce(() => {
+        session.current = false
+        return Promise.reject(apiError('AUTH_FAILED', 401))
+      })
+    const { queryClient, router } = renderSupport(createQueryClient(), session)
     const form = await openDetail()
     fireEvent.change(form.reply, { target: { value: 'reply' } })
     await form.user.click(form.send)
@@ -971,11 +995,15 @@ describe('Support Ticket mutation Auth invalidation', () => {
 
   it('invalidates the full session when Close Detail recovery rejects auth', async () => {
     const mocks = installMocks()
+    const session = { current: true }
     mocks.close.mockRejectedValue(apiError('UPSTREAM_ERROR'))
     mocks.getDetail
       .mockResolvedValueOnce(replyableDetail)
-      .mockRejectedValueOnce(apiError('AUTH_REQUIRED', 401))
-    const { queryClient, router } = renderSupport()
+      .mockImplementationOnce(() => {
+        session.current = false
+        return Promise.reject(apiError('AUTH_REQUIRED', 401))
+      })
+    const { queryClient, router } = renderSupport(createQueryClient(), session)
     const form = await openDetail()
     await form.user.click(form.close)
     await form.user.click(screen.getByRole('button', { name: '确认关闭工单' }))
@@ -989,6 +1017,7 @@ describe('Support Ticket mutation Auth invalidation', () => {
 
   it('invalidates the full session when manual Detail recovery rejects auth', async () => {
     const mocks = installMocks()
+    const session = { current: true }
     const queryClient = createQueryClient()
     queryClient.setDefaultOptions({
       queries: { retry: false, staleTime: 30_000 },
@@ -998,8 +1027,11 @@ describe('Support Ticket mutation Auth invalidation', () => {
     mocks.getDetail
       .mockResolvedValueOnce(replyableDetail)
       .mockRejectedValueOnce(apiError('UPSTREAM_ERROR'))
-      .mockRejectedValueOnce(apiError('AUTH_FAILED', 401))
-    const { router } = renderSupport(queryClient)
+      .mockImplementationOnce(() => {
+        session.current = false
+        return Promise.reject(apiError('AUTH_FAILED', 401))
+      })
+    const { router } = renderSupport(queryClient, session)
     const form = await openDetail()
     fireEvent.change(form.reply, { target: { value: 'reply' } })
     await form.user.click(form.send)
@@ -1017,10 +1049,12 @@ describe('Support Ticket mutation Auth invalidation', () => {
 
   it('invalidates the full session when List reconciliation rejects auth', async () => {
     const mocks = installMocks()
-    mocks.getList
-      .mockResolvedValueOnce([ticket])
-      .mockRejectedValueOnce(apiError('AUTH_REQUIRED', 401))
-    const { queryClient, router } = renderSupport()
+    const session = { current: true }
+    mocks.getList.mockResolvedValueOnce([ticket]).mockImplementationOnce(() => {
+      session.current = false
+      return Promise.reject(apiError('AUTH_REQUIRED', 401))
+    })
+    const { queryClient, router } = renderSupport(createQueryClient(), session)
     const form = await openDetail()
     fireEvent.change(form.reply, { target: { value: 'reply' } })
     await form.user.click(form.send)

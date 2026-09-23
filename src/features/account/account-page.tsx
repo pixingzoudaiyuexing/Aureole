@@ -6,7 +6,10 @@ import type { CurrentUser } from '@/features/auth/auth-api'
 import { isInvalidSessionError } from '@/features/auth/auth-errors'
 import { useAuth } from '@/features/auth/auth-context'
 import { ApiError } from '@/lib/api/errors'
-import { useAuthSessionStore } from '@/lib/auth/session-store'
+import {
+  isErrorFromCurrentAuthSession,
+  useAuthSessionStore,
+} from '@/lib/auth/session-store'
 import type { AccountStats } from './account-api'
 import { useAccountConfig, useAccountStats } from './account-queries'
 import { PasswordChangeSection } from './password-change-section'
@@ -120,19 +123,29 @@ function AccountContent({
   currentUser: CurrentUser
   accessToken: string
 }) {
-  const { logout } = useAuth()
+  const { sessionInvalidated } = useAuth()
   const stats = useAccountStats(accessToken)
   const config = useAccountConfig(accessToken)
   const status = statusPresentation[currentUser.status]
 
   useEffect(() => {
     if (
-      (stats.isError && isInvalidSessionError(stats.error)) ||
-      (config.isError && isInvalidSessionError(config.error))
+      (stats.isError &&
+        isInvalidSessionError(stats.error) &&
+        isErrorFromCurrentAuthSession(stats.error)) ||
+      (config.isError &&
+        isInvalidSessionError(config.error) &&
+        isErrorFromCurrentAuthSession(config.error))
     ) {
-      logout()
+      sessionInvalidated()
     }
-  }, [config.error, config.isError, logout, stats.error, stats.isError])
+  }, [
+    config.error,
+    config.isError,
+    sessionInvalidated,
+    stats.error,
+    stats.isError,
+  ])
 
   return (
     <div className="mx-auto max-w-5xl">

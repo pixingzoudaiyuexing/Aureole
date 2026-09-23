@@ -85,15 +85,27 @@ function installClipboard() {
   return writeText
 }
 
-function renderReferrals(queryClient: QueryClient = createQueryClient()) {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'referral-token')
+function renderReferrals(
+  queryClient: QueryClient = createQueryClient(),
+  session = { current: true },
+) {
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue({
-      email: 'member@example.com',
-      expiresAt: null,
-      status: 'active',
-    }),
+    getCurrentUser: vi.fn().mockImplementation(() =>
+      session.current
+        ? Promise.resolve({
+            email: 'member@example.com',
+            expiresAt: null,
+            status: 'active',
+          })
+        : Promise.reject(
+            new ApiError({
+              status: 401,
+              code: 'AUTH_REQUIRED',
+              message: 'Authentication required',
+            }),
+          ),
+    ),
   }
   const router = createAppRouter({ initialEntries: ['/referrals'] })
   render(
@@ -103,7 +115,7 @@ function renderReferrals(queryClient: QueryClient = createQueryClient()) {
       queryClient={queryClient}
     />,
   )
-  return { queryClient, router }
+  return { queryClient, router, session }
 }
 
 describe('Referrals page', () => {
@@ -191,7 +203,7 @@ describe('Referrals page', () => {
     await user.keyboard('{Enter}')
     await waitFor(() =>
       expect(mocks.getCommissions).toHaveBeenCalledWith(
-        'referral-token',
+        expect.any(String),
         2,
         20,
       ),
@@ -387,18 +399,31 @@ describe('Referrals page', () => {
     'exits protected UI and clears Query cache when %s returns %s',
     async (source, code) => {
       const mocks = installMocks()
-      const method =
-        source === 'overview'
-          ? mocks.getOverview
-          : source === 'commissions'
-            ? mocks.getCommissions
-            : mocks.getWithdrawalOptions
-      method.mockRejectedValue(
-        new ApiError({ status: 401, code, message: 'auth' }),
-      )
+      const session = { current: true }
+      if (source === 'overview')
+        mocks.getOverview.mockImplementation(() => {
+          session.current = false
+          return Promise.reject(
+            new ApiError({ status: 401, code, message: 'auth' }),
+          )
+        })
+      else if (source === 'commissions')
+        mocks.getCommissions.mockImplementation(() => {
+          session.current = false
+          return Promise.reject(
+            new ApiError({ status: 401, code, message: 'auth' }),
+          )
+        })
+      else
+        mocks.getWithdrawalOptions.mockImplementation(() => {
+          session.current = false
+          return Promise.reject(
+            new ApiError({ status: 401, code, message: 'auth' }),
+          )
+        })
       const queryClient = createQueryClient()
       queryClient.setQueryData(['sensitive-server-state'], { private: true })
-      const { router } = renderReferrals(queryClient)
+      const { router } = renderReferrals(queryClient, session)
 
       expect(
         await screen.findByRole('heading', { name: '登录 Aureole' }),

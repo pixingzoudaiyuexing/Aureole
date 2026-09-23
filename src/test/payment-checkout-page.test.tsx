@@ -22,6 +22,7 @@ import { paymentApi } from '@/features/payments/payment-api'
 import { paymentNavigation } from '@/features/payments/payment-navigation'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
+import { useAuthSessionStore } from '@/lib/auth/session-store'
 
 const pendingOrder = {
   id: 'payment-order-001',
@@ -70,14 +71,24 @@ function installMocks() {
   return { checkout, getDetail, getList, getMethods, getStatus }
 }
 
-function renderOrders() {
-  window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'token')
+function renderOrders(valid = { current: true }) {
   const authApi: AuthApi = {
     login: vi.fn(),
-    getCurrentUser: vi.fn().mockResolvedValue({
-      email: 'member@example.com',
-      expiresAt: null,
-      status: 'active',
+    getCurrentUser: vi.fn(async () => {
+      if (!valid.current)
+        throw new ApiError({
+          status: 401,
+          code: 'AUTH_FAILED',
+          message: 'Authentication failed',
+        })
+      return {
+        email: 'member@example.com',
+        expiresAt: null,
+        status: 'active' as const,
+      }
+    }),
+    logout: vi.fn(async () => {
+      valid.current = false
     }),
   }
   const router = createAppRouter({ initialEntries: ['/orders'] })
@@ -171,9 +182,13 @@ describe('Payment checkout flow', () => {
     fireEvent.click(button)
     fireEvent.click(button)
     await waitFor(() => expect(mocks.checkout).toHaveBeenCalledOnce())
-    expect(mocks.checkout).toHaveBeenCalledWith('token', pendingOrder.id, {
-      paymentMethodId: '3',
-    })
+    expect(mocks.checkout).toHaveBeenCalledWith(
+      useAuthSessionStore.getState().accessToken,
+      pendingOrder.id,
+      {
+        paymentMethodId: '3',
+      },
+    )
     await act(async () => resolveCheckout({ type: 'finished' }))
   })
 
@@ -324,7 +339,7 @@ describe('Payment checkout flow', () => {
       ).toBeInTheDocument()
       expect(mocks.checkout).toHaveBeenCalledOnce()
       expect(mocks.getStatus).toHaveBeenCalledOnce()
-      expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBe('token')
+      expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
       if (
         code === 'PAYMENT_METHOD_UNAVAILABLE' ||
         code === 'VALIDATION_ERROR'
@@ -458,10 +473,16 @@ describe('Payment checkout flow', () => {
 describe('Payment authentication boundaries', () => {
   it('exits authenticated UI when Payment Methods rejects the session', async () => {
     const mocks = installMocks()
-    mocks.getMethods.mockRejectedValue(
-      new ApiError({ status: 401, code: 'AUTH_REQUIRED', message: 'auth' }),
-    )
-    const { router } = renderOrders()
+    const valid = { current: true }
+    mocks.getMethods.mockImplementation(async () => {
+      valid.current = false
+      throw new ApiError({
+        status: 401,
+        code: 'AUTH_REQUIRED',
+        message: 'auth',
+      })
+    })
+    const { router } = renderOrders(valid)
     const { dialog, user } = await openDetail()
     await user.click(within(dialog).getByRole('button', { name: '支付订单' }))
     expect(
@@ -472,10 +493,12 @@ describe('Payment authentication boundaries', () => {
 
   it('exits authenticated UI when Checkout rejects the session', async () => {
     const mocks = installMocks()
-    mocks.checkout.mockRejectedValue(
-      new ApiError({ status: 401, code: 'AUTH_FAILED', message: 'auth' }),
-    )
-    const { router } = renderOrders()
+    const valid = { current: true }
+    mocks.checkout.mockImplementation(async () => {
+      valid.current = false
+      throw new ApiError({ status: 401, code: 'AUTH_FAILED', message: 'auth' })
+    })
+    const { router } = renderOrders(valid)
     const { dialog, user } = await openPaymentAndSelect()
     await confirmPayment(dialog, user)
     expect(
@@ -487,10 +510,12 @@ describe('Payment authentication boundaries', () => {
   it('exits authenticated UI when status polling rejects the session', async () => {
     const mocks = installMocks()
     mocks.checkout.mockResolvedValue({ type: 'qrcode', data: 'opaque-qr' })
-    mocks.getStatus.mockRejectedValue(
-      new ApiError({ status: 401, code: 'AUTH_FAILED', message: 'auth' }),
-    )
-    const { router } = renderOrders()
+    const valid = { current: true }
+    mocks.getStatus.mockImplementation(async () => {
+      valid.current = false
+      throw new ApiError({ status: 401, code: 'AUTH_FAILED', message: 'auth' })
+    })
+    const { router } = renderOrders(valid)
     const { dialog, user } = await openPaymentAndSelect()
     await confirmPayment(dialog, user)
     expect(
@@ -511,16 +536,22 @@ describe('Payment authentication boundaries', () => {
         code: 'AUTH_FAILED',
         message: 'auth',
       })
-      if (source === 'detail') {
-        mocks.getDetail
-          .mockResolvedValueOnce(pendingOrder)
-          .mockRejectedValue(authError)
-      } else {
-        mocks.getList
-          .mockResolvedValueOnce([pendingOrder])
-          .mockRejectedValue(authError)
+      const valid = { current: true }
+      const failAuth = async () => {
+        valid.current = false
+        throw authError
       }
-      const { router } = renderOrders()
+      if (source === 'detail')
+        mocks.getDetail
+          .mockReset()
+          .mockResolvedValueOnce(pendingOrder)
+          .mockImplementation(failAuth)
+      else
+        mocks.getList
+          .mockReset()
+          .mockResolvedValueOnce([pendingOrder])
+          .mockImplementation(failAuth)
+      const { router } = renderOrders(valid)
       const { dialog, user } = await openPaymentAndSelect()
       await confirmPayment(dialog, user)
       expect(
