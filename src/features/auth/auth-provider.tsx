@@ -7,6 +7,10 @@ import {
 } from '@/lib/auth/session-store'
 import { prepareSessionSafetyForAuthBoundary } from '@/lib/auth/session-safety-storage'
 import {
+  isolateSupportWidgetSession,
+  setSupportWidgetIdentityReady,
+} from '@/features/support-widget/support-widget-runtime'
+import {
   authApi as defaultAuthApi,
   type AuthApi,
   type CurrentUser,
@@ -57,6 +61,8 @@ export function AuthProvider({
 
   const isolate = useCallback(
     (identityChanged = true) => {
+      isolateSupportWidgetSession()
+      setSupportWidgetIdentityReady(false)
       advanceAuthSessionGeneration()
       if (identityChanged) prepareSessionSafetyForAuthBoundary()
       void queryClient.cancelQueries()
@@ -78,6 +84,8 @@ export function AuthProvider({
 
   const pauseForVerification = useCallback(
     (cause: unknown) => {
+      isolateSupportWidgetSession()
+      setSupportWidgetIdentityReady(false)
       advanceAuthSessionGeneration()
       prepareSessionSafetyForAuthBoundary()
       void queryClient.cancelQueries()
@@ -127,6 +135,7 @@ export function AuthProvider({
           useAuthSessionStore.getState().setValidated(true)
         }
         userRef.current = current
+        setSupportWidgetIdentityReady(true)
         versionRef.current = current.sessionVersion ?? null
         queryClient.setQueryData(authQueryKeys.me, current)
         setUser(current)
@@ -167,9 +176,11 @@ export function AuthProvider({
     const sequence = checkSequence.current
     active.current = true
     useAuthSessionStore.getState().hydrate()
+    setSupportWidgetIdentityReady(false)
     if (typeof BroadcastChannel !== 'undefined') {
       channel.current = new BroadcastChannel(CHANNEL)
       channel.current.onmessage = () => {
+        isolateSupportWidgetSession()
         ++mutationSequence.current
         ++checkSequence.current
         isolate()
@@ -220,6 +231,7 @@ export function AuthProvider({
           .setAccessToken(crypto.randomUUID(), verified.sessionVersion)
         useAuthSessionStore.getState().setValidated(true)
         userRef.current = verified
+        setSupportWidgetIdentityReady(true)
         versionRef.current = verified.sessionVersion ?? null
         queryClient.setQueryData(authQueryKeys.me, verified)
         setUser(verified)
