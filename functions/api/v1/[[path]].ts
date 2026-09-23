@@ -263,7 +263,10 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
       return failure(401, 'AUTH_REQUIRED')
     }
     const session = await loadSession(env, oldId, familyId)
-    if (!session) return failure(401, 'AUTH_FAILED')
+    if (!session) {
+      if (isOptional) return safeResponse(await upstream(request, target))
+      return failure(401, 'AUTH_FAILED')
+    }
     if (isRestore) {
       const me = await upstreamMe(env.SOLUTION_GATEWAY_ORIGIN!, session.token)
       if (!me.ok) {

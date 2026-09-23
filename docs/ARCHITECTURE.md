@@ -103,6 +103,8 @@ fallback。跨域 iframe 的 X-Frame-Options、frame-ancestors、DNS 和 remote 
 
 每次身份变化先递增 generation、清理私有 Query 并保守处理财务不确定性标记；旧业务响应和旧认证错误不得回填新身份。固定 Cookie 在重叠登录响应乱序时可能被旧值覆盖：D1 只授权当前会话，此时旧 Cookie 被拒绝，私有数据隔离，用户需要正常重新登录。退出仅撤销请求携带的会话，**不**发送迟到的 Cookie 清除响应，以免擦除较新的登录；旧 Cookie 仍由服务端拒绝。
 
+`GET /api/v1/announcements` 是唯一可选认证路由。无 Cookie 或 D1 已确认会话无效时，Pages 仅以无 Bearer 请求读取上游公开公告；有效会话仍使用当前身份读取。D1/解密故障不降级为匿名读取，`/api/v1/auth/session` 和所有受保护路由仍拒绝旧 Cookie。退出及账号切换会清理公告 Query，旧账号响应不能回填新身份。
+
 Auth response parser 对 solution 的 additive unknown fields 保持兼容，同时 strip 未知字段，只把 Aureole 当前认识且已强校验的白名单字段交给应用层。Login 等 request schema 不因此放宽。
 
 `AUTH_REQUIRED` / `AUTH_FAILED` 确认会话不可用时，前端隔离内存身份及完整私有 Query，返回 Login。刷新与冷启动期间只渲染不含私有数据的普通页面加载骨架，首次通过一次服务端 `/api/v1/auth/session` 确认身份后才挂载 AppShell；加载骨架本身不表示已登录。已确认登录后的焦点/可见性复核在后台去重执行一次，身份未变化时保持 AppShell 和 Query，不因暂时网络、数据库或上游故障卸载页面。故障不证明认证失效，也不清除服务端 Cookie；下一次切回或显式重试继续核对。收到跨标签页身份刷新通知时立即隔离旧身份并重新验证。主动退出调用 Pages `/api/v1/auth/logout` 撤销当前服务端会话；调用失败时不声称撤销成功，保持私有 UI 隔离并再次核对。
