@@ -39,6 +39,7 @@ export function AuthProvider({
   const userRef = useRef<CurrentUser | null>(null)
   const versionRef = useRef<string | null>(null)
   const mutationSequence = useRef(0)
+  const backgroundCheck = useRef<Promise<void> | null>(null)
   const identity = useAuthSessionStore((state) => state.accessToken)
   useQuery({
     queryKey: authQueryKeys.me,
@@ -90,62 +91,76 @@ export function AuthProvider({
     [queryClient],
   )
 
-  const verify = useCallback(async () => {
-    const sequence = ++checkSequence.current
-    const generation = captureAuthSessionGeneration()
-    const mutation = mutationSequence.current
-    setChecking(true)
-    try {
-      const first = await api.getCurrentUser('')
-      const current = await api.getCurrentUser('')
-      if (
-        !active.current ||
-        sequence !== checkSequence.current ||
-        generation !== captureAuthSessionGeneration() ||
-        mutation !== mutationSequence.current
-      )
-        return
-      if (first.sessionVersion !== current.sessionVersion) {
-        isolate()
-        setError(new Error('Session changed during verification'))
-        return
+  const verify = useCallback(
+    async (background = false) => {
+      const sequence = ++checkSequence.current
+      const generation = captureAuthSessionGeneration()
+      const mutation = mutationSequence.current
+      if (!background || !useAuthSessionStore.getState().validated)
+        setChecking(true)
+      try {
+        const first = await api.getCurrentUser('')
+        const current = background ? first : await api.getCurrentUser('')
+        if (
+          !active.current ||
+          sequence !== checkSequence.current ||
+          generation !== captureAuthSessionGeneration() ||
+          mutation !== mutationSequence.current
+        )
+          return
+        if (first.sessionVersion !== current.sessionVersion) {
+          isolate()
+          setError(new Error('Session changed during verification'))
+          return
+        }
+        const previous = useAuthSessionStore.getState()
+        if (
+          !previous.validated ||
+          userRef.current?.email !== current.email ||
+          versionRef.current !== (current.sessionVersion ?? null)
+        ) {
+          isolate(previous.validated)
+          useAuthSessionStore
+            .getState()
+            .setAccessToken(crypto.randomUUID(), current.sessionVersion)
+          useAuthSessionStore.getState().setValidated(true)
+        }
+        userRef.current = current
+        versionRef.current = current.sessionVersion ?? null
+        queryClient.setQueryData(authQueryKeys.me, current)
+        setUser(current)
+        setError(null)
+      } catch (cause) {
+        if (
+          !active.current ||
+          sequence !== checkSequence.current ||
+          generation !== captureAuthSessionGeneration() ||
+          mutation !== mutationSequence.current
+        )
+          return
+        if (isInvalidSessionError(cause)) isolate()
+        else if (!background || !useAuthSessionStore.getState().validated) {
+          pauseForVerification(cause)
+        }
+      } finally {
+        if (active.current && sequence === checkSequence.current) {
+          setChecking(false)
+          setReady(true)
+        }
       }
-      const previous = useAuthSessionStore.getState()
-      if (
-        !previous.validated ||
-        userRef.current?.email !== current.email ||
-        versionRef.current !== (current.sessionVersion ?? null)
-      ) {
-        isolate(previous.validated)
-        useAuthSessionStore
-          .getState()
-          .setAccessToken(crypto.randomUUID(), current.sessionVersion)
-        useAuthSessionStore.getState().setValidated(true)
-      }
-      userRef.current = current
-      versionRef.current = current.sessionVersion ?? null
-      queryClient.setQueryData(authQueryKeys.me, current)
-      setUser(current)
-      setError(null)
-    } catch (cause) {
-      if (
-        !active.current ||
-        sequence !== checkSequence.current ||
-        generation !== captureAuthSessionGeneration() ||
-        mutation !== mutationSequence.current
-      )
-        return
-      if (isInvalidSessionError(cause)) isolate()
-      else {
-        pauseForVerification(cause)
-      }
-    } finally {
-      if (active.current && sequence === checkSequence.current) {
-        setChecking(false)
-        setReady(true)
-      }
-    }
-  }, [api, isolate, pauseForVerification, queryClient])
+    },
+    [api, isolate, pauseForVerification, queryClient],
+  )
+
+  const revalidateInBackground = useCallback(() => {
+    if (!useAuthSessionStore.getState().validated) return
+    if (backgroundCheck.current) return
+    const check = verify(true)
+    backgroundCheck.current = check
+    void check.finally(() => {
+      if (backgroundCheck.current === check) backgroundCheck.current = null
+    })
+  }, [verify])
 
   useEffect(() => {
     const sequence = checkSequence.current
@@ -161,10 +176,10 @@ export function AuthProvider({
       }
     }
     const onFocus = () => {
-      void verify()
+      revalidateInBackground()
     }
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') void verify()
+      if (document.visibilityState === 'visible') revalidateInBackground()
     }
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVisibility)
@@ -178,7 +193,7 @@ export function AuthProvider({
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [isolate, verify])
+  }, [isolate, revalidateInBackground, verify])
 
   const establishSession = useCallback(
     async (nextUser: CurrentUser) => {
