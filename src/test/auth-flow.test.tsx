@@ -196,6 +196,122 @@ describe('Cookie session UI', () => {
     )
   })
 
+  it('keeps an established page mounted during one deduplicated focus verification', async () => {
+    const pending = deferred<CurrentUser>()
+    const getCurrentUser = vi.fn().mockResolvedValue(member)
+    const { queryClient } = renderSession({ login: vi.fn(), getCurrentUser })
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('authenticated'),
+    )
+    const identity = useAuthSessionStore.getState().accessToken
+    queryClient.setQueryData(['private'], { owner: member.email })
+    const initialCalls = getCurrentUser.mock.calls.length
+    getCurrentUser.mockImplementationOnce(() => pending.promise)
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+      document.dispatchEvent(new Event('visibilitychange'))
+      window.dispatchEvent(new Event('focus'))
+    })
+    expect(getCurrentUser).toHaveBeenCalledTimes(initialCalls + 1)
+    expect(screen.getByTestId('status')).toHaveTextContent('authenticated')
+    expect(screen.getByTestId('user')).toHaveTextContent(member.email)
+    expect(queryClient.getQueryData(['private'])).toEqual({
+      owner: member.email,
+    })
+    await act(async () => {
+      pending.resolve(member)
+      await pending.promise
+    })
+    expect(screen.getByTestId('status')).toHaveTextContent('authenticated')
+    expect(useAuthSessionStore.getState().accessToken).toBe(identity)
+    expect(getCurrentUser).toHaveBeenCalledTimes(initialCalls + 1)
+  })
+
+  it('does not unload established UI on a transient background failure', async () => {
+    const pending = deferred<CurrentUser>()
+    const getCurrentUser = vi.fn().mockResolvedValue(member)
+    const { queryClient } = renderSession({ login: vi.fn(), getCurrentUser })
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('authenticated'),
+    )
+    const identity = useAuthSessionStore.getState().accessToken
+    queryClient.setQueryData(['private'], { owner: member.email })
+    getCurrentUser.mockImplementationOnce(() => pending.promise)
+    act(() => window.dispatchEvent(new Event('focus')))
+    expect(screen.getByTestId('status')).toHaveTextContent('authenticated')
+    await act(async () => {
+      pending.reject(unavailable())
+      await pending.promise.catch(() => undefined)
+    })
+    expect(screen.getByTestId('status')).toHaveTextContent('authenticated')
+    expect(useAuthSessionStore.getState().accessToken).toBe(identity)
+    expect(queryClient.getQueryData(['private'])).toEqual({
+      owner: member.email,
+    })
+  })
+
+  it('discards an old focus result after a cross-tab identity switch', async () => {
+    class TestChannel {
+      onmessage: (() => void) | null = null
+      postMessage() {}
+      close() {}
+    }
+    const channels: TestChannel[] = []
+    vi.stubGlobal(
+      'BroadcastChannel',
+      class extends TestChannel {
+        constructor() {
+          super()
+          channels.push(this)
+        }
+      },
+    )
+    const old = deferred<CurrentUser>()
+    let current = member
+    const getCurrentUser = vi.fn(async () => current)
+    const { queryClient } = renderSession({ login: vi.fn(), getCurrentUser })
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(member.email),
+    )
+    getCurrentUser.mockImplementationOnce(() => old.promise)
+    act(() => window.dispatchEvent(new Event('focus')))
+    current = other
+    await act(async () => channels[0]?.onmessage?.())
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(other.email),
+    )
+    queryClient.setQueryData(['private'], { owner: other.email })
+    await act(async () => {
+      old.resolve(member)
+      await old.promise
+    })
+    expect(screen.getByTestId('user')).toHaveTextContent(other.email)
+    expect(queryClient.getQueryData(['private'])).toEqual({
+      owner: other.email,
+    })
+    vi.unstubAllGlobals()
+  })
+
+  it('does not start a focus read while an explicit account switch is pending', async () => {
+    const login = deferred<CurrentUser>()
+    const getCurrentUser = vi.fn().mockResolvedValue(member)
+    renderSession({ login: vi.fn(() => login.promise), getCurrentUser })
+    await waitFor(() =>
+      expect(screen.getByTestId('user')).toHaveTextContent(member.email),
+    )
+    const initialCalls = getCurrentUser.mock.calls.length
+    await userEvent.setup().click(screen.getByRole('button', { name: 'login' }))
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    expect(getCurrentUser).toHaveBeenCalledTimes(initialCalls)
+    await act(async () => {
+      login.resolve(other)
+      await login.promise
+    })
+  })
+
   it('does not restore a late pre-logout /me response', async () => {
     const pending = deferred<CurrentUser>()
     const getCurrentUser = vi
@@ -327,7 +443,7 @@ describe('Cookie session UI', () => {
     expect(screen.getByTestId('user')).toHaveTextContent(other.email)
   })
 
-  it('isolates private data during transient verification errors and recovers on retry', async () => {
+  it('retains the established session and private page after a transient focus error', async () => {
     let fail = false
     const getCurrentUser = vi.fn(async () => {
       if (fail) throw unavailable()
@@ -337,19 +453,40 @@ describe('Cookie session UI', () => {
     await waitFor(() =>
       expect(screen.getByTestId('user')).toHaveTextContent(member.email),
     )
+    const identity = useAuthSessionStore.getState().accessToken
     queryClient.setQueryData(['private'], { email: member.email })
     fail = true
     act(() => window.dispatchEvent(new Event('focus')))
-    await waitFor(() =>
-      expect(screen.getByTestId('status')).toHaveTextContent('error'),
-    )
-    expect(screen.getByTestId('user')).toHaveTextContent('none')
-    expect(queryClient.getQueryData(['private'])).toBeUndefined()
+    await waitFor(() => expect(getCurrentUser).toHaveBeenCalledTimes(3))
+    expect(screen.getByTestId('status')).toHaveTextContent('authenticated')
+    expect(screen.getByTestId('user')).toHaveTextContent(member.email)
+    expect(useAuthSessionStore.getState().accessToken).toBe(identity)
+    expect(queryClient.getQueryData(['private'])).toEqual({
+      email: member.email,
+    })
     fail = false
     await userEvent.setup().click(screen.getByRole('button', { name: 'retry' }))
     await waitFor(() =>
       expect(screen.getByTestId('user')).toHaveTextContent(member.email),
     )
+  })
+
+  it('isolates confirmed invalidation during background verification', async () => {
+    const pending = deferred<CurrentUser>()
+    const getCurrentUser = vi.fn().mockResolvedValue(member)
+    const { queryClient } = renderSession({ login: vi.fn(), getCurrentUser })
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('authenticated'),
+    )
+    queryClient.setQueryData(['private'], { owner: member.email })
+    getCurrentUser.mockImplementationOnce(() => pending.promise)
+    act(() => window.dispatchEvent(new Event('focus')))
+    await act(async () => {
+      pending.reject(missing())
+      await pending.promise.catch(() => undefined)
+    })
+    expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated')
+    expect(queryClient.getQueryData(['private'])).toBeUndefined()
   })
 
   it('isolates a changing server session between verification reads and recovers on retry', async () => {

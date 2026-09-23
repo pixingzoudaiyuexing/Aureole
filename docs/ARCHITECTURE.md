@@ -105,7 +105,7 @@ fallback。跨域 iframe 的 X-Frame-Options、frame-ancestors、DNS 和 remote 
 
 Auth response parser 对 solution 的 additive unknown fields 保持兼容，同时 strip 未知字段，只把 Aureole 当前认识且已强校验的白名单字段交给应用层。Login 等 request schema 不因此放宽。
 
-`AUTH_REQUIRED` / `AUTH_FAILED` 确认会话不可用时，前端隔离内存身份及完整私有 Query，返回 Login。暂时网络、数据库或上游故障不证明认证失效：隐藏私有 UI 并提供重试，服务端 Cookie 不因这一失败被清除。主动退出调用 Pages `/api/v1/auth/logout` 撤销当前服务端会话；调用失败时不声称撤销成功，保持私有 UI 隔离并再次核对。
+`AUTH_REQUIRED` / `AUTH_FAILED` 确认会话不可用时，前端隔离内存身份及完整私有 Query，返回 Login。首次恢复身份未完成时使用阻断式验证；已确认登录后的焦点/可见性复核在后台去重执行一次，身份未变化时保持 AppShell 和 Query，不因暂时网络、数据库或上游故障卸载页面。故障不证明认证失效，也不清除服务端 Cookie；下一次切回或显式重试继续核对。收到跨标签页身份刷新通知时立即隔离旧身份并重新验证。主动退出调用 Pages `/api/v1/auth/logout` 撤销当前服务端会话；调用失败时不声称撤销成功，保持私有 UI 隔离并再次核对。
 
 ## Public onboarding and challenge
 
