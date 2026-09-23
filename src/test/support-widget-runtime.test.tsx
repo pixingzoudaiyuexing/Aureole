@@ -95,6 +95,51 @@ describe('Crisp lifecycle', () => {
     view.unmount()
   })
 
+  it('hides an already loaded widget when a config refresh fails, despite cached data', async () => {
+    vi.resetModules()
+    const { SupportWidgetRuntimeEffects: FreshEffects } =
+      await import('@/features/support-widget/support-widget-runtime-effects')
+    const { supportWidgetApi: freshApi } =
+      await import('@/features/support-widget/support-widget-api')
+    const { setSupportWidgetIdentityReady: setFreshIdentityReady } =
+      await import('@/features/support-widget/support-widget-runtime')
+    setFreshIdentityReady(true)
+    const getConfig = vi.spyOn(freshApi, 'getConfig').mockResolvedValue({
+      crisp: { enabled: true, websiteId: id },
+    })
+    const client = createQueryClient()
+    const view = render(
+      <QueryClientProvider client={client}>
+        <FreshEffects />
+      </QueryClientProvider>,
+    )
+    await waitFor(() => expect(sdk.chat.show).toHaveBeenCalledTimes(1))
+    expect(sdk.load).toHaveBeenCalledTimes(1)
+    expect(getConfig).toHaveBeenCalled()
+    sdk.chat.hide.mockClear()
+    getConfig.mockRejectedValue(new Error('offline'))
+
+    await act(async () => {
+      await client.refetchQueries({
+        queryKey: ['support-widget', 'public'],
+      })
+    })
+
+    expect(getConfig).toHaveBeenCalledTimes(2)
+    expect(client.getQueryState(['support-widget', 'public'])?.status).toBe(
+      'error',
+    )
+    expect(client.getQueryData(['support-widget', 'public'])).toEqual({
+      crisp: { enabled: true, websiteId: id },
+    })
+    await waitFor(() => expect(sdk.chat.hide).toHaveBeenCalled())
+    sdk.chat.show.mockClear()
+    act(() => document.dispatchEvent(new Event('visibilitychange')))
+    expect(sdk.chat.show).not.toHaveBeenCalled()
+    view.unmount()
+    vi.resetModules()
+  })
+
   it('hides and resets on auth generation changes without sending user attributes', async () => {
     vi.spyOn(supportWidgetApi, 'getConfig').mockResolvedValue({
       crisp: { enabled: true, websiteId: id },
