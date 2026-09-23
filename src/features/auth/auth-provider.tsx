@@ -92,7 +92,7 @@ export function AuthProvider({
   )
 
   const verify = useCallback(
-    async (background = false) => {
+    async (background = false, initial = false) => {
       const sequence = ++checkSequence.current
       const generation = captureAuthSessionGeneration()
       const mutation = mutationSequence.current
@@ -100,7 +100,8 @@ export function AuthProvider({
         setChecking(true)
       try {
         const first = await api.getCurrentUser('')
-        const current = background ? first : await api.getCurrentUser('')
+        const current =
+          background || initial ? first : await api.getCurrentUser('')
         if (
           !active.current ||
           sequence !== checkSequence.current ||
@@ -184,7 +185,7 @@ export function AuthProvider({
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVisibility)
     queueMicrotask(() => {
-      if (active.current) void verify()
+      if (active.current) void verify(false, true)
     })
     return () => {
       active.current = false

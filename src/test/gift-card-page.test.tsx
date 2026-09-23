@@ -309,7 +309,7 @@ describe('Gift Card confirmed success', () => {
       expect(input).toHaveValue('')
       expect(input).toHaveAttribute('type', 'password')
       expect(mocks.getWallet).toHaveBeenCalledTimes(2)
-      expect(mocks.getCurrentUser).toHaveBeenCalledTimes(3)
+      expect(mocks.getCurrentUser).toHaveBeenCalledTimes(2)
       expect(mocks.getOverview).toHaveBeenCalledOnce()
       expect(mocks.getAccess).not.toHaveBeenCalled()
       expect(JSON.stringify(giftCardMutationKeys.redeem)).not.toContain(
@@ -355,7 +355,6 @@ describe('Gift Card confirmed success', () => {
   it('keeps confirmed success and fails closed when Me reconciliation fails', async () => {
     const mocks = installMocks()
     mocks.getCurrentUser
-      .mockResolvedValueOnce(currentUser)
       .mockResolvedValueOnce(currentUser)
       .mockRejectedValueOnce(
         new ApiError({
@@ -419,7 +418,7 @@ describe('Gift Card definitive errors', () => {
       expect(input).toHaveValue('fake-card-code')
       expect(mocks.redeem).toHaveBeenCalledOnce()
       expect(mocks.getWallet).toHaveBeenCalledOnce()
-      expect(mocks.getCurrentUser).toHaveBeenCalledTimes(2)
+      expect(mocks.getCurrentUser).toHaveBeenCalledOnce()
       expect(mocks.getOverview).not.toHaveBeenCalled()
       expect(
         JSON.stringify(
@@ -454,7 +453,6 @@ describe('Gift Card unknown-result recovery', () => {
         .mockResolvedValueOnce({ balanceMinor: 20_000 })
       mocks.getCurrentUser
         .mockResolvedValueOnce(currentUser)
-        .mockResolvedValueOnce(currentUser)
         .mockResolvedValueOnce(recoveredUser)
       mocks.redeem.mockRejectedValue(
         code === 'PLAIN_ERROR'
@@ -487,7 +485,7 @@ describe('Gift Card unknown-result recovery', () => {
       expect(input).toHaveValue('fake-card-code')
       expect(mocks.redeem).toHaveBeenCalledOnce()
       expect(mocks.getWallet).toHaveBeenCalledTimes(2)
-      expect(mocks.getCurrentUser).toHaveBeenCalledTimes(3)
+      expect(mocks.getCurrentUser).toHaveBeenCalledTimes(2)
       expect(mocks.getOverview).toHaveBeenCalledOnce()
       expect(mocks.getAccess).not.toHaveBeenCalled()
       expect(
@@ -526,7 +524,6 @@ describe('Gift Card unknown-result recovery', () => {
           .mockResolvedValueOnce({ balanceMinor: 20_000 })
       } else if (source === 'me') {
         mocks.getCurrentUser
-          .mockResolvedValueOnce(currentUser)
           .mockResolvedValueOnce(currentUser)
           .mockRejectedValueOnce(readError)
           .mockResolvedValueOnce(recoveredUser)
@@ -694,7 +691,6 @@ describe('Gift Card authentication boundaries', () => {
           .mockRejectedValueOnce(authError)
       } else if (source === 'me') {
         mocks.getCurrentUser
-          .mockResolvedValueOnce(currentUser)
           .mockResolvedValueOnce(currentUser)
           .mockRejectedValueOnce(authError)
       } else if (source === 'overview') {
