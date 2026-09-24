@@ -177,6 +177,11 @@ footer defaults。Runtime Settings 不控制 API origin、Authorization、CSP、
 
 ## Commerce mutation mapping
 
+- `GET /api/v1/config/promotion-ui` 是匿名同源精确公开路由；DTO 仅有 `showCouponEntry` 与
+  `annualPrefillCode`。读取失败时显示手动入口但不预填。关闭入口时隐藏优惠券专属 UI，建单不携带旧码；
+  非年付不预填，年付预填只填输入框，用户编辑不被配置刷新覆盖。只有当前优惠码与周期经用户主动验证
+  成功才可随建单提交。明确 `PROMOTION_INVALID` 清除旧预览；建单拒券后必须另行明确点击无券创建，
+  不自动重试，也不把套餐标价宣称为最终金额。
 - `GET /api/v1/products/{id}` 在用户从 Plans 明确选择创建订单后按需读取。Product Detail 是 Create
   Dialog 的套餐名称、规格和周期标价来源，但 `POST /api/v1/orders` 仍是购买/续费资格及最终金额权威。
 - `POST /api/v1/promotions/validate` 只在用户点击“验证优惠码”时调用。Aureole 只显示 Contract 返回的
