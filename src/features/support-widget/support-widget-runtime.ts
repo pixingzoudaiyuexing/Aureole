@@ -1,27 +1,28 @@
-type CrispSdk = (typeof import('crisp-sdk-web'))['Crisp']
+const CRISP_SCRIPT_URL = 'https://client.crisp.chat/l.js'
 
-let sdk: CrispSdk | null = null
+type CrispCommand = [string, string, ...unknown[]]
+
+declare global {
+  interface Window {
+    $crisp?: CrispCommand[]
+    CRISP_WEBSITE_ID?: string
+  }
+}
+
 let loadedWebsiteId: string | null = null
-let desiredWebsiteId: string | null = null
-let loadPromise: Promise<void> | null = null
-let safeToShow = false
-let isolationPending = false
-let activated = false
 let identityReady = false
 let recheckIdentity: (() => void) | null = null
-let blockedWebsiteId: string | null = null
-let activationSequence = 0
-let activationBlocked = false
-let failedImportSequence: number | null = null
+let blocked = false
+
+function command(name: string) {
+  window.$crisp?.push(['do', name])
+}
 
 export function setSupportWidgetIdentityReady(ready: boolean) {
   if (ready === identityReady) return
   identityReady = ready
-  if (!ready) {
-    isolateSupportWidgetSession()
-  } else {
-    recheckIdentity?.()
-  }
+  if (!ready) isolateSupportWidgetSession()
+  else recheckIdentity?.()
 }
 
 export function isSupportWidgetIdentityReady() {
@@ -35,122 +36,50 @@ export function subscribeSupportWidgetIdentityRecheck(callback: () => void) {
   }
 }
 
-function hideAndReset() {
-  if (!sdk || !loadedWebsiteId) return
-  try {
-    sdk.chat.hide()
-    sdk.chat.close()
-    sdk.session.reset()
-    isolationPending = false
-  } catch {
-    // Keep the widget disabled if the third-party runtime is unavailable.
-  }
-}
-
 export function isolateSupportWidgetSession() {
-  ++activationSequence
-  safeToShow = false
-  isolationPending = true
-  activated = false
-  hideAndReset()
+  if (!loadedWebsiteId) return
+  command('chat:hide')
+  command('chat:close')
+  command('session:reset')
 }
 
 export function disableSupportWidget() {
-  ++activationSequence
-  safeToShow = false
-  desiredWebsiteId = null
-  activated = false
-  if (sdk && loadedWebsiteId) {
-    try {
-      sdk.chat.hide()
-      sdk.chat.close()
-    } catch {
-      // A broken third-party runtime must not interrupt auth transitions.
-    }
-  }
+  if (!loadedWebsiteId) return
+  command('chat:hide')
+  command('chat:close')
 }
 
 export function rejectSupportWidgetConfig() {
   if (loadedWebsiteId) {
-    blockedWebsiteId = loadedWebsiteId
-    hideAndReset()
+    isolateSupportWidgetSession()
+    blocked = true
   }
   disableSupportWidget()
 }
 
 export function enableSupportWidget(websiteId: string) {
-  if (!identityReady) {
-    disableSupportWidget()
-    return
-  }
-  if (blockedWebsiteId === websiteId || activationBlocked) return
-  desiredWebsiteId = websiteId
-  safeToShow = true
-
-  if (sdk && loadedWebsiteId === websiteId) {
-    if (isolationPending) hideAndReset()
-    if (!activated) {
-      sdk.chat.show()
-      activated = true
-    }
-    return
-  }
-
-  // The SDK cannot unload its script or swap a configured website in one page.
+  if (!identityReady || blocked) return
   if (loadedWebsiteId && loadedWebsiteId !== websiteId) {
-    blockedWebsiteId = websiteId
-    hideAndReset()
+    rejectSupportWidgetConfig()
     return
   }
-
-  if (!loadPromise) {
-    const sequence = activationSequence
-    loadPromise = import('crisp-sdk-web')
-      .then(({ Crisp }) => {
-        sdk = Crisp
-        if (
-          !identityReady ||
-          !safeToShow ||
-          sequence !== activationSequence ||
-          !desiredWebsiteId ||
-          loadedWebsiteId
-        )
-          return
-        Crisp.configure(desiredWebsiteId, { autoload: false })
-        Crisp.chat.hide()
-        Crisp.load()
-        loadedWebsiteId = desiredWebsiteId
-        isolationPending = false
-      })
-      .then(() => {
-        if (
-          identityReady &&
-          safeToShow &&
-          sequence === activationSequence &&
-          desiredWebsiteId === loadedWebsiteId &&
-          !activated
-        ) {
-          sdk?.chat.show()
-          activated = true
-        }
-      })
-      .catch(() => {
-        activationBlocked = true
-        failedImportSequence = sequence
+  if (!loadedWebsiteId) {
+    loadedWebsiteId = websiteId
+    window.$crisp = window.$crisp || []
+    window.CRISP_WEBSITE_ID = websiteId
+    const existingScript = Array.from(document.scripts).find(
+      (script) => script.src === CRISP_SCRIPT_URL,
+    )
+    if (!existingScript) {
+      const script = document.createElement('script')
+      script.src = CRISP_SCRIPT_URL
+      script.async = true
+      script.onerror = () => {
+        blocked = true
         disableSupportWidget()
-      })
-      .finally(() => {
-        loadPromise = null
-        if (
-          identityReady &&
-          safeToShow &&
-          desiredWebsiteId &&
-          !loadedWebsiteId &&
-          sequence !== activationSequence &&
-          failedImportSequence !== sequence
-        ) {
-          enableSupportWidget(desiredWebsiteId)
-        }
-      })
+      }
+      document.head.appendChild(script)
+    }
   }
+  command('chat:show')
 }

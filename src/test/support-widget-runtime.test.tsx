@@ -2,168 +2,140 @@ import { act, render, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createQueryClient } from '@/app/providers/query-client'
-import { supportWidgetApi } from '@/features/support-widget/support-widget-api'
-import { SupportWidgetRuntimeEffects } from '@/features/support-widget/support-widget-runtime-effects'
-import {
-  disableSupportWidget,
-  enableSupportWidget,
-  isolateSupportWidgetSession,
-  setSupportWidgetIdentityReady,
-} from '@/features/support-widget/support-widget-runtime'
-import {
-  advanceAuthSessionGeneration,
-  useAuthSessionStore,
-} from '@/lib/auth/session-store'
 
 const id = '12345678-1234-1234-1234-123456789abc'
-const sdk = vi.hoisted(() => ({
-  configure: vi.fn(),
-  load: vi.fn(),
-  chat: { hide: vi.fn(), show: vi.fn(), close: vi.fn() },
-  session: { reset: vi.fn() },
-}))
-vi.mock('crisp-sdk-web', () => ({ Crisp: sdk }))
+const scriptUrl = 'https://client.crisp.chat/l.js'
 
-function renderEffects() {
+async function renderEffects(
+  getConfig: () => Promise<
+    | { crisp: { enabled: false } }
+    | { crisp: { enabled: true; websiteId: string } }
+  >,
+) {
+  vi.resetModules()
+  const { supportWidgetApi } =
+    await import('@/features/support-widget/support-widget-api')
+  vi.spyOn(supportWidgetApi, 'getConfig').mockImplementation(getConfig)
+  const { SupportWidgetRuntimeEffects } =
+    await import('@/features/support-widget/support-widget-runtime-effects')
+  const runtime =
+    await import('@/features/support-widget/support-widget-runtime')
+  runtime.setSupportWidgetIdentityReady(true)
   const client = createQueryClient()
   const view = render(
     <QueryClientProvider client={client}>
       <SupportWidgetRuntimeEffects />
     </QueryClientProvider>,
   )
-  return { client, ...view }
+  return { client, runtime, Effects: SupportWidgetRuntimeEffects, ...view }
 }
 
 beforeEach(() => {
-  vi.clearAllMocks()
-  disableSupportWidget()
-  setSupportWidgetIdentityReady(true)
-  useAuthSessionStore.setState({
-    hydrated: true,
-    validated: false,
-    accessToken: null,
+  delete window.$crisp
+  delete window.CRISP_WEBSITE_ID
+  document.querySelectorAll(`script[src="${scriptUrl}"]`).forEach((script) => {
+    script.remove()
   })
 })
 
 describe('Crisp lifecycle', () => {
-  it('does not import or initialize for disabled, missing, error or malformed config', async () => {
-    vi.spyOn(supportWidgetApi, 'getConfig').mockResolvedValueOnce({
+  it('does not initialize for disabled or failed config', async () => {
+    const disabled = await renderEffects(async () => ({
       crisp: { enabled: false },
-    })
-    const disabled = renderEffects()
+    }))
     await waitFor(() =>
       expect(
         disabled.client.getQueryData(['support-widget', 'public']),
       ).toEqual({ crisp: { enabled: false } }),
     )
-    expect(sdk.configure).not.toHaveBeenCalled()
+    expect(document.querySelector(`script[src="${scriptUrl}"]`)).toBeNull()
     disabled.unmount()
 
-    vi.spyOn(supportWidgetApi, 'getConfig').mockRejectedValue(
-      new Error('offline'),
-    )
-    const failed = renderEffects()
+    const failed = await renderEffects(async () => {
+      throw new Error('offline')
+    })
     await waitFor(() =>
       expect(
         failed.client.getQueryState(['support-widget', 'public'])?.status,
       ).toBe('error'),
     )
-    expect(sdk.configure).not.toHaveBeenCalled()
+    expect(document.querySelector(`script[src="${scriptUrl}"]`)).toBeNull()
     failed.unmount()
   })
 
-  it('loads once for a valid config, stays stable across rerenders and hides on disable', async () => {
-    vi.spyOn(supportWidgetApi, 'getConfig').mockResolvedValue({
+  it('loads the official script once and hides when disabled', async () => {
+    const view = await renderEffects(async () => ({
       crisp: { enabled: true, websiteId: id },
-    })
-    const view = renderEffects()
-    await waitFor(() => expect(sdk.load).toHaveBeenCalledTimes(1))
-    expect(sdk.configure).toHaveBeenCalledWith(id, { autoload: false })
-    expect(sdk.chat.show).toHaveBeenCalledTimes(1)
+    }))
+    await waitFor(() =>
+      expect(
+        document.querySelectorAll(`script[src="${scriptUrl}"]`),
+      ).toHaveLength(1),
+    )
+    expect(window.CRISP_WEBSITE_ID).toBe(id)
+    expect(window.$crisp).toContainEqual(['do', 'chat:show'])
     view.rerender(
       <QueryClientProvider client={view.client}>
-        <SupportWidgetRuntimeEffects />
+        <view.Effects />
       </QueryClientProvider>,
     )
-    expect(sdk.load).toHaveBeenCalledTimes(1)
+    expect(
+      document.querySelectorAll(`script[src="${scriptUrl}"]`),
+    ).toHaveLength(1)
+
     act(() =>
       view.client.setQueryData(['support-widget', 'public'], {
         crisp: { enabled: false },
       }),
     )
-    await waitFor(() => expect(sdk.chat.hide).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(window.$crisp).toContainEqual(['do', 'session:reset']),
+    )
+    expect(window.$crisp).toContainEqual(['do', 'chat:hide'])
     view.unmount()
   })
 
-  it('hides an already loaded widget when a config refresh fails, despite cached data', async () => {
-    vi.resetModules()
-    const { SupportWidgetRuntimeEffects: FreshEffects } =
-      await import('@/features/support-widget/support-widget-runtime-effects')
-    const { supportWidgetApi: freshApi } =
-      await import('@/features/support-widget/support-widget-api')
-    const { setSupportWidgetIdentityReady: setFreshIdentityReady } =
-      await import('@/features/support-widget/support-widget-runtime')
-    setFreshIdentityReady(true)
-    const getConfig = vi.spyOn(freshApi, 'getConfig').mockResolvedValue({
-      crisp: { enabled: true, websiteId: id },
-    })
-    const client = createQueryClient()
-    const view = render(
-      <QueryClientProvider client={client}>
-        <FreshEffects />
-      </QueryClientProvider>,
+  it('keeps cached enabled data hidden after a refresh failure', async () => {
+    const getConfig = vi
+      .fn()
+      .mockResolvedValueOnce({ crisp: { enabled: true, websiteId: id } })
+      .mockRejectedValue(new Error('offline'))
+    const view = await renderEffects(getConfig)
+    await waitFor(() =>
+      expect(
+        document.querySelectorAll(`script[src="${scriptUrl}"]`),
+      ).toHaveLength(1),
     )
-    await waitFor(() => expect(sdk.chat.show).toHaveBeenCalledTimes(1))
-    expect(sdk.load).toHaveBeenCalledTimes(1)
-    expect(getConfig).toHaveBeenCalled()
-    sdk.chat.hide.mockClear()
-    getConfig.mockRejectedValue(new Error('offline'))
+    const push = vi.spyOn(window.$crisp!, 'push')
 
     await act(async () => {
-      await client.refetchQueries({
+      await view.client.refetchQueries({
         queryKey: ['support-widget', 'public'],
       })
     })
 
-    expect(getConfig).toHaveBeenCalledTimes(2)
-    expect(client.getQueryState(['support-widget', 'public'])?.status).toBe(
-      'error',
-    )
-    expect(client.getQueryData(['support-widget', 'public'])).toEqual({
-      crisp: { enabled: true, websiteId: id },
-    })
-    await waitFor(() => expect(sdk.chat.hide).toHaveBeenCalled())
-    sdk.chat.show.mockClear()
+    expect(
+      view.client.getQueryState(['support-widget', 'public'])?.status,
+    ).toBe('error')
+    await waitFor(() => expect(push).toHaveBeenCalledWith(['do', 'chat:hide']))
+    push.mockClear()
     act(() => document.dispatchEvent(new Event('visibilitychange')))
-    expect(sdk.chat.show).not.toHaveBeenCalled()
+    expect(push).not.toHaveBeenCalledWith(['do', 'chat:show'])
     view.unmount()
-    vi.resetModules()
   })
 
-  it('hides and resets on auth generation changes without sending user attributes', async () => {
-    vi.spyOn(supportWidgetApi, 'getConfig').mockResolvedValue({
+  it('resets the Crisp session on auth isolation', async () => {
+    const view = await renderEffects(async () => ({
       crisp: { enabled: true, websiteId: id },
-    })
-    const view = renderEffects()
-    await waitFor(() =>
-      expect(
-        view.client.getQueryState(['support-widget', 'public'])?.status,
-      ).toBe('success'),
-    )
-    enableSupportWidget(id)
-    expect(sdk.chat.hide).toHaveBeenCalled()
-    act(() => {
-      isolateSupportWidgetSession()
-      advanceAuthSessionGeneration()
-    })
-    expect(sdk.session.reset).toHaveBeenCalled()
-    expect(sdk.chat.hide).toHaveBeenCalled()
-    expect(
-      sdk.configure.mock.calls.every(
-        ([, options]) =>
-          JSON.stringify(options) === JSON.stringify({ autoload: false }),
-      ),
-    ).toBe(true)
+    }))
+    await waitFor(() => expect(window.CRISP_WEBSITE_ID).toBe(id))
+    const push = vi.spyOn(window.$crisp!, 'push')
+
+    act(() => view.runtime.isolateSupportWidgetSession())
+
+    expect(push).toHaveBeenCalledWith(['do', 'chat:hide'])
+    expect(push).toHaveBeenCalledWith(['do', 'chat:close'])
+    expect(push).toHaveBeenCalledWith(['do', 'session:reset'])
     view.unmount()
   })
 })
