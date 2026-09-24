@@ -40,6 +40,7 @@ export function verifyCspPolicy(headersContent) {
     'https://client.crisp.chat',
     'https://client.relay.crisp.chat',
     'wss://client.relay.crisp.chat',
+    'wss://client.relay.rescue.crisp.chat',
     'https://storage.crisp.chat',
   ])
   requireExactDirective(csp, 'style-src', [
