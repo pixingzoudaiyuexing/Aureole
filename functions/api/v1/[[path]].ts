@@ -30,7 +30,6 @@ export type PagesFunction<Env = unknown> = (
 const PUBLIC_GET = new Set([
   '/api/v1/config/onboarding',
   '/api/v1/config/runtime',
-  '/api/v1/config/promotion-ui',
 ])
 const PUBLIC_POST = new Set([
   '/api/v1/auth/email-code',

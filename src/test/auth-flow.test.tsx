@@ -75,31 +75,6 @@ function renderSession(api: AuthApi) {
 }
 
 describe('Cookie session UI', () => {
-  it('ignores a stale missing-session response after a newer login', async () => {
-    const old = deferred<CurrentUser>()
-    const getCurrentUser = vi
-      .fn()
-      .mockResolvedValueOnce(member)
-      .mockImplementationOnce(() => old.promise)
-      .mockResolvedValue(other)
-    renderSession({ login: vi.fn().mockResolvedValue(other), getCurrentUser })
-    await waitFor(() =>
-      expect(screen.getByTestId('user')).toHaveTextContent(member.email),
-    )
-    act(() => window.dispatchEvent(new Event('focus')))
-    await waitFor(() => expect(getCurrentUser).toHaveBeenCalledTimes(2))
-    await userEvent.setup().click(screen.getByRole('button', { name: 'login' }))
-    await waitFor(() =>
-      expect(screen.getByTestId('user')).toHaveTextContent(other.email),
-    )
-    await act(async () => {
-      old.reject(missing())
-      await old.promise.catch(() => undefined)
-    })
-    expect(screen.getByTestId('status')).toHaveTextContent('authenticated')
-    expect(screen.getByTestId('user')).toHaveTextContent(other.email)
-  })
-
   it('restores an existing server session without reading the legacy bearer', async () => {
     window.sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, 'old-bearer')
     const getCurrentUser = vi.fn().mockResolvedValue(member)

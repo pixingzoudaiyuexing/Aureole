@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { LoaderCircle } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useAccountConfig } from '@/features/account/account-queries'
 import { isInvalidSessionError } from '@/features/auth/auth-errors'
 import { MutationFeedback } from '@/features/auth/form-feedback'
@@ -33,13 +33,10 @@ import {
 import { ordersApi } from './orders-api'
 import { ordersListOptions, ordersQueryKeys } from './orders-queries'
 import { promotionsApi, type PromotionPreview } from './promotions-api'
-import { defaultPromotionUiConfig } from './promotion-ui-api'
-import { usePromotionUi } from './promotion-ui-queries'
 
 type CreateFeedback =
   | { kind: 'error'; error: unknown }
   | { kind: 'unknown'; error: unknown; ordersRefreshed: boolean }
-  | { kind: 'rejected-promotion' }
 
 export function OrderCreateDialog({
   accessToken,
@@ -59,24 +56,14 @@ export function OrderCreateDialog({
   const queryClient = useQueryClient()
   const product = useProductDetail(accessToken, productId)
   const config = useAccountConfig(accessToken)
-  const promotionUi = usePromotionUi()
   const promotionLock = useSynchronousActionLock()
   const createLock = useSynchronousActionLock()
   const validationVersionRef = useRef(0)
-  const validationContextRef = useRef('')
   const [open, setOpen] = useState(true)
   const [selectedPeriod, setSelectedPeriod] = useState<BillingPeriod | null>(
     null,
   )
   const [promotionCode, setPromotionCode] = useState('')
-  const [promotionInputSource, setPromotionInputSource] = useState<
-    'untouched' | 'manual'
-  >('untouched')
-  const [validatedPromotion, setValidatedPromotion] = useState<{
-    code: string
-    period: BillingPeriod
-    context: string
-  } | null>(null)
   const [promotionPreview, setPromotionPreview] =
     useState<PromotionPreview | null>(null)
   const [promotionError, setPromotionError] = useState<unknown>(null)
@@ -107,13 +94,6 @@ export function OrderCreateDialog({
     retry: false,
   })
 
-  const showCouponEntry = (promotionUi.data ?? defaultPromotionUiConfig)
-    .showCouponEntry
-  const promotionContext = `${showCouponEntry}:${selectedPeriod ?? ''}`
-  useEffect(() => {
-    validationContextRef.current = promotionContext
-  }, [promotionContext])
-
   const invalidSessionError = isInvalidSessionError(product.error)
     ? product.error
     : isInvalidSessionError(config.error)
@@ -136,25 +116,10 @@ export function OrderCreateDialog({
     selectedPrice && config.data
       ? formatMinorMoney(selectedPrice.amountMinor, config.data)
       : null
-  const publicPromotionUi = promotionUi.data ?? defaultPromotionUiConfig
-  const prefillCode =
-    selectedPeriod === 'year' && showCouponEntry
-      ? publicPromotionUi.annualPrefillCode
-      : null
-  const displayedPromotionCode =
-    promotionInputSource === 'manual' ? promotionCode : (prefillCode ?? '')
-  const visiblePromotionCode = showCouponEntry ? displayedPromotionCode : ''
-  const activePromotionCode = visiblePromotionCode.trim()
-  const submittedPromotionCode =
-    showCouponEntry &&
-    selectedPeriod &&
-    validatedPromotion?.period === selectedPeriod &&
-    validatedPromotion.code === activePromotionCode &&
-    validatedPromotion.context === promotionContext
-      ? activePromotionCode
-      : ''
+  const normalizedPromotionCode = promotionCode.trim()
   const promotionCodeValid =
-    !showCouponEntry || activePromotionCode.length <= 255
+    normalizedPromotionCode.length === 0 ||
+    normalizedPromotionCode.length <= 255
   const requiresGuard =
     requiresUnknownAcknowledgement || createFeedback?.kind === 'unknown'
 
@@ -176,9 +141,8 @@ export function OrderCreateDialog({
   }
 
   const validatePromotion = async () => {
-    if (!showCouponEntry || !selectedPeriod) return
     if (!promotionLock.tryAcquire()) return
-    const code = activePromotionCode
+    const code = promotionCode.trim()
     if (!code) {
       setPromotionFieldError('请输入优惠码后再验证。')
       promotionLock.release()
@@ -194,35 +158,19 @@ export function OrderCreateDialog({
     setPromotionFieldError(null)
     setPromotionError(null)
     setPromotionPreview(null)
-    setValidatedPromotion(null)
     promotionMutation.reset()
     try {
       const preview = await promotionMutation.mutateAsync({
         code,
         productId: toNumericProductId(productId),
       })
-      if (
-        validationVersionRef.current === version &&
-        promotionContext === validationContextRef.current
-      ) {
+      if (validationVersionRef.current === version) {
         setPromotionPreview(preview)
-        setValidatedPromotion({
-          code,
-          period: selectedPeriod,
-          context: promotionContext,
-        })
       }
     } catch (error) {
       if (isInvalidSessionError(error)) {
         setSessionError(error)
-      } else if (
-        validationVersionRef.current === version &&
-        promotionContext === validationContextRef.current
-      ) {
-        if (error instanceof ApiError && error.code === 'PROMOTION_INVALID') {
-          setPromotionCode('')
-          setPromotionInputSource('manual')
-        }
+      } else if (validationVersionRef.current === version) {
         setPromotionError(error)
       }
     } finally {
@@ -230,12 +178,8 @@ export function OrderCreateDialog({
     }
   }
 
-  const createOrder = async (withoutPromotion = false) => {
+  const createOrder = async () => {
     if (!selectedPeriod || !formattedStickerPrice || !promotionCodeValid) return
-    if (createFeedback?.kind === 'rejected-promotion' && !withoutPromotion)
-      return
-    if (withoutPromotion && createFeedback?.kind !== 'rejected-promotion')
-      return
     if (requiresGuard && !unknownAcknowledged) return
     if (!createLock.tryAcquire()) return
 
@@ -246,8 +190,8 @@ export function OrderCreateDialog({
       const result = await createMutation.mutateAsync({
         productId,
         billingPeriod: selectedPeriod,
-        ...(!withoutPromotion && submittedPromotionCode
-          ? { promotionCode: submittedPromotionCode }
+        ...(normalizedPromotionCode
+          ? { promotionCode: normalizedPromotionCode }
           : {}),
       })
       onUnknownResultChange(false)
@@ -269,21 +213,10 @@ export function OrderCreateDialog({
         })
       } else {
         onUnknownResultChange(false)
-        if (
-          !withoutPromotion &&
-          error instanceof ApiError &&
-          error.code === 'PROMOTION_INVALID'
-        ) {
-          validationVersionRef.current += 1
-          setPromotionCode('')
-          setPromotionInputSource('manual')
-          setValidatedPromotion(null)
+        if (error instanceof ApiError && error.code === 'PROMOTION_INVALID') {
           setPromotionPreview(null)
-          setPromotionError(null)
-          setCreateFeedback({ kind: 'rejected-promotion' })
-        } else {
-          setCreateFeedback({ kind: 'error', error })
         }
+        setCreateFeedback({ kind: 'error', error })
       }
     } finally {
       createLock.release()
@@ -426,15 +359,6 @@ export function OrderCreateDialog({
                             disabled={createMutation.isPending}
                             onChange={() => {
                               setSelectedPeriod(price.billingPeriod)
-                              validationVersionRef.current += 1
-                              setValidatedPromotion(null)
-                              setPromotionPreview(null)
-                              setPromotionError(null)
-                              setPromotionFieldError(null)
-                              if (promotionInputSource !== 'manual') {
-                                setPromotionInputSource('untouched')
-                                setPromotionCode('')
-                              }
                               setCreateFeedback((current) =>
                                 current?.kind === 'unknown' ? current : null,
                               )
@@ -448,96 +372,92 @@ export function OrderCreateDialog({
                 </fieldset>
               )}
 
-              {showCouponEntry ? (
-                <div className="space-y-3">
-                  <label
-                    className="text-sm font-semibold"
-                    htmlFor="promotion-code"
+              <div className="space-y-3">
+                <label
+                  className="text-sm font-semibold"
+                  htmlFor="promotion-code"
+                >
+                  优惠码（可选）
+                </label>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Input
+                    id="promotion-code"
+                    value={promotionCode}
+                    autoComplete="off"
+                    aria-invalid={Boolean(promotionFieldError)}
+                    aria-describedby={
+                      promotionFieldError ? 'promotion-code-error' : undefined
+                    }
+                    onChange={(event) => {
+                      const nextCode = event.target.value
+                      validationVersionRef.current += 1
+                      setPromotionCode(nextCode)
+                      setPromotionPreview(null)
+                      setPromotionError(null)
+                      setPromotionFieldError(
+                        nextCode.trim().length > 255
+                          ? '优惠码不能超过 255 个字符。'
+                          : null,
+                      )
+                      setCreateFeedback((current) =>
+                        current?.kind === 'unknown' ? current : null,
+                      )
+                      promotionMutation.reset()
+                      createMutation.reset()
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="sm:w-auto"
+                    disabled={promotionMutation.isPending}
+                    onClick={() => void validatePromotion()}
                   >
-                    优惠码（可选）
-                  </label>
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <Input
-                      id="promotion-code"
-                      value={visiblePromotionCode}
-                      autoComplete="off"
-                      aria-invalid={Boolean(promotionFieldError)}
-                      aria-describedby={
-                        promotionFieldError ? 'promotion-code-error' : undefined
-                      }
-                      onChange={(event) => {
-                        const nextCode = event.target.value
-                        validationVersionRef.current += 1
-                        setPromotionInputSource('manual')
-                        setPromotionCode(nextCode)
-                        setValidatedPromotion(null)
-                        setPromotionPreview(null)
-                        setPromotionError(null)
-                        setPromotionFieldError(
-                          nextCode.trim().length > 255
-                            ? '优惠码不能超过 255 个字符。'
-                            : null,
-                        )
-                        setCreateFeedback((current) =>
-                          current?.kind === 'unknown' ? current : null,
-                        )
-                        promotionMutation.reset()
-                        createMutation.reset()
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="sm:w-auto"
-                      disabled={promotionMutation.isPending}
-                      onClick={() => void validatePromotion()}
-                    >
-                      {promotionMutation.isPending ? (
-                        <LoaderCircle
-                          className="size-4 animate-spin"
-                          aria-hidden="true"
-                        />
-                      ) : null}
-                      {promotionMutation.isPending ? '正在验证…' : '验证优惠码'}
-                    </Button>
-                  </div>
-                  {promotionFieldError ? (
-                    <p
-                      id="promotion-code-error"
-                      className="text-sm text-destructive"
-                    >
-                      {promotionFieldError}
-                    </p>
-                  ) : null}
-                  {promotionError ? (
-                    <MutationFeedback
-                      error={promotionError}
-                      message={getPromotionErrorMessage(promotionError)}
-                    />
-                  ) : promotionPreview && submittedPromotionCode ? (
-                    <div
-                      className="border-l-2 border-primary bg-primary/5 px-4 py-3"
-                      role="status"
-                    >
-                      <p className="text-sm font-medium">
-                        {promotionPreview.discount.type === 'fixed'
-                          ? `优惠预览：固定金额优惠 ${
-                              config.data
-                                ? (formatMinorMoney(
-                                    promotionPreview.discount.amountMinor,
-                                    config.data,
-                                  ) ?? '暂无法安全格式化')
-                                : '暂无法安全格式化'
-                            }`
-                          : `优惠预览：${promotionPreview.discount.percent}%`}
-                      </p>
-                    </div>
-                  ) : null}
-                  <p className="text-xs leading-5 text-muted-foreground">
-                    优惠验证仅供预览；具体能否应用及最终订单金额以下单结果为准。
-                  </p>
+                    {promotionMutation.isPending ? (
+                      <LoaderCircle
+                        className="size-4 animate-spin"
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                    {promotionMutation.isPending ? '正在验证…' : '验证优惠码'}
+                  </Button>
                 </div>
-              ) : null}
+                {promotionFieldError ? (
+                  <p
+                    id="promotion-code-error"
+                    className="text-sm text-destructive"
+                  >
+                    {promotionFieldError}
+                  </p>
+                ) : null}
+                {promotionError ? (
+                  <MutationFeedback
+                    error={promotionError}
+                    message={getPromotionErrorMessage(promotionError)}
+                  />
+                ) : promotionPreview ? (
+                  <div
+                    className="border-l-2 border-primary bg-primary/5 px-4 py-3"
+                    role="status"
+                  >
+                    <p className="text-sm font-medium">
+                      {promotionPreview.discount.type === 'fixed'
+                        ? `优惠预览：固定金额优惠 ${
+                            config.data
+                              ? (formatMinorMoney(
+                                  promotionPreview.discount.amountMinor,
+                                  config.data,
+                                ) ?? '暂无法安全格式化')
+                              : '暂无法安全格式化'
+                          }`
+                        : `优惠预览：${promotionPreview.discount.percent}%`}
+                    </p>
+                  </div>
+                ) : null}
+                <p className="text-xs leading-5 text-muted-foreground">
+                  优惠验证仅供预览；具体能否应用及最终订单金额以下单结果为准。
+                </p>
+              </div>
 
               <div className="border-l-2 border-foreground/40 bg-muted px-4 py-3">
                 <p className="text-sm leading-6">
@@ -551,30 +471,6 @@ export function OrderCreateDialog({
                   error={createFeedback.error}
                   message={getCreateOrderErrorMessage(createFeedback.error)}
                 />
-              ) : createFeedback?.kind === 'rejected-promotion' ? (
-                <div
-                  className="space-y-3 border-l-2 border-foreground/40 bg-muted px-4 py-3"
-                  role="alert"
-                >
-                  <p className="text-sm font-semibold">优惠码本次未被接受。</p>
-                  <p className="text-sm leading-6">
-                    可不使用优惠码继续购买。套餐标价并非最终实付金额，实际金额以订单详情为准。
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={
-                      createMutation.isPending ||
-                      !selectedPeriod ||
-                      !formattedStickerPrice ||
-                      (requiresGuard && !unknownAcknowledged)
-                    }
-                    onClick={() => void createOrder(true)}
-                  >
-                    不使用优惠码，确认创建订单
-                  </Button>
-                </div>
               ) : createFeedback?.kind === 'unknown' ? (
                 <div
                   className="space-y-3 border-l-2 border-foreground/40 bg-muted px-4 py-3"
@@ -617,7 +513,6 @@ export function OrderCreateDialog({
                     !formattedStickerPrice ||
                     !promotionCodeValid ||
                     createMutation.isPending ||
-                    createFeedback?.kind === 'rejected-promotion' ||
                     (requiresGuard && !unknownAcknowledged)
                   }
                   onClick={() => void createOrder()}
