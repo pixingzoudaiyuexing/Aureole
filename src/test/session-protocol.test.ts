@@ -193,7 +193,7 @@ describe('fixed-cookie server session protocol', () => {
 
   it.each([
     ['微信', '3', 'qrcode'],
-    ['支付宝', '4', 'url'],
+    ['支付宝', '4', 'redirect'],
   ] as const)(
     'forwards the trusted checkout origin and preserves the %s QR action',
     async (_channel, paymentMethodId, actionType) => {
@@ -212,7 +212,10 @@ describe('fixed-cookie server session protocol', () => {
           return new Response(
             JSON.stringify({
               ok: true,
-              data: { type: actionType, data: paymentData },
+              data:
+                actionType === 'qrcode'
+                  ? { type: actionType, data: paymentData }
+                  : { type: actionType, target: paymentData },
             }),
             {
               headers: {
@@ -252,7 +255,10 @@ describe('fixed-cookie server session protocol', () => {
       expect(response.headers.get('x-request-id')).toBe('checkout-request')
       expect(await response.json()).toEqual({
         ok: true,
-        data: { type: actionType, data: paymentData },
+        data:
+          actionType === 'qrcode'
+            ? { type: actionType, data: paymentData }
+            : { type: actionType, target: paymentData },
       })
       const [, init] = fetchImpl.mock.calls.at(-1)!
       const headers = new Headers(init.headers)
