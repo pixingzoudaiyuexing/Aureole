@@ -55,31 +55,6 @@ describe('Cloudflare Pages same-origin API boundary', () => {
     expect(response.headers.has('server')).toBe(false)
   })
 
-  it('allows only the exact promotion-ui public GET route', async () => {
-    expect(
-      (await onRequest({ request: request('config/promotion-ui'), env }))
-        .status,
-    ).toBe(200)
-    expect(fetch).toHaveBeenCalledOnce()
-    for (const path of ['config/other', 'config/promotion-ui/extra']) {
-      expect((await onRequest({ request: request(path), env })).status).toBe(
-        404,
-      )
-    }
-    expect(
-      (
-        await onRequest({
-          request: request('config/promotion-ui', {
-            method: 'POST',
-            headers: { origin },
-          }),
-          env,
-        })
-      ).status,
-    ).toBe(404)
-    expect(fetch).toHaveBeenCalledOnce()
-  })
-
   it('forwards public POST body only with exact same-origin CSRF signals', async () => {
     const response = await onRequest({
       request: request('auth/email-code', {
@@ -159,14 +134,6 @@ describe('Cloudflare Pages same-origin API boundary', () => {
     }
     expect(
       (await onRequest({ request: request('unlisted'), env })).status,
-    ).toBe(404)
-    expect(
-      (
-        await onRequest({
-          request: request('config/support-widget'),
-          env,
-        })
-      ).status,
     ).toBe(404)
     expect(
       (

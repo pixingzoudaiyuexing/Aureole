@@ -139,9 +139,8 @@ export function AuthProvider({
           mutation !== mutationSequence.current
         )
           return
-        if (isInvalidSessionError(cause)) {
-          isolate()
-        } else if (!background || !useAuthSessionStore.getState().validated) {
+        if (isInvalidSessionError(cause)) isolate()
+        else if (!background || !useAuthSessionStore.getState().validated) {
           pauseForVerification(cause)
         }
       } finally {
