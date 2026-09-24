@@ -130,13 +130,19 @@ function upstreamUrl(origin: string | undefined, url: URL) {
   }
 }
 
-async function upstream(request: Request, target: URL, token?: string) {
+async function upstream(
+  request: Request,
+  target: URL,
+  token?: string,
+  frontendOrigin?: string,
+) {
   const headers = new Headers()
   for (const name of ['content-type', 'accept', 'user-agent']) {
     const value = request.headers.get(name)
     if (value) headers.set(name, value)
   }
   if (token) headers.set('authorization', `Bearer ${token}`)
+  if (frontendOrigin) headers.set('origin', frontendOrigin)
   return fetch(target, {
     method: request.method,
     headers,
@@ -280,7 +286,18 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
         return failure(401, 'AUTH_FAILED')
       return sessionResponse({ ...user, sessionVersion: session.publicVersion })
     }
-    const response = await upstream(request, target, session.token)
+    const frontendOrigin =
+      request.method === 'POST' &&
+      /^\/api\/v1\/orders\/[A-Za-z0-9_-]+\/checkout$/.test(path) &&
+      url.protocol === 'https:'
+        ? url.origin
+        : undefined
+    const response = await upstream(
+      request,
+      target,
+      session.token,
+      frontendOrigin,
+    )
     if (await confirmedAuthFailure(response))
       await revokeSession(env, oldId, familyId)
     if (!(await loadSession(env, oldId, familyId)))

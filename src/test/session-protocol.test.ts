@@ -191,6 +191,121 @@ describe('fixed-cookie server session protocol', () => {
   })
   afterEach(() => vi.unstubAllGlobals())
 
+  it.each(['微信', '支付宝'])(
+    'forwards the trusted checkout origin and preserves the %s QR action',
+    async () => {
+      const site = 'https://cc-aureole-stg.pages.dev'
+      const qrData = 'opaque-payment-qr'
+      const fetchImpl = vi.fn().mockImplementation((target: URL) => {
+        const path = new URL(String(target)).pathname
+        if (path.endsWith('/auth/login')) return loginResponse('session-token')
+        if (path.endsWith('/me')) return userResponse('session-token')
+        if (path.endsWith('/orders'))
+          return new Response(JSON.stringify({ ok: true, data: [] }))
+        if (path.endsWith('/checkout'))
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              data: { type: 'qrcode', data: qrData },
+            }),
+            {
+              headers: {
+                'content-type': 'application/json',
+                'x-request-id': 'checkout-request',
+              },
+            },
+          )
+        throw new Error('Unexpected upstream request')
+      })
+      vi.stubGlobal('fetch', fetchImpl)
+      const jar = new Map<string, string>()
+      applyResponse(
+        jar,
+        await onRequest({ request: request('auth/browser', jar), env }),
+      )
+      applyResponse(
+        jar,
+        await onRequest({ request: request('auth/login', jar, 'POST'), env }),
+      )
+
+      const checkout = () =>
+        new Request(`${site}/api/v1/orders/order-1/checkout`, {
+          method: 'POST',
+          headers: {
+            origin: site,
+            'sec-fetch-site': 'same-origin',
+            'user-agent': 'Test browser',
+            cookie: cookieHeader(jar),
+            'content-type': 'application/json',
+          },
+          body: '{"paymentMethodId":"3"}',
+        })
+      const response = await onRequest({ request: checkout(), env })
+      expect(response.status).toBe(200)
+      expect(response.headers.get('x-request-id')).toBe('checkout-request')
+      expect(await response.json()).toEqual({
+        ok: true,
+        data: { type: 'qrcode', data: qrData },
+      })
+      const [, init] = fetchImpl.mock.calls.at(-1)!
+      const headers = new Headers(init.headers)
+      expect(headers.get('origin')).toBe(site)
+      expect(headers.get('authorization')).toBe('Bearer session-token')
+      expect(headers.get('user-agent')).toBe('Test browser')
+      expect(headers.has('cookie')).toBe(false)
+      expect(init.redirect).toBe('manual')
+
+      const ordinaryOrder = await onRequest({
+        request: request('orders', jar),
+        env,
+      })
+      expect(ordinaryOrder.status).toBe(200)
+      const ordinaryHeaders = new Headers(
+        fetchImpl.mock.calls.at(-1)![1].headers,
+      )
+      expect(ordinaryHeaders.has('origin')).toBe(false)
+      expect(ordinaryHeaders.get('authorization')).toBe('Bearer session-token')
+
+      for (const headers of [
+        { origin: 'https://evil.example', 'sec-fetch-site': 'same-origin' },
+        { origin: site, 'sec-fetch-site': 'cross-site' },
+        { 'sec-fetch-site': 'same-origin' },
+        { origin: site, authorization: 'Bearer browser-token' },
+      ]) {
+        const rejected = await onRequest({
+          request: new Request(`${site}/api/v1/orders/order-1/checkout`, {
+            method: 'POST',
+            headers: new Headers([
+              ...Object.entries(headers).filter(
+                (entry): entry is [string, string] => entry[1] !== undefined,
+              ),
+              ['cookie', cookieHeader(jar)],
+            ]),
+          }),
+          env,
+        })
+        expect([401, 403]).toContain(rejected.status)
+      }
+      expect(fetchImpl).toHaveBeenCalledTimes(4)
+
+      const insecure = await onRequest({
+        request: new Request(
+          'http://aureole.example/api/v1/orders/order-1/checkout',
+          {
+            method: 'POST',
+            headers: {
+              origin: 'http://aureole.example',
+              cookie: cookieHeader(jar),
+            },
+          },
+        ),
+        env,
+      })
+      expect(insecure.status).toBe(403)
+      expect(fetchImpl).toHaveBeenCalledTimes(4)
+    },
+  )
+
   it('caps the browser and D1 session at seven days independently of subscription expiry', async () => {
     const expiry = new Date(Date.now() + 90_000).toISOString()
     const fetchImpl = vi.fn().mockImplementation((url: URL) =>
