@@ -191,22 +191,28 @@ describe('fixed-cookie server session protocol', () => {
   })
   afterEach(() => vi.unstubAllGlobals())
 
-  it.each(['微信', '支付宝'])(
+  it.each([
+    ['微信', '3', 'qrcode'],
+    ['支付宝', '4', 'url'],
+  ] as const)(
     'forwards the trusted checkout origin and preserves the %s QR action',
-    async () => {
+    async (_channel, paymentMethodId, actionType) => {
       const site = 'https://cc-aureole-stg.pages.dev'
-      const qrData = 'opaque-payment-qr'
+      const paymentData =
+        actionType === 'qrcode' ? 'opaque-payment-qr' : 'https://pay.example'
+      let checkoutBody: unknown
       const fetchImpl = vi.fn().mockImplementation((target: URL) => {
         const path = new URL(String(target)).pathname
         if (path.endsWith('/auth/login')) return loginResponse('session-token')
         if (path.endsWith('/me')) return userResponse('session-token')
         if (path.endsWith('/orders'))
           return new Response(JSON.stringify({ ok: true, data: [] }))
-        if (path.endsWith('/checkout'))
+        if (path.endsWith('/checkout')) {
+          checkoutBody = { paymentMethodId }
           return new Response(
             JSON.stringify({
               ok: true,
-              data: { type: 'qrcode', data: qrData },
+              data: { type: actionType, data: paymentData },
             }),
             {
               headers: {
@@ -215,6 +221,7 @@ describe('fixed-cookie server session protocol', () => {
               },
             },
           )
+        }
         throw new Error('Unexpected upstream request')
       })
       vi.stubGlobal('fetch', fetchImpl)
@@ -238,17 +245,18 @@ describe('fixed-cookie server session protocol', () => {
             cookie: cookieHeader(jar),
             'content-type': 'application/json',
           },
-          body: '{"paymentMethodId":"3"}',
+          body: JSON.stringify({ paymentMethodId }),
         })
       const response = await onRequest({ request: checkout(), env })
       expect(response.status).toBe(200)
       expect(response.headers.get('x-request-id')).toBe('checkout-request')
       expect(await response.json()).toEqual({
         ok: true,
-        data: { type: 'qrcode', data: qrData },
+        data: { type: actionType, data: paymentData },
       })
       const [, init] = fetchImpl.mock.calls.at(-1)!
       const headers = new Headers(init.headers)
+      expect(checkoutBody).toEqual({ paymentMethodId })
       expect(headers.get('origin')).toBe(site)
       expect(headers.get('authorization')).toBe('Bearer session-token')
       expect(headers.get('user-agent')).toBe('Test browser')
