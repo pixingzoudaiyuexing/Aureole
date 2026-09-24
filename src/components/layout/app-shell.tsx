@@ -1,5 +1,6 @@
 import { Outlet, useRouterState } from '@tanstack/react-router'
 import { Menu } from 'lucide-react'
+import { useState } from 'react'
 import { Brand } from '@/components/layout/brand'
 import { SidebarNavigation } from '@/components/layout/sidebar-navigation'
 import { ThemeToggle } from '@/components/layout/theme-toggle'
@@ -28,6 +29,9 @@ export function AppShell() {
     : (customPagesQuery.data?.items ?? [])
   const pageTitle = getNavigationPageTitle(pathname, customPages)
   const customPageLayout = isCustomPageRoutePath(pathname)
+  const [mobileNavigationPath, setMobileNavigationPath] = useState<
+    string | null
+  >(null)
 
   return (
     <div
@@ -53,7 +57,12 @@ export function AppShell() {
       >
         <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur-sm sm:px-6">
           <div className="lg:hidden">
-            <Sheet>
+            <Sheet
+              open={mobileNavigationPath === pathname}
+              onOpenChange={(open) =>
+                setMobileNavigationPath(open ? pathname : null)
+              }
+            >
               <SheetTrigger asChild>
                 <Button
                   variant="ghost"
