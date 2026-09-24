@@ -16,6 +16,8 @@ import type { AuthApi } from '@/features/auth/auth-api'
 import { catalogApi, type Product } from '@/features/catalog/catalog-api'
 import { ordersApi } from '@/features/orders/orders-api'
 import { promotionsApi } from '@/features/orders/promotions-api'
+import { promotionUiApi } from '@/features/orders/promotion-ui-api'
+import { promotionUiQueryKey } from '@/features/orders/promotion-ui-queries'
 import { ApiError } from '@/lib/api/errors'
 import { AUTH_SESSION_STORAGE_KEY } from '@/lib/auth/credential-storage'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
@@ -76,6 +78,10 @@ function createAuthApi(valid: { current: boolean }): AuthApi {
 }
 
 function installMocks() {
+  vi.spyOn(promotionUiApi, 'getConfig').mockResolvedValue({
+    showCouponEntry: true,
+    annualPrefillCode: null,
+  })
   const getProducts = vi
     .spyOn(catalogApi, 'getProducts')
     .mockResolvedValue([product, priceLessProduct])
@@ -180,6 +186,218 @@ describe('Order Create flow', () => {
     ).toBeDisabled()
   })
 
+  it('keeps the manual entry on configuration failure and submits no unverified code', async () => {
+    const mocks = installMocks()
+    vi.mocked(promotionUiApi.getConfig).mockRejectedValue(new Error('offline'))
+    renderPlans()
+    const { dialog, user } = await openCreateDialog()
+    const input = within(dialog).getByLabelText('优惠码（可选）')
+    await user.click(
+      within(dialog).getByRole('radio', { name: /^年付套餐标价/ }),
+    )
+    expect(input).toHaveValue('')
+    await user.type(input, 'MANUAL')
+    await user.click(
+      within(dialog).getByRole('button', { name: '确认创建订单' }),
+    )
+    expect(await within(dialog).findByText('订单已创建')).toBeInTheDocument()
+    expect(mocks.validate).not.toHaveBeenCalled()
+    expect(mocks.create.mock.calls[0]?.[1]).toEqual({
+      productId: '7',
+      billingPeriod: 'year',
+    })
+  })
+
+  it('hides an already entered and validated coupon when config closes', async () => {
+    const mocks = installMocks()
+    const queryClient = createQueryClient()
+    renderPlans(queryClient)
+    const { dialog, user } = await openCreateDialog()
+    await user.click(within(dialog).getByRole('radio', { name: /月付/ }))
+    await user.type(within(dialog).getByLabelText('优惠码（可选）'), 'OLD')
+    await user.click(within(dialog).getByRole('button', { name: '验证优惠码' }))
+    await within(dialog).findByText(/优惠预览：/)
+    queryClient.setQueryData(promotionUiQueryKey, {
+      showCouponEntry: false,
+      annualPrefillCode: null,
+    })
+    await waitFor(() =>
+      expect(within(dialog).queryByLabelText('优惠码（可选）')).toBeNull(),
+    )
+    expect(
+      within(dialog).queryByRole('button', { name: '验证优惠码' }),
+    ).toBeNull()
+    expect(within(dialog).queryByText(/优惠预览：/)).toBeNull()
+    await user.click(
+      within(dialog).getByRole('button', { name: '确认创建订单' }),
+    )
+    expect(await within(dialog).findByText('订单已创建')).toBeInTheDocument()
+    expect(mocks.create.mock.calls[0]?.[1]).toEqual({
+      productId: '7',
+      billingPeriod: 'month',
+    })
+  })
+
+  it('prefills only annual, never validates automatically, and preserves user edits after refresh', async () => {
+    const mocks = installMocks()
+    const queryClient = createQueryClient()
+    vi.mocked(promotionUiApi.getConfig).mockResolvedValue({
+      showCouponEntry: true,
+      annualPrefillCode: 'PUBLIC-YEAR',
+    })
+    renderPlans(queryClient)
+    const { dialog, user } = await openCreateDialog()
+    const input = within(dialog).getByLabelText('优惠码（可选）')
+    await user.click(within(dialog).getByRole('radio', { name: /月付/ }))
+    expect(input).toHaveValue('')
+    await user.click(
+      within(dialog).getByRole('radio', { name: /^年付套餐标价/ }),
+    )
+    await waitFor(() => expect(input).toHaveValue('PUBLIC-YEAR'))
+    expect(mocks.validate).not.toHaveBeenCalled()
+    await user.click(
+      within(dialog).getByRole('button', { name: '确认创建订单' }),
+    )
+    expect(await within(dialog).findByText('订单已创建')).toBeInTheDocument()
+    expect(mocks.create.mock.calls[0]?.[1]).toEqual({
+      productId: '7',
+      billingPeriod: 'year',
+    })
+  })
+
+  it('does not overwrite a user-cleared prefill on a later query response', async () => {
+    installMocks()
+    const queryClient = createQueryClient()
+    vi.mocked(promotionUiApi.getConfig).mockResolvedValue({
+      showCouponEntry: true,
+      annualPrefillCode: 'PUBLIC-YEAR',
+    })
+    renderPlans(queryClient)
+    const { dialog, user } = await openCreateDialog()
+    const input = within(dialog).getByLabelText('优惠码（可选）')
+    await user.click(
+      within(dialog).getByRole('radio', { name: /^年付套餐标价/ }),
+    )
+    await waitFor(() => expect(input).toHaveValue('PUBLIC-YEAR'))
+    await user.clear(input)
+    queryClient.setQueryData(promotionUiQueryKey, {
+      showCouponEntry: true,
+      annualPrefillCode: 'REFRESHED',
+    })
+    expect(input).toHaveValue('')
+    await user.click(within(dialog).getByRole('radio', { name: /月付/ }))
+    await user.click(
+      within(dialog).getByRole('radio', { name: /^年付套餐标价/ }),
+    )
+    expect(input).toHaveValue('')
+  })
+
+  it('preserves a manual edit made before the annual config response arrives', async () => {
+    installMocks()
+    const pending = deferred<{
+      showCouponEntry: true
+      annualPrefillCode: string
+    }>()
+    vi.mocked(promotionUiApi.getConfig).mockReturnValue(pending.promise)
+    renderPlans()
+    const { dialog, user } = await openCreateDialog()
+    await user.click(
+      within(dialog).getByRole('radio', { name: /^年付套餐标价/ }),
+    )
+    const input = within(dialog).getByLabelText('优惠码（可选）')
+    await user.type(input, 'MY-CODE')
+    pending.resolve({ showCouponEntry: true, annualPrefillCode: 'LATE-CODE' })
+    await waitFor(() => expect(promotionUiApi.getConfig).toHaveBeenCalledOnce())
+    expect(input).toHaveValue('MY-CODE')
+  })
+
+  it('discards an in-flight validation after the coupon entry is closed', async () => {
+    const mocks = installMocks()
+    const pending = deferred<{
+      valid: true
+      discount: { type: 'fixed'; amountMinor: number }
+    }>()
+    mocks.validate.mockReturnValue(pending.promise)
+    const queryClient = createQueryClient()
+    renderPlans(queryClient)
+    const { dialog, user } = await openCreateDialog()
+    await user.click(within(dialog).getByRole('radio', { name: /月付/ }))
+    await user.type(within(dialog).getByLabelText('优惠码（可选）'), 'OLD')
+    await user.click(within(dialog).getByRole('button', { name: '验证优惠码' }))
+    queryClient.setQueryData(promotionUiQueryKey, {
+      showCouponEntry: false,
+      annualPrefillCode: null,
+    })
+    await waitFor(() =>
+      expect(within(dialog).queryByLabelText('优惠码（可选）')).toBeNull(),
+    )
+    pending.resolve({
+      valid: true,
+      discount: { type: 'fixed', amountMinor: 500 },
+    })
+    await user.click(
+      within(dialog).getByRole('button', { name: '确认创建订单' }),
+    )
+    expect(await within(dialog).findByText('订单已创建')).toBeInTheDocument()
+    expect(mocks.create.mock.calls[0]?.[1]).toEqual({
+      productId: '7',
+      billingPeriod: 'month',
+    })
+  })
+
+  it('clears an old preview and excludes its coupon when the billing period changes', async () => {
+    const mocks = installMocks()
+    renderPlans()
+    const { dialog, user } = await openCreateDialog()
+    await user.click(within(dialog).getByRole('radio', { name: /月付/ }))
+    await user.type(within(dialog).getByLabelText('优惠码（可选）'), 'MANUAL')
+    await user.click(within(dialog).getByRole('button', { name: '验证优惠码' }))
+    await within(dialog).findByText(/优惠预览：/)
+    await user.click(
+      within(dialog).getByRole('radio', { name: /^年付套餐标价/ }),
+    )
+    expect(within(dialog).getByLabelText('优惠码（可选）')).toHaveValue(
+      'MANUAL',
+    )
+    expect(within(dialog).queryByText(/优惠预览：/)).toBeNull()
+    await user.click(
+      within(dialog).getByRole('button', { name: '确认创建订单' }),
+    )
+    expect(await within(dialog).findByText('订单已创建')).toBeInTheDocument()
+    expect(mocks.create.mock.calls[0]?.[1]).toEqual({
+      productId: '7',
+      billingPeriod: 'year',
+    })
+  })
+
+  it.each([
+    ['NETWORK_ERROR', 0],
+    ['UPSTREAM_ERROR', 502],
+    ['UPSTREAM_TIMEOUT', 504],
+  ])(
+    'does not clear the coupon on %s validation failure',
+    async (code, status) => {
+      const mocks = installMocks()
+      mocks.validate.mockRejectedValue(
+        new ApiError({ status, code, message: 'temporary' }),
+      )
+      renderPlans()
+      const { dialog, user } = await openCreateDialog()
+      await user.click(within(dialog).getByRole('radio', { name: /月付/ }))
+      await user.type(within(dialog).getByLabelText('优惠码（可选）'), 'KEEP')
+      await user.click(
+        within(dialog).getByRole('button', { name: '验证优惠码' }),
+      )
+      expect(
+        await within(dialog).findByText('优惠码暂时无法验证，请手动重试。'),
+      ).toBeInTheDocument()
+      expect(within(dialog).getByLabelText('优惠码（可选）')).toHaveValue(
+        'KEEP',
+      )
+      expect(within(dialog).queryByText('优惠码本次未被接受。')).toBeNull()
+    },
+  )
+
   it('keeps Plans available for PRODUCT_NOT_FOUND and ordinary Detail retry', async () => {
     const mocks = installMocks()
     mocks.getProduct.mockRejectedValueOnce(
@@ -229,6 +447,7 @@ describe('Order Create flow', () => {
     const mocks = installMocks()
     renderPlans()
     const { dialog, user } = await openCreateDialog()
+    await user.click(within(dialog).getByRole('radio', { name: /月付/ }))
     const input = within(dialog).getByLabelText('优惠码（可选）')
     await user.type(input, '  Mixed-Code  ')
     expect(mocks.validate).not.toHaveBeenCalled()
@@ -259,6 +478,7 @@ describe('Order Create flow', () => {
     })
     renderPlans()
     const { dialog, user } = await openCreateDialog()
+    await user.click(within(dialog).getByRole('radio', { name: /月付/ }))
     await user.type(within(dialog).getByLabelText('优惠码（可选）'), 'PERCENT')
     await user.click(within(dialog).getByRole('button', { name: '验证优惠码' }))
     expect(
@@ -271,6 +491,7 @@ describe('Order Create flow', () => {
     installMocks()
     renderPlans()
     const { dialog, user } = await openCreateDialog()
+    await user.click(within(dialog).getByRole('radio', { name: /月付/ }))
     const input = within(dialog).getByLabelText('优惠码（可选）')
     await user.type(input, 'OLD')
     await user.click(within(dialog).getByRole('button', { name: '验证优惠码' }))
@@ -288,6 +509,7 @@ describe('Order Create flow', () => {
     mocks.validate.mockReturnValue(pending.promise)
     renderPlans()
     const { dialog, user } = await openCreateDialog()
+    await user.click(within(dialog).getByRole('radio', { name: /月付/ }))
     const input = within(dialog).getByLabelText('优惠码（可选）')
     await user.type(input, 'OLD')
     await user.click(within(dialog).getByRole('button', { name: '验证优惠码' }))
@@ -317,12 +539,15 @@ describe('Order Create flow', () => {
       })
     renderPlans()
     const { dialog, user } = await openCreateDialog()
+    await user.click(within(dialog).getByRole('radio', { name: /月付/ }))
     await user.type(within(dialog).getByLabelText('优惠码（可选）'), 'PROMO')
     await user.click(within(dialog).getByRole('button', { name: '验证优惠码' }))
     expect(
       await within(dialog).findByText('优惠码无效、不可用或不适用于当前套餐。'),
     ).toBeInTheDocument()
     expect(mocks.validate).toHaveBeenCalledOnce()
+    expect(within(dialog).getByLabelText('优惠码（可选）')).toHaveValue('')
+    await user.type(within(dialog).getByLabelText('优惠码（可选）'), 'NEW')
     await user.click(within(dialog).getByRole('button', { name: '验证优惠码' }))
     expect(await within(dialog).findByText('优惠预览：25%')).toBeInTheDocument()
     expect(mocks.validate).toHaveBeenCalledTimes(2)
@@ -335,6 +560,8 @@ describe('Order Create flow', () => {
     await user.click(within(dialog).getByRole('radio', { name: /月付/ }))
     await user.type(within(dialog).getByLabelText('优惠码（可选）'), 'DIRECT')
     expect(mocks.create).not.toHaveBeenCalled()
+    await user.click(within(dialog).getByRole('button', { name: '验证优惠码' }))
+    await within(dialog).findByText(/优惠预览：固定金额优惠/)
     await user.click(
       within(dialog).getByRole('button', { name: '确认创建订单' }),
     )
@@ -381,18 +608,30 @@ describe('Order Create flow', () => {
     )
     renderPlans()
     const { dialog, user } = await openCreateDialog()
+    await user.click(within(dialog).getByRole('radio', { name: /月付/ }))
     await user.type(within(dialog).getByLabelText('优惠码（可选）'), 'PROMO')
     await user.click(within(dialog).getByRole('button', { name: '验证优惠码' }))
     await within(dialog).findByText(/优惠预览：固定金额优惠/)
-    await selectMonthAndConfirm(user)
+    await user.click(
+      within(dialog).getByRole('button', { name: '确认创建订单' }),
+    )
     expect(
-      await within(dialog).findByText(
-        '优惠码在创建订单时未通过最终验证，请检查后重新提交。',
-      ),
+      await within(dialog).findByText('优惠码本次未被接受。'),
     ).toBeInTheDocument()
     expect(within(dialog).queryByText(/优惠预览：/)).toBeNull()
+    expect(within(dialog).getByLabelText('优惠码（可选）')).toHaveValue('')
     expect(mocks.create).toHaveBeenCalledOnce()
     expect(mocks.getOrders).not.toHaveBeenCalled()
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: '不使用优惠码，确认创建订单',
+      }),
+    )
+    expect(mocks.create).toHaveBeenCalledTimes(2)
+    expect(mocks.create.mock.calls[1]?.[1]).toEqual({
+      productId: '7',
+      billingPeriod: 'month',
+    })
   })
 
   it('shows ORDER_CREATE_FAILED as definitive without automatic retry', async () => {
@@ -537,6 +776,7 @@ describe('Order Create flow', () => {
       } else {
         const { dialog, user } = await openCreateDialog()
         if (source === 'promotion') {
+          await user.click(within(dialog).getByRole('radio', { name: /月付/ }))
           await user.type(
             within(dialog).getByLabelText('优惠码（可选）'),
             'PROMO',
