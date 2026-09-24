@@ -138,6 +138,14 @@ describe('Cloudflare Pages same-origin API boundary', () => {
     expect(
       (
         await onRequest({
+          request: request('config/support-widget'),
+          env,
+        })
+      ).status,
+    ).toBe(404)
+    expect(
+      (
+        await onRequest({
           request: request('referrals', {
             method: 'POST',
             headers: { origin },

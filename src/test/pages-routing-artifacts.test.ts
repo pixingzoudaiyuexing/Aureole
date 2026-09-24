@@ -3,6 +3,29 @@ import { describe, it, expect } from 'vitest'
 import fs from 'node:fs/promises'
 
 describe('Cloudflare Pages Routing Artifacts', () => {
+  it('has no third-party Crisp runtime, source directory or dependency', async () => {
+    const [appProviders, authProvider, indexHtml, packageJson, packageLock] =
+      await Promise.all([
+        fs.readFile('./src/app/providers/app-providers.tsx', 'utf-8'),
+        fs.readFile('./src/features/auth/auth-provider.tsx', 'utf-8'),
+        fs.readFile('./index.html', 'utf-8'),
+        fs.readFile('./package.json', 'utf-8').then(JSON.parse),
+        fs.readFile('./package-lock.json', 'utf-8').then(JSON.parse),
+      ])
+
+    expect(appProviders).not.toMatch(/support-widget|crisp/i)
+    expect(authProvider).not.toMatch(/support-widget|crisp/i)
+    expect(indexHtml).not.toMatch(/client\.crisp\.chat|CRISP_WEBSITE_ID/i)
+    expect(packageJson.dependencies).not.toHaveProperty('crisp-sdk-web')
+    expect(packageLock.packages).not.toHaveProperty(
+      'node_modules/crisp-sdk-web',
+    )
+    const supportWidgetFiles = await fs
+      .readdir('./src/features/support-widget')
+      .catch(() => [])
+    expect(supportWidgetFiles).toEqual([])
+  })
+
   it('validates public/404.html exists and is non-empty', async () => {
     const content = await fs.readFile('./public/404.html', 'utf-8')
     expect(content.trim().length).toBeGreaterThan(0)
@@ -175,9 +198,7 @@ describe('Cloudflare Pages Routing Artifacts', () => {
     expect(csp).toContain("frame-ancestors 'none'")
     expect(csp).toContain("form-action 'self'")
     expect(csp).toContain("connect-src 'self'")
-    expect(csp).toContain(
-      "script-src 'self' https://client.crisp.chat 'sha256-",
-    )
+    expect(csp).toContain("script-src 'self' 'sha256-")
     expect(csp).toContain("style-src 'self' 'unsafe-inline'")
     expect(csp).toContain("img-src 'self' data: https:")
     expect(csp).toContain("font-src 'self' data:")
@@ -192,5 +213,6 @@ describe('Cloudflare Pages Routing Artifacts', () => {
     expect(csp).not.toContain('frame-src data:')
     expect(csp).not.toContain('frame-src blob:')
     expect(csp).not.toContain('unsafe-eval')
+    expect(csp).not.toMatch(/crisp\.chat/i)
   })
 })

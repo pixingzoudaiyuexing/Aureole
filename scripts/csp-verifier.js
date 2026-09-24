@@ -35,24 +35,9 @@ export function verifyCspPolicy(headersContent) {
   requireExactDirective(csp, 'object-src', ["'none'"])
   requireExactDirective(csp, 'frame-ancestors', ["'none'"])
   requireExactDirective(csp, 'form-action', ["'self'"])
-  requireExactDirective(csp, 'connect-src', [
-    "'self'",
-    'https://client.crisp.chat',
-    'https://client.relay.crisp.chat',
-    'wss://client.relay.crisp.chat',
-    'wss://client.relay.rescue.crisp.chat',
-    'https://storage.crisp.chat',
-  ])
-  requireExactDirective(csp, 'style-src', [
-    "'self'",
-    "'unsafe-inline'",
-    'https://client.crisp.chat',
-  ])
-  requireExactDirective(csp, 'font-src', [
-    "'self'",
-    'data:',
-    'https://client.crisp.chat',
-  ])
+  requireExactDirective(csp, 'connect-src', ["'self'"])
+  requireExactDirective(csp, 'style-src', ["'self'", "'unsafe-inline'"])
+  requireExactDirective(csp, 'font-src', ["'self'", 'data:'])
 
   const frameSources = getDirectiveSources(csp, 'frame-src')
   if (!frameSources.includes('https:')) {
@@ -72,11 +57,7 @@ export function verifyCspPolicy(headersContent) {
     throw new Error("script-src must include 'self'")
   }
   for (const source of scriptSources) {
-    if (
-      source !== "'self'" &&
-      source !== 'https://client.crisp.chat' &&
-      !/^'sha256-[a-zA-Z0-9+/=]+'$/.test(source)
-    ) {
+    if (source !== "'self'" && !/^'sha256-[a-zA-Z0-9+/=]+'$/.test(source)) {
       throw new Error(`script-src unexpected source ${source}`)
     }
   }

@@ -9,10 +9,6 @@ export interface ApiRequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown
 }
 
-export interface StrictPublicResponse<T> {
-  parse: (payload: unknown) => T
-}
-
 export interface ApiClientOptions {
   baseUrl?: string
   fetchImpl?: typeof fetch
@@ -83,7 +79,6 @@ export function createApiClient({
     path: string,
     options: ApiRequestOptions,
     accessToken?: string,
-    strictResponse?: StrictPublicResponse<T>,
   ) {
     assertPublicApiPath(path)
 
@@ -203,30 +198,11 @@ export function createApiClient({
       })
     }
 
-    if (strictResponse) {
-      try {
-        return strictResponse.parse(payload)
-      } catch {
-        throw new ApiError({
-          status: response.status,
-          code: 'MALFORMED_RESPONSE',
-          message: 'The public API returned an invalid response',
-        })
-      }
-    }
-
     return payload.data as T
   }
 
   function request<T>(path: string, options: ApiRequestOptions = {}) {
     return executeRequest<T>(path, options)
-  }
-
-  function strictPublicRequest<T>(
-    path: string,
-    response: StrictPublicResponse<T>,
-  ) {
-    return executeRequest<T>(path, { method: 'GET' }, undefined, response)
   }
 
   function authenticatedRequest<T>(
@@ -265,7 +241,7 @@ export function createApiClient({
     )
   }
 
-  return { authenticatedRequest, request, strictPublicRequest }
+  return { authenticatedRequest, request }
 }
 
 export const apiClient = createApiClient()
