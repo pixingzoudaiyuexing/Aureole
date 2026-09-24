@@ -6,7 +6,6 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthProvider } from '@/features/auth/auth-provider'
 import type { AuthApi } from '@/features/auth/auth-api'
 import { RuntimeSettingsProvider } from '@/features/runtime-settings/runtime-settings-provider'
-import { SupportWidgetRuntimeEffects } from '@/features/support-widget/support-widget-runtime-effects'
 import { createQueryClient } from './query-client'
 import { ThemeProvider } from './theme-provider'
 
@@ -31,7 +30,6 @@ export function AppProviders({
               <RouterProvider router={router} />
             </TooltipProvider>
           </AuthProvider>
-          <SupportWidgetRuntimeEffects />
         </RuntimeSettingsProvider>
       </QueryClientProvider>
     </ThemeProvider>

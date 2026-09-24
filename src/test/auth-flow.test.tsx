@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { createQueryClient } from '@/app/providers/query-client'
 import { AuthProvider } from '@/features/auth/auth-provider'
-import { isSupportWidgetIdentityReady } from '@/features/support-widget/support-widget-runtime'
 import { useAuth } from '@/features/auth/auth-context'
 import type { AuthApi, CurrentUser } from '@/features/auth/auth-api'
 import { authQueryKeys } from '@/features/auth/auth-query-keys'
@@ -76,23 +75,6 @@ function renderSession(api: AuthApi) {
 }
 
 describe('Cookie session UI', () => {
-  it('allows the anonymous support widget after a confirmed missing session, but not an uncertain failure', async () => {
-    const getCurrentUser = vi.fn().mockRejectedValue(missing())
-    const view = renderSession({ login: vi.fn(), getCurrentUser })
-    await waitFor(() =>
-      expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated'),
-    )
-    expect(isSupportWidgetIdentityReady()).toBe(true)
-    view.unmount()
-
-    const unavailableApi = vi.fn().mockRejectedValue(unavailable())
-    renderSession({ login: vi.fn(), getCurrentUser: unavailableApi })
-    await waitFor(() =>
-      expect(screen.getByTestId('status')).toHaveTextContent('error'),
-    )
-    expect(isSupportWidgetIdentityReady()).toBe(false)
-  })
-
   it('ignores a stale missing-session response after a newer login', async () => {
     const old = deferred<CurrentUser>()
     const getCurrentUser = vi
@@ -116,7 +98,6 @@ describe('Cookie session UI', () => {
     })
     expect(screen.getByTestId('status')).toHaveTextContent('authenticated')
     expect(screen.getByTestId('user')).toHaveTextContent(other.email)
-    expect(isSupportWidgetIdentityReady()).toBe(true)
   })
 
   it('restores an existing server session without reading the legacy bearer', async () => {
