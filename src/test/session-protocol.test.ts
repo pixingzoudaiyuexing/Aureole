@@ -195,12 +195,12 @@ describe('fixed-cookie server session protocol', () => {
     ['微信', '3', 'qrcode'],
     ['支付宝', '4', 'redirect'],
   ] as const)(
-    'forwards the trusted checkout origin and preserves the %s QR action',
+    'forwards the trusted checkout origin and preserves the %s payment action',
     async (_channel, paymentMethodId, actionType) => {
       const site = 'https://cc-aureole-stg.pages.dev'
       const paymentData =
         actionType === 'qrcode' ? 'opaque-payment-qr' : 'https://pay.example'
-      let checkoutBody: unknown
+      let forwardedBody: unknown
       const fetchImpl = vi.fn().mockImplementation((target: URL) => {
         const path = new URL(String(target)).pathname
         if (path.endsWith('/auth/login')) return loginResponse('session-token')
@@ -208,7 +208,13 @@ describe('fixed-cookie server session protocol', () => {
         if (path.endsWith('/orders'))
           return new Response(JSON.stringify({ ok: true, data: [] }))
         if (path.endsWith('/checkout')) {
-          checkoutBody = { paymentMethodId }
+          const requestInit = fetchImpl.mock.calls.at(-1)?.[1] as RequestInit
+          const body = requestInit.body
+          if (typeof body === 'string') forwardedBody = JSON.parse(body)
+          else if (body instanceof ReadableStream)
+            void new Response(body)
+              .text()
+              .then((value) => (forwardedBody = JSON.parse(value)))
           return new Response(
             JSON.stringify({
               ok: true,
@@ -262,7 +268,7 @@ describe('fixed-cookie server session protocol', () => {
       })
       const [, init] = fetchImpl.mock.calls.at(-1)!
       const headers = new Headers(init.headers)
-      expect(checkoutBody).toEqual({ paymentMethodId })
+      await vi.waitFor(() => expect(forwardedBody).toEqual({ paymentMethodId }))
       expect(headers.get('origin')).toBe(site)
       expect(headers.get('authorization')).toBe('Bearer session-token')
       expect(headers.get('user-agent')).toBe('Test browser')
