@@ -55,6 +55,34 @@ describe('Cloudflare Pages same-origin API boundary', () => {
     expect(response.headers.has('server')).toBe(false)
   })
 
+  it('forwards anonymous download reads through the safe public boundary', async () => {
+    const response = await onRequest({
+      request: request('downloads', {
+        headers: {
+          accept: 'application/json',
+          cookie: 'private=secret',
+          'x-test-secret': 'secret',
+        },
+      }),
+      env,
+    })
+
+    expect(response.status).toBe(200)
+    const [target, init] = vi.mocked(fetch).mock.calls[0]!
+    expect(String(target)).toBe('https://gateway.example.com/api/v1/downloads')
+    expect(init?.method).toBe('GET')
+    expect(init?.redirect).toBe('manual')
+    const headers = new Headers(init?.headers)
+    expect(headers.get('accept')).toBe('application/json')
+    expect(headers.has('authorization')).toBe(false)
+    expect(headers.has('cookie')).toBe(false)
+    expect(headers.has('x-test-secret')).toBe(false)
+    expect(response.headers.get('x-request-id')).toBe('req-1')
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(response.headers.has('set-cookie')).toBe(false)
+    expect(response.headers.has('server')).toBe(false)
+  })
+
   it('forwards public POST body only with exact same-origin CSRF signals', async () => {
     const response = await onRequest({
       request: request('auth/email-code', {
@@ -92,7 +120,7 @@ describe('Cloudflare Pages same-origin API boundary', () => {
   })
 
   it('rejects a legacy bearer on public and protected routes', async () => {
-    for (const path of ['me', 'config/runtime']) {
+    for (const path of ['me', 'config/runtime', 'downloads']) {
       const response = await onRequest({
         request: request(path, { headers: { authorization: 'Bearer legacy' } }),
         env,
