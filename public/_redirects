@@ -9,6 +9,7 @@
 /support / 200
 /wallet / 200
 /custom/* / 200
+/downloads / 200
 /forgot-password / 200
 /login / 200
 /register / 200

@@ -6,20 +6,21 @@
 
 ## Stable domain mapping
 
-| Aureole feature                     | solution Public API domain              | Frontend behavior                                                       |
-| ----------------------------------- | --------------------------------------- | ----------------------------------------------------------------------- |
-| Auth and onboarding                 | Auth, onboarding config                 | 校验输入、处理 public error code、建立真实 session lifecycle            |
-| Account                             | Me, preferences, stats, account config  | 只显示 Public DTO，不暴露上游用户模型                                   |
-| Products / Plans                    | Products                                | 显示已认证 catalog；Order Create 是最终购买资格权威                     |
-| Orders / Payment                    | Orders, billing, checkout, promotions   | 轮询权威订单状态；优惠仅 preview；不持有 callback 状态                  |
-| Subscription                        | Subscription overview and mutations     | Query owns state；mutation 后按 Contract invalidate；未知结果不盲目重试 |
-| Resources / Traffic                 | Resources, traffic logs                 | 只显示白名单字段；Traffic 使用 compact list                             |
-| Wallet / Gift Card                  | Wallet, deposits, gift card redeem      | 余额只认 Wallet；Deposit/Gift Card 保持显式确认与权威恢复               |
-| Notices                             | Notices                                 | 不发明 unread 或 important 状态                                         |
-| Custom Pages                        | Custom Pages                            | 保持 server order；同一 Query 驱动导航、标题与 iframe route             |
-| Runtime Settings                    | Runtime settings                        | 匿名展示快照；编译默认值仍是启动与失败回退                              |
-| Support                             | Tickets                                 | message 视为敏感用户内容，不记录 raw payload                            |
-| Referrals / Commission / Withdrawal | Referrals and guarded financial actions | 佣金、资格、minimum 与工单状态以上游为权威                              |
+| Aureole feature                     | solution Public API domain              | Frontend behavior                                                          |
+| ----------------------------------- | --------------------------------------- | -------------------------------------------------------------------------- |
+| Auth and onboarding                 | Auth, onboarding config                 | 校验输入、处理 public error code、建立真实 session lifecycle               |
+| Account                             | Me, preferences, stats, account config  | 只显示 Public DTO，不暴露上游用户模型                                      |
+| Products / Plans                    | Products                                | 显示已认证 catalog；Order Create 是最终购买资格权威                        |
+| Orders / Payment                    | Orders, billing, checkout, promotions   | 轮询权威订单状态；优惠仅 preview；不持有 callback 状态                     |
+| Subscription                        | Subscription overview and mutations     | Query owns state；mutation 后按 Contract invalidate；未知结果不盲目重试    |
+| Resources / Traffic                 | Resources, traffic logs                 | 只显示白名单字段；Traffic 使用 compact list                                |
+| Wallet / Gift Card                  | Wallet, deposits, gift card redeem      | 余额只认 Wallet；Deposit/Gift Card 保持显式确认与权威恢复                  |
+| Notices                             | Notices                                 | 不发明 unread 或 important 状态                                            |
+| Custom Pages                        | Custom Pages                            | 保持 server order；同一 Query 驱动导航、标题与 iframe route                |
+| Runtime Settings                    | Runtime settings                        | 匿名展示快照；编译默认值仍是启动与失败回退                                 |
+| Downloads                           | Downloads                               | 匿名消费有序 `downloads[]`；Linux 聚合仅是展示逻辑，不处理 GitHub/Registry |
+| Support                             | Tickets                                 | message 视为敏感用户内容，不记录 raw payload                               |
+| Referrals / Commission / Withdrawal | Referrals and guarded financial actions | 佣金、资格、minimum 与工单状态以上游为权威                                 |
 
 Custom Pages 的 Production runtime SSOT 是 authenticated
 `GET /api/v1/custom-pages`。数据链路固定为：V2Board Notice -> Solution
@@ -38,6 +39,11 @@ memory-only Query；它不读取 Auth、不会持久化，也不成为 Router �
 malformed response 和 all-null response 都使用编译的 Aureole Brand、document metadata 与 PublicLayout
 footer defaults。Runtime Settings 不控制 API origin、Authorization、CSP、路由、导航、entitlement 或业务规则。
 有效 HTTPS logo/favicon 仅由浏览器资源加载，使用 no-referrer；Aureole 不 fetch、probe 或代理它们。
+
+`GET /api/v1/downloads` 是 `/downloads` 的匿名数据来源。Aureole 仅严格消费 Public DTO 的 ordered
+`items[].downloads` 两个动作，保持其原始顺序，前端仅将第一个动作呈现为主要入口、第二个呈现为备用入口。
+Linux 条目聚合为单一 Linux GUI 展示区，但不排序或推断产品、release、asset、镜像或 provider 逻辑。Aureole
+不调用 GitHub API、不读取 Registry、不构建下载 URL，也不在认证、Router bootstrap 或持久化 state 中依赖该查询。
 
 ## Public onboarding and challenge mapping
 

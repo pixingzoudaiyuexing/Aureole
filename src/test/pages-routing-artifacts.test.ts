@@ -31,6 +31,7 @@ describe('Cloudflare Pages Routing Artifacts', () => {
       '/support',
       '/wallet',
       '/custom/*',
+      '/downloads',
       '/forgot-password',
       '/login',
       '/register',

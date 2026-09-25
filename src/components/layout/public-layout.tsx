@@ -39,13 +39,21 @@ export function PublicLayout() {
           <Outlet />
         </div>
         <footer className="px-6 py-5 text-center text-xs text-muted-foreground">
-          <Link
-            to="/login"
-            className="inline-flex items-center gap-1 rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <ArrowLeft className="size-3.5" aria-hidden="true" />
-            Return to sign in
-          </Link>
+          <div className="flex items-center justify-center gap-4">
+            <Link
+              to="/downloads"
+              className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              下载中心
+            </Link>
+            <Link
+              to="/login"
+              className="inline-flex items-center gap-1 rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <ArrowLeft className="size-3.5" aria-hidden="true" />
+              Return to sign in
+            </Link>
+          </div>
         </footer>
       </main>
     </div>

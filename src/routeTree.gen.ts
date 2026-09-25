@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as PublicRouteImport } from './routes/_public'
+import { Route as DownloadsRouteImport } from './routes/downloads'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppNoticesRouteImport } from './routes/_app.notices'
 import { Route as AppOrdersRouteImport } from './routes/_app.orders'
@@ -38,6 +39,11 @@ const AppRoute = AppRouteImport.update({
 } as any)
 const PublicRoute = PublicRouteImport.update({
   id: '/_public',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DownloadsRoute = DownloadsRouteImport.update({
+  id: '/downloads',
+  path: '/downloads',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
@@ -113,6 +119,7 @@ const AppCustomCustomPageIdRoute = AppCustomCustomPageIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/downloads': typeof DownloadsRoute
   '/dashboard': typeof AppDashboardRoute
   '/notices': typeof AppNoticesRoute
   '/orders': typeof AppOrdersRoute
@@ -130,6 +137,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/downloads': typeof DownloadsRoute
   '/dashboard': typeof AppDashboardRoute
   '/notices': typeof AppNoticesRoute
   '/orders': typeof AppOrdersRoute
@@ -150,6 +158,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/_public': typeof PublicRouteWithChildren
+  '/downloads': typeof DownloadsRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/notices': typeof AppNoticesRoute
   '/_app/orders': typeof AppOrdersRoute
@@ -169,6 +178,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/downloads'
     | '/dashboard'
     | '/notices'
     | '/orders'
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/downloads'
     | '/dashboard'
     | '/notices'
     | '/orders'
@@ -205,6 +216,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_app'
     | '/_public'
+    | '/downloads'
     | '/_app/dashboard'
     | '/_app/notices'
     | '/_app/orders'
@@ -225,6 +237,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   PublicRoute: typeof PublicRouteWithChildren
+  DownloadsRoute: typeof DownloadsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -248,6 +261,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof PublicRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/downloads': {
+      id: '/downloads'
+      path: '/downloads'
+      fullPath: '/downloads'
+      preLoaderRoute: typeof DownloadsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/dashboard': {
@@ -400,6 +420,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   PublicRoute: PublicRouteWithChildren,
+  DownloadsRoute: DownloadsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
