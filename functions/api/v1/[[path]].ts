@@ -40,10 +40,10 @@ const SESSION_POST = new Set(['/api/v1/auth/login', '/api/v1/auth/register'])
 const OPTIONAL_GET = new Set(['/api/v1/announcements'])
 const PROTECTED: Record<string, RegExp[]> = {
   GET: [
-    /^\/api\/v1\/(?:me|me\/preferences|me\/stats|wallet|products|products\/[A-Za-z0-9_-]+|orders|orders\/[A-Za-z0-9_-]+|orders\/[A-Za-z0-9_-]+\/status|billing\/methods|subscription|subscription\/(?:overview|entries|delivery-options)|resources|tickets|tickets\/[A-Za-z0-9_-]+|notices|notices\/[A-Za-z0-9_-]+|custom-pages|traffic\/logs|referrals|referrals\/commissions|referrals\/withdrawal-options|config\/account)$/,
+    /^\/api\/v1\/(?:me|me\/preferences|me\/stats|wallet|products|products\/[A-Za-z0-9_-]+|orders|orders\/[A-Za-z0-9_-]+|orders\/[A-Za-z0-9_-]+\/status|billing\/methods|subscription|subscription\/(?:overview|entries|delivery-options)|resources|apple-ids|tickets|tickets\/[A-Za-z0-9_-]+|notices|notices\/[A-Za-z0-9_-]+|custom-pages|traffic\/logs|referrals|referrals\/commissions|referrals\/withdrawal-options|config\/account)$/,
   ],
   POST: [
-    /^\/api\/v1\/(?:me\/password|wallet\/deposits|orders|orders\/[A-Za-z0-9_-]+\/(?:checkout|cancel)|promotions\/validate|subscription\/(?:entry-access|rotate-access|advance-period|access-link)|tickets|tickets\/[A-Za-z0-9_-]+\/(?:reply|close)|referrals\/codes|referrals\/commissions\/transfer|referrals\/withdrawal-requests|gift-cards\/redeem)$/,
+    /^\/api\/v1\/(?:me\/password|wallet\/deposits|orders|orders\/[A-Za-z0-9_-]+\/(?:checkout|cancel)|promotions\/validate|subscription\/(?:entry-access|rotate-access|advance-period|access-link)|apple-ids\/reveal|tickets|tickets\/[A-Za-z0-9_-]+\/(?:reply|close)|referrals\/codes|referrals\/commissions\/transfer|referrals\/withdrawal-requests|gift-cards\/redeem)$/,
   ],
   PATCH: [/^\/api\/v1\/me\/preferences$/],
 }

@@ -137,12 +137,44 @@ describe('Cloudflare Pages same-origin API boundary', () => {
       'orders?page=2',
       'tickets',
       'subscription/overview',
+      'apple-ids',
     ]) {
       const response = await onRequest({
         request: request(path, { headers: { cookie: 'legacy=untrusted' } }),
         env,
       })
       expect(response.status).toBe(401)
+    }
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('allowlists only exact authenticated Apple ID endpoints', async () => {
+    for (const [path, method] of [
+      ['apple-ids', 'GET'],
+      ['apple-ids/reveal', 'POST'],
+    ]) {
+      const response = await onRequest({
+        request: request(path!, {
+          method,
+          ...(method === 'POST' ? { headers: { origin } } : {}),
+        }),
+        env,
+      })
+      expect(response.status).toBe(401)
+    }
+    for (const [path, method] of [
+      ['apple-ids/reveal', 'GET'],
+      ['apple-ids', 'POST'],
+      ['apple-ids/other', 'POST'],
+    ]) {
+      const response = await onRequest({
+        request: request(path!, {
+          method,
+          ...(method === 'POST' ? { headers: { origin } } : {}),
+        }),
+        env,
+      })
+      expect(response.status).toBe(404)
     }
     expect(fetch).not.toHaveBeenCalled()
   })

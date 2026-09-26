@@ -5,6 +5,7 @@ import {
   CreditCard,
   Gauge,
   Headphones,
+  KeyRound,
   PackageOpen,
   PanelsTopLeft,
   ReceiptText,
@@ -20,6 +21,7 @@ export type AppPath =
   | '/subscription'
   | '/plans'
   | '/resources'
+  | '/apple-id'
   | '/orders'
   | '/wallet'
   | '/notices'
@@ -67,6 +69,7 @@ const coreNavigationItems: InternalNavigationItem[] = [
   },
   { kind: 'internal', label: 'Plans', to: '/plans', icon: PackageOpen },
   { kind: 'internal', label: 'Resources', to: '/resources', icon: Boxes },
+  { kind: 'internal', label: 'Apple ID', to: '/apple-id', icon: KeyRound },
   { kind: 'internal', label: 'Orders', to: '/orders', icon: ReceiptText },
   { kind: 'internal', label: 'Wallet', to: '/wallet', icon: WalletCards },
   { kind: 'internal', label: 'Notices', to: '/notices', icon: Bell },

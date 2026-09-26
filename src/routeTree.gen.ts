@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as PublicRouteImport } from './routes/_public'
 import { Route as DownloadsRouteImport } from './routes/downloads'
+import { Route as AppAppleIdRouteImport } from './routes/_app.apple-id'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppNoticesRouteImport } from './routes/_app.notices'
 import { Route as AppOrdersRouteImport } from './routes/_app.orders'
@@ -45,6 +46,11 @@ const DownloadsRoute = DownloadsRouteImport.update({
   id: '/downloads',
   path: '/downloads',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppAppleIdRoute = AppAppleIdRouteImport.update({
+  id: '/apple-id',
+  path: '/apple-id',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
@@ -120,6 +126,7 @@ const AppCustomCustomPageIdRoute = AppCustomCustomPageIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/downloads': typeof DownloadsRoute
+  '/apple-id': typeof AppAppleIdRoute
   '/dashboard': typeof AppDashboardRoute
   '/notices': typeof AppNoticesRoute
   '/orders': typeof AppOrdersRoute
@@ -138,6 +145,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/downloads': typeof DownloadsRoute
+  '/apple-id': typeof AppAppleIdRoute
   '/dashboard': typeof AppDashboardRoute
   '/notices': typeof AppNoticesRoute
   '/orders': typeof AppOrdersRoute
@@ -159,6 +167,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/_public': typeof PublicRouteWithChildren
   '/downloads': typeof DownloadsRoute
+  '/_app/apple-id': typeof AppAppleIdRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/notices': typeof AppNoticesRoute
   '/_app/orders': typeof AppOrdersRoute
@@ -179,6 +188,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/downloads'
+    | '/apple-id'
     | '/dashboard'
     | '/notices'
     | '/orders'
@@ -197,6 +207,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/downloads'
+    | '/apple-id'
     | '/dashboard'
     | '/notices'
     | '/orders'
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/_public'
     | '/downloads'
+    | '/_app/apple-id'
     | '/_app/dashboard'
     | '/_app/notices'
     | '/_app/orders'
@@ -269,6 +281,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/downloads'
       preLoaderRoute: typeof DownloadsRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/apple-id': {
+      id: '/_app/apple-id'
+      path: '/apple-id'
+      fullPath: '/apple-id'
+      preLoaderRoute: typeof AppAppleIdRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/dashboard': {
       id: '/_app/dashboard'
@@ -372,6 +391,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppAppleIdRoute: typeof AppAppleIdRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppNoticesRoute: typeof AppNoticesRoute
   AppOrdersRoute: typeof AppOrdersRoute
@@ -386,6 +406,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAppleIdRoute: AppAppleIdRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppNoticesRoute: AppNoticesRoute,
   AppOrdersRoute: AppOrdersRoute,
