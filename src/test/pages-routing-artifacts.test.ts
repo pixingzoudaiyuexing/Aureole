@@ -21,6 +21,7 @@ describe('Cloudflare Pages Routing Artifacts', () => {
     const content = await fs.readFile('./public/_redirects', 'utf-8')
     const expectedRoutes = [
       '/dashboard',
+      '/apple-id',
       '/notices',
       '/orders',
       '/plans',
