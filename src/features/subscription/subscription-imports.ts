@@ -18,7 +18,7 @@ export function buildSubscriptionImportUri(
   title = getSubscriptionImportTitle(),
 ) {
   if (client === 'clash') {
-    return `clash://install-config?url=${encodeURIComponent(accessUrl)}&name=${encodeURIComponent(title)}`
+    return `clash://install-config?name=${encodeURIComponent(title)}&url=${encodeURIComponent(accessUrl)}`
   }
   if (client === 'shadowrocket') {
     return `shadowrocket://add/sub://${toUtf8Base64(accessUrl)}?remark=${encodeURIComponent(title)}`

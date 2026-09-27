@@ -60,7 +60,7 @@ function extractSubscriptionUrl(
 describe('Subscription client import compatibility', () => {
   it('encodes the exact access URL as one Clash parameter value', () => {
     expect(buildSubscriptionImportUri('clash', accessUrl, title)).toBe(
-      `clash://install-config?url=${encodeURIComponent(accessUrl)}&name=${encodeURIComponent(title)}`,
+      `clash://install-config?name=${encodeURIComponent(title)}&url=${encodeURIComponent(accessUrl)}`,
     )
   })
 
