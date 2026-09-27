@@ -37,6 +37,7 @@ describe('Subscription API contract', () => {
           { id: 'primary', label: 'Subscription', private: true },
           { id: 'backup', label: 'Backup' },
         ],
+        profiles: [],
         registry: 'stripped',
       })
 
@@ -48,11 +49,34 @@ describe('Subscription API contract', () => {
         { id: 'primary', label: 'Subscription' },
         { id: 'backup', label: 'Backup' },
       ],
+      profiles: [],
     })
     expect(request).toHaveBeenCalledWith(
       '/api/v1/subscription/delivery-options',
       { method: 'GET', accessToken, signal: undefined },
     )
+  })
+
+  it('accepts the neutral default and cc profiles without exposing backend fields', async () => {
+    vi.spyOn(apiClient, 'authenticatedRequest').mockResolvedValue({
+      defaultEntryId: 'primary',
+      entries: [{ id: 'primary', label: 'Subscription' }],
+      profiles: [
+        { id: 'default', label: 'Default', available: true, internal: 'x' },
+        { id: 'cc', label: 'Clash split', available: true, internal: 'x' },
+      ],
+    })
+
+    await expect(
+      subscriptionApi.getDeliveryOptions(accessToken),
+    ).resolves.toEqual({
+      defaultEntryId: 'primary',
+      entries: [{ id: 'primary', label: 'Subscription' }],
+      profiles: [
+        { id: 'default', label: 'Default', available: true },
+        { id: 'cc', label: 'Clash split', available: true },
+      ],
+    })
   })
 
   it.each([
@@ -65,6 +89,19 @@ describe('Subscription API contract', () => {
         { id: 'primary', label: 'One' },
         { id: 'primary', label: 'Duplicate' },
       ],
+    },
+    {
+      defaultEntryId: null,
+      entries: [{ id: 'primary', label: 'One' }],
+      profiles: [
+        { id: 'cc', label: 'CC', available: true },
+        { id: 'cc', label: 'Duplicate', available: false },
+      ],
+    },
+    {
+      defaultEntryId: null,
+      entries: [{ id: 'primary', label: 'One' }],
+      profiles: [{ id: 'cc', label: 'CC', available: 'yes' }],
     },
   ])('rejects malformed delivery options %#', async (payload) => {
     vi.spyOn(apiClient, 'authenticatedRequest').mockResolvedValue(payload)
@@ -94,6 +131,23 @@ describe('Subscription API contract', () => {
         subscriptionInfo: 'show',
       },
       signal: undefined,
+    })
+  })
+
+  it('accepts the cc access-link profile without constructing a URL', async () => {
+    const request = vi
+      .spyOn(apiClient, 'authenticatedRequest')
+      .mockResolvedValue({ accessUrl: credentialUrl })
+
+    await expect(
+      subscriptionApi.getAccessLink(accessToken, {
+        entryId: 'primary',
+        profileId: 'cc',
+        subscriptionInfo: 'show',
+      }),
+    ).resolves.toEqual({ accessUrl: credentialUrl })
+    expect(request.mock.calls[0]?.[1]).toMatchObject({
+      body: { entryId: 'primary', profileId: 'cc', subscriptionInfo: 'show' },
     })
   })
 

@@ -101,7 +101,13 @@ export function SubscriptionEntryAccess({
   return (
     <SubscriptionEntryAccessReady
       accessToken={accessToken}
-      options={deliveryOptions.data ?? { defaultEntryId: null, entries: [] }}
+      options={
+        deliveryOptions.data ?? {
+          defaultEntryId: null,
+          entries: [],
+          profiles: [],
+        }
+      }
       mutationCoordinator={mutationCoordinator}
     />
   )
@@ -252,6 +258,7 @@ function SubscriptionEntryAccessReady({
               sessionGeneration={sessionGeneration}
               entryId={selectedEntryId}
               runtimeIdentity={runtimeIdentity}
+              profiles={options.profiles}
               onAvailabilityChange={handleAvailabilityChange}
               onEntryUnavailable={handleEntryUnavailable}
             />

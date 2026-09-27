@@ -110,6 +110,7 @@ function renderWallet(
   queryClient.setQueryData(subscriptionQueryKeys.deliveryOptions, {
     defaultEntryId: 'primary',
     entries: [{ id: 'primary', label: 'Subscription' }],
+    profiles: [],
   })
   const authApi: AuthApi = {
     login: vi.fn(),

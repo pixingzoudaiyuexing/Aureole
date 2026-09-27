@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { ReadError } from '@/components/shared/read-error'
 import { isInvalidSessionError } from '@/features/auth/auth-errors'
 import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invalid-session-error'
@@ -15,7 +16,11 @@ import {
 } from '@/lib/auth/session-store'
 import { ApiError } from '@/lib/api/errors'
 import { SubscriptionCredential } from './subscription-access'
-import { subscriptionApi } from './subscription-api'
+import {
+  subscriptionApi,
+  type SubscriptionDeliveryOptions,
+} from './subscription-api'
+import { subscriptionQueryKeys } from './subscription-queries'
 
 export interface SubscriptionAccessLinkRuntimeHandle {
   refresh: (options?: { suppressError?: boolean }) => Promise<void>
@@ -27,6 +32,7 @@ type AccessLinkState =
   | { status: 'success'; accessUrl: string; error: null }
   | { status: 'error'; accessUrl: null; error: unknown }
   | { status: 'idle'; accessUrl: null; error: null }
+type ProfileAccessState = AccessLinkState
 
 function isApiCode(error: unknown, code: string) {
   return error instanceof ApiError && error.code === code
@@ -39,6 +45,7 @@ export const SubscriptionAccessLinkRuntime = forwardRef<
     sessionGeneration: number
     entryId: string
     runtimeIdentity: string
+    profiles: SubscriptionDeliveryOptions['profiles']
     onAvailabilityChange: (identity: string, available: boolean) => void
     onEntryUnavailable: (entryId: string) => void
   }
@@ -48,6 +55,7 @@ export const SubscriptionAccessLinkRuntime = forwardRef<
     sessionGeneration,
     entryId,
     runtimeIdentity,
+    profiles,
     onAvailabilityChange,
     onEntryUnavailable,
   },
@@ -56,19 +64,108 @@ export const SubscriptionAccessLinkRuntime = forwardRef<
   const mountedRef = useRef(true)
   const requestGenerationRef = useRef(0)
   const controllerRef = useRef<AbortController | null>(null)
+  const ccControllerRef = useRef<AbortController | null>(null)
+  const ccRequestGenerationRef = useRef(0)
+  const queryClient = useQueryClient()
   const [state, setState] = useState<AccessLinkState>({
     status: 'idle',
     accessUrl: null,
     error: null,
   })
+  const [ccState, setCcState] = useState<ProfileAccessState>({
+    status: 'idle',
+    accessUrl: null,
+    error: null,
+  })
+  const ccAvailable = profiles.some(
+    (profile) => profile.id === 'cc' && profile.available,
+  )
 
   const suppress = useCallback(() => {
     requestGenerationRef.current += 1
     controllerRef.current?.abort()
     controllerRef.current = null
+    ccRequestGenerationRef.current += 1
+    ccControllerRef.current?.abort()
+    ccControllerRef.current = null
     onAvailabilityChange(runtimeIdentity, false)
     setState({ status: 'idle', accessUrl: null, error: null })
+    setCcState({ status: 'idle', accessUrl: null, error: null })
   }, [onAvailabilityChange, runtimeIdentity])
+
+  const clearCc = useCallback(() => {
+    ccRequestGenerationRef.current += 1
+    ccControllerRef.current?.abort()
+    ccControllerRef.current = null
+    setCcState({ status: 'idle', accessUrl: null, error: null })
+  }, [])
+
+  const refreshCc = useCallback(async () => {
+    if (!ccAvailable) {
+      clearCc()
+      return
+    }
+
+    const requestGeneration = ccRequestGenerationRef.current + 1
+    ccRequestGenerationRef.current = requestGeneration
+    ccControllerRef.current?.abort()
+    const controller = new AbortController()
+    ccControllerRef.current = controller
+    setCcState({ status: 'pending', accessUrl: null, error: null })
+    try {
+      const result = await subscriptionApi.getAccessLink(
+        accessToken,
+        { entryId, profileId: 'cc', subscriptionInfo: 'show' },
+        controller.signal,
+      )
+      const currentSession = useAuthSessionStore.getState()
+      if (
+        !mountedRef.current ||
+        controller.signal.aborted ||
+        ccRequestGenerationRef.current !== requestGeneration ||
+        currentSession.accessToken !== accessToken ||
+        currentSession.generation !== sessionGeneration ||
+        !isCurrentAuthSessionGeneration(sessionGeneration)
+      ) {
+        throw new Error('Stale Clash profile access-link result')
+      }
+      setCcState({
+        status: 'success',
+        accessUrl: result.accessUrl,
+        error: null,
+      })
+    } catch (error) {
+      const currentSession = useAuthSessionStore.getState()
+      const stale =
+        !mountedRef.current ||
+        controller.signal.aborted ||
+        ccRequestGenerationRef.current !== requestGeneration ||
+        currentSession.accessToken !== accessToken ||
+        currentSession.generation !== sessionGeneration
+      if (stale) return
+      setCcState({ status: 'error', accessUrl: null, error })
+      if (
+        isApiCode(error, 'SUBSCRIPTION_ACCESS_UNAVAILABLE') ||
+        isApiCode(error, 'SUBSCRIPTION_ENTRY_UNAVAILABLE')
+      ) {
+        void queryClient.invalidateQueries({
+          queryKey: subscriptionQueryKeys.deliveryOptions,
+          exact: true,
+        })
+      }
+    } finally {
+      if (ccRequestGenerationRef.current === requestGeneration) {
+        ccControllerRef.current = null
+      }
+    }
+  }, [
+    accessToken,
+    ccAvailable,
+    clearCc,
+    entryId,
+    queryClient,
+    sessionGeneration,
+  ])
 
   const refresh = useCallback(
     async (options?: { suppressError?: boolean }) => {
@@ -162,16 +259,34 @@ export const SubscriptionAccessLinkRuntime = forwardRef<
       requestGenerationRef.current += 1
       controllerRef.current?.abort()
       controllerRef.current = null
+      ccRequestGenerationRef.current += 1
+      ccControllerRef.current?.abort()
+      ccControllerRef.current = null
     }
   }, [refresh])
 
+  useEffect(() => {
+    if (ccAvailable) return
+    queueMicrotask(clearCc)
+  }, [ccAvailable, clearCc])
+
   useExitOnInvalidSessionError(state.status === 'error' ? state.error : null)
+  useExitOnInvalidSessionError(
+    ccState.status === 'error' ? ccState.error : null,
+  )
 
   if (state.status === 'success') {
     return (
       <SubscriptionCredential
         key={state.accessUrl}
         accessUrl={state.accessUrl}
+        ccAvailable={ccAvailable}
+        ccAccessUrl={ccState.status === 'success' ? ccState.accessUrl : null}
+        ccPending={ccState.status === 'pending'}
+        ccError={ccState.status === 'error' ? ccState.error : null}
+        onClashModeChange={(enabled) =>
+          enabled ? void refreshCc() : clearCc()
+        }
       />
     )
   }

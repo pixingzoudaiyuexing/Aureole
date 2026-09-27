@@ -31,6 +31,14 @@ const subscriptionDeliveryLabelSchema = z
   .max(120)
   .refine((value) => value.trim() === value)
 
+const subscriptionProfileSchema = z
+  .object({
+    id: z.enum(['default', 'cc']),
+    label: subscriptionDeliveryLabelSchema,
+    available: z.boolean(),
+  })
+  .strip()
+
 const subscriptionDeliveryOptionsSchema = z
   .object({
     defaultEntryId: subscriptionDeliveryEntryIdSchema.nullable(),
@@ -42,6 +50,7 @@ const subscriptionDeliveryOptionsSchema = z
         })
         .strip(),
     ),
+    profiles: z.array(subscriptionProfileSchema),
   })
   .strip()
   .superRefine((value, context) => {
@@ -64,12 +73,24 @@ const subscriptionDeliveryOptionsSchema = z
         message: 'Default subscription delivery entry is unavailable',
       })
     }
+
+    const profileIds = new Set<string>()
+    for (const [index, profile] of value.profiles.entries()) {
+      if (profileIds.has(profile.id)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['profiles', index, 'id'],
+          message: 'Duplicate subscription profile ID',
+        })
+      }
+      profileIds.add(profile.id)
+    }
   })
 
 const subscriptionAccessLinkRequestSchema = z
   .object({
     entryId: subscriptionDeliveryEntryIdSchema,
-    profileId: z.literal('default'),
+    profileId: z.enum(['default', 'cc']),
     subscriptionInfo: z.enum(['show', 'hide']),
   })
   .strict()

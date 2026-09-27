@@ -49,6 +49,7 @@ function installSubscriptionMocks() {
     .mockResolvedValue({
       defaultEntryId: 'primary',
       entries: [{ id: 'primary', label: 'Subscription' }],
+      profiles: [],
     })
   const getEntryAccess = vi
     .spyOn(subscriptionApi, 'getAccessLink')

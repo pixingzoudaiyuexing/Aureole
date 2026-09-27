@@ -72,6 +72,7 @@ function installMocks() {
     .mockResolvedValue({
       defaultEntryId: entryA,
       entries: [{ id: entryA, label: 'Entry A' }],
+      profiles: [],
     })
   const getAccess = vi
     .spyOn(subscriptionApi, 'getAccessLink')
@@ -533,6 +534,7 @@ describe('Subscription access rotation', () => {
     mocks.getEntries.mockResolvedValue({
       defaultEntryId: entryA,
       entries: [entryA, entryB, entryC].map((id) => ({ id, label: id })),
+      profiles: [],
     })
     let bReads = 0
     let cReads = 0
@@ -597,6 +599,7 @@ describe('Subscription access rotation', () => {
     mocks.getEntries.mockResolvedValue({
       defaultEntryId: entryA,
       entries: [entryA, entryB, entryC].map((id) => ({ id, label: id })),
+      profiles: [],
     })
     mocks.rotateAccess.mockRejectedValue(
       new ApiError({
@@ -652,10 +655,12 @@ describe('Subscription access rotation', () => {
       .mockResolvedValueOnce({
         defaultEntryId: entryA,
         entries: [entryA, entryB, entryC].map((id) => ({ id, label: id })),
+        profiles: [],
       })
       .mockResolvedValue({
         defaultEntryId: entryA,
         entries: [entryA, entryC].map((id) => ({ id, label: id })),
+        profiles: [],
       })
     let bReads = 0
     let cReads = 0
@@ -720,10 +725,12 @@ describe('Subscription access rotation', () => {
       .mockResolvedValueOnce({
         defaultEntryId: entryA,
         entries: [entryA, entryB, entryC].map((id) => ({ id, label: id })),
+        profiles: [],
       })
       .mockResolvedValue({
         defaultEntryId: entryA,
         entries: [entryA, entryC].map((id) => ({ id, label: id })),
+        profiles: [],
       })
     mocks.rotateAccess.mockRejectedValue(
       new ApiError({
@@ -785,10 +792,12 @@ describe('Subscription access rotation', () => {
       .mockResolvedValueOnce({
         defaultEntryId: entryA,
         entries: [entryA, entryB, entryC].map((id) => ({ id, label: id })),
+        profiles: [],
       })
       .mockResolvedValue({
         defaultEntryId: entryA,
         entries: [entryA, entryC].map((id) => ({ id, label: id })),
+        profiles: [],
       })
     mocks.rotateAccess.mockRejectedValue(
       new ApiError({

@@ -10,7 +10,10 @@ import {
   subscriptionApi,
   type SubscriptionDeliveryOptions,
 } from '@/features/subscription/subscription-api'
-import { subscriptionImportNavigation } from '@/features/subscription/subscription-imports'
+import {
+  buildSubscriptionImportUri,
+  subscriptionImportNavigation,
+} from '@/features/subscription/subscription-imports'
 import { SUBSCRIPTION_SELECTED_ENTRY_STORAGE_KEY } from '@/features/subscription/subscription-selection-storage'
 import { trafficApi } from '@/features/traffic/traffic-api'
 import { ApiError } from '@/lib/api/errors'
@@ -32,6 +35,7 @@ const accessUrls = {
   backup: 'https://subscription.example/BACKUP_TOKEN',
   regional: 'https://subscription.example/REGIONAL_TOKEN',
 }
+const ccAccessUrl = 'https://subscription.example/CC_TOKEN'
 const currentUser: CurrentUser = {
   email: 'member@example.com',
   expiresAt: '2030-01-01T00:00:00.000Z',
@@ -58,14 +62,14 @@ function deferred<T>() {
 }
 
 function installMocks(
-  delivery: SubscriptionDeliveryOptions = {
-    defaultEntryId: 'primary',
-    entries,
-  },
+  delivery: Omit<SubscriptionDeliveryOptions, 'profiles'> & {
+    profiles?: SubscriptionDeliveryOptions['profiles']
+  } = { defaultEntryId: 'primary', entries },
 ) {
+  const normalizedDelivery = { ...delivery, profiles: delivery.profiles ?? [] }
   const getDeliveryOptions = vi
     .spyOn(subscriptionApi, 'getDeliveryOptions')
-    .mockResolvedValue(delivery)
+    .mockResolvedValue(normalizedDelivery)
   const getAccessLink = vi
     .spyOn(subscriptionApi, 'getAccessLink')
     .mockImplementation(async (_token, input) => ({
@@ -350,8 +354,16 @@ describe('Subscription delivery selection and credential runtime', () => {
   it('reconciles a 422 by refreshing options and requiring explicit selection', async () => {
     const mocks = installMocks()
     mocks.getDeliveryOptions
-      .mockResolvedValueOnce({ defaultEntryId: 'primary', entries })
-      .mockResolvedValue({ defaultEntryId: 'backup', entries: [entries[1]!] })
+      .mockResolvedValueOnce({
+        defaultEntryId: 'primary',
+        entries,
+        profiles: [],
+      })
+      .mockResolvedValue({
+        defaultEntryId: 'backup',
+        entries: [entries[1]!],
+        profiles: [],
+      })
     mocks.getAccessLink.mockRejectedValueOnce(
       new ApiError({
         status: 422,
@@ -394,6 +406,198 @@ describe('Subscription delivery selection and credential runtime', () => {
     expect(navigation).toHaveBeenCalledWith(
       expect.stringContaining(encodeURIComponent(accessUrls.primary)),
     )
+  })
+
+  it('keeps default display/QR and non-Clash imports while CC mode changes only Copy and Clash', async () => {
+    const mocks = installMocks({
+      defaultEntryId: 'primary',
+      entries,
+      profiles: [
+        { id: 'default', label: 'Default', available: true },
+        { id: 'cc', label: 'Clash split', available: true },
+      ],
+    })
+    mocks.getAccessLink.mockImplementation(async (_token, input) => ({
+      accessUrl: input.profileId === 'cc' ? ccAccessUrl : accessUrls.primary,
+    }))
+    const navigation = vi
+      .spyOn(subscriptionImportNavigation, 'goTo')
+      .mockImplementation(() => undefined)
+    renderSubscription()
+    const user = userEvent.setup()
+    const writeText = installClipboard()
+
+    expect(await screen.findByText(accessUrls.primary)).toBeInTheDocument()
+    const toggle = screen.getByRole('checkbox', { name: /^Clash 分流规则/ })
+    expect(toggle).not.toBeChecked()
+    await user.click(screen.getByRole('button', { name: '显示二维码' }))
+    expect(screen.getByTestId('subscription-qr')).toHaveAttribute(
+      'data-value',
+      accessUrls.primary,
+    )
+    await user.click(toggle)
+    await waitFor(() =>
+      expect(mocks.getAccessLink).toHaveBeenCalledWith(
+        expect.any(String),
+        { entryId: 'primary', profileId: 'cc', subscriptionInfo: 'show' },
+        expect.any(AbortSignal),
+      ),
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '复制' })).toBeEnabled(),
+    )
+    expect(screen.getByText(accessUrls.primary)).toBeInTheDocument()
+    expect(screen.getByTestId('subscription-qr')).toHaveAttribute(
+      'data-value',
+      accessUrls.primary,
+    )
+
+    await user.click(screen.getByRole('button', { name: '复制' }))
+    await waitFor(() => expect(writeText.mock.calls).toEqual([[ccAccessUrl]]))
+    await user.click(screen.getByRole('button', { name: 'Clash' }))
+    expect(navigation).toHaveBeenCalledWith(
+      expect.stringContaining(encodeURIComponent(ccAccessUrl)),
+    )
+
+    for (const client of ['Shadowrocket', 'Quantumult X', 'SingBox']) {
+      await user.click(screen.getByRole('button', { name: client }))
+    }
+    const nonClashCalls = navigation.mock.calls.slice(-3).map(([uri]) => uri)
+    expect(nonClashCalls).toEqual([
+      buildSubscriptionImportUri('shadowrocket', accessUrls.primary),
+      buildSubscriptionImportUri('quantumult-x', accessUrls.primary),
+      buildSubscriptionImportUri('sing-box', accessUrls.primary),
+    ])
+
+    await user.click(toggle)
+    await user.click(screen.getByRole('button', { name: '复制' }))
+    await waitFor(() =>
+      expect(writeText).toHaveBeenLastCalledWith(accessUrls.primary),
+    )
+    await user.click(screen.getByRole('button', { name: 'Clash' }))
+    expect(navigation).toHaveBeenLastCalledWith(
+      expect.stringContaining(encodeURIComponent(accessUrls.primary)),
+    )
+    expect(screen.getByRole('main').textContent).not.toContain(ccAccessUrl)
+    expect(JSON.stringify({ ...window.sessionStorage })).not.toContain(
+      ccAccessUrl,
+    )
+  })
+
+  it('clears CC state when the selected entry changes', async () => {
+    const mocks = installMocks({
+      defaultEntryId: 'primary',
+      entries,
+      profiles: [{ id: 'cc', label: 'Clash split', available: true }],
+    })
+    mocks.getAccessLink.mockImplementation(async (_token, input) => ({
+      accessUrl:
+        input.profileId === 'cc'
+          ? ccAccessUrl
+          : accessUrls[input.entryId as keyof typeof accessUrls],
+    }))
+    renderSubscription()
+    const user = userEvent.setup()
+    expect(await screen.findByText(accessUrls.primary)).toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: /^Clash 分流规则/ }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '复制' })).toBeEnabled(),
+    )
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: '订阅入口' }),
+      'backup',
+    )
+    expect(await screen.findByText(accessUrls.backup)).toBeInTheDocument()
+    expect(screen.queryByText(ccAccessUrl)).toBeNull()
+    expect(
+      screen.getByRole('checkbox', { name: /^Clash 分流规则/ }),
+    ).not.toBeChecked()
+  })
+
+  it('clears CC state when subscription address rotation suppresses the runtime', async () => {
+    const mocks = installMocks({
+      defaultEntryId: 'primary',
+      entries,
+      profiles: [{ id: 'cc', label: 'Clash split', available: true }],
+    })
+    mocks.getAccessLink.mockImplementation(async (_token, input) => ({
+      accessUrl: input.profileId === 'cc' ? ccAccessUrl : accessUrls.primary,
+    }))
+    renderSubscription()
+    const user = userEvent.setup()
+    expect(await screen.findByText(accessUrls.primary)).toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: /^Clash 分流规则/ }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '复制' })).toBeEnabled(),
+    )
+    await user.click(screen.getByRole('button', { name: '重置订阅地址' }))
+    await user.click(
+      screen.getByRole('checkbox', { name: /我已理解旧订阅地址/ }),
+    )
+    await user.click(screen.getByRole('button', { name: '确认重置' }))
+    expect(
+      await screen.findByText('订阅地址已重置，请使用新地址重新获取订阅。'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(ccAccessUrl)).toBeNull()
+    expect(
+      screen.getByRole('checkbox', { name: /^Clash 分流规则/ }),
+    ).not.toBeChecked()
+  })
+
+  it('does not silently fall back while CC is pending or failed', async () => {
+    const pending = deferred<{ accessUrl: string }>()
+    const mocks = installMocks({
+      defaultEntryId: 'primary',
+      entries,
+      profiles: [
+        { id: 'default', label: 'Default', available: true },
+        { id: 'cc', label: 'Clash split', available: true },
+      ],
+    })
+    mocks.getAccessLink.mockImplementation((_token, input) =>
+      input.profileId === 'cc'
+        ? pending.promise
+        : Promise.resolve({ accessUrl: accessUrls.primary }),
+    )
+    renderSubscription()
+    const user = userEvent.setup()
+    expect(await screen.findByText(accessUrls.primary)).toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: /^Clash 分流规则/ }))
+    expect(screen.getByText(accessUrls.primary)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '复制' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Clash' })).toBeDisabled()
+    act(() =>
+      pending.reject(
+        new ApiError({
+          status: 409,
+          code: 'SUBSCRIPTION_ACCESS_UNAVAILABLE',
+          message: 'Unavailable',
+        }),
+      ),
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Clash 分流规则暂时不可用',
+    )
+    await waitFor(() =>
+      expect(mocks.getDeliveryOptions).toHaveBeenCalledTimes(2),
+    )
+    expect(screen.getByText(accessUrls.primary)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '复制' })).toBeDisabled()
+    await user.click(screen.getByRole('checkbox', { name: /^Clash 分流规则/ }))
+    expect(screen.getByRole('button', { name: '复制' })).toBeEnabled()
+  })
+
+  it('does not show the CC control when the profile is unavailable', async () => {
+    installMocks({
+      defaultEntryId: 'primary',
+      entries,
+      profiles: [{ id: 'cc', label: 'Clash split', available: false }],
+    })
+    renderSubscription()
+    expect(await screen.findByText(accessUrls.primary)).toBeInTheDocument()
+    expect(
+      screen.queryByRole('checkbox', { name: /^Clash 分流规则/ }),
+    ).toBeNull()
   })
 
   it('never renders a delayed Session A credential after Session B becomes active', async () => {
