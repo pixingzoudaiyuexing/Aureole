@@ -41,6 +41,7 @@ const OPTIONAL_GET = new Set(['/api/v1/announcements'])
 const PROTECTED: Record<string, RegExp[]> = {
   GET: [
     /^\/api\/v1\/(?:me|me\/preferences|me\/stats|wallet|products|products\/[A-Za-z0-9_-]+|orders|orders\/[A-Za-z0-9_-]+|orders\/[A-Za-z0-9_-]+\/status|billing\/methods|subscription|subscription\/(?:overview|entries|delivery-options)|resources|apple-ids|tickets|tickets\/[A-Za-z0-9_-]+|notices|notices\/[A-Za-z0-9_-]+|custom-pages|traffic\/logs|referrals|referrals\/commissions|referrals\/withdrawal-options|config\/account)$/,
+    /^\/api\/v1\/help\/(?:categories|articles|articles\/[1-9]\d*)$/,
   ],
   POST: [
     /^\/api\/v1\/(?:me\/password|wallet\/deposits|orders|orders\/[A-Za-z0-9_-]+\/(?:checkout|cancel)|promotions\/validate|subscription\/(?:entry-access|rotate-access|advance-period|access-link)|apple-ids\/reveal|tickets|tickets\/[A-Za-z0-9_-]+\/(?:reply|close)|referrals\/codes|referrals\/commissions\/transfer|referrals\/withdrawal-requests|gift-cards\/redeem)$/,
@@ -200,6 +201,11 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
   if (!csrfAllowed(request, url)) return failure(403, 'FORBIDDEN')
 
   const path = url.pathname
+  const helpArticleId = /^\/api\/v1\/help\/articles\/([1-9]\d*)$/.exec(
+    path,
+  )?.[1]
+  if (helpArticleId && Number(helpArticleId) > 2_147_483_647)
+    return failure(404, 'NOT_FOUND')
   if (request.method === 'GET' && path === '/api/v1/access/subscription') {
     return subscriptionResponse(await upstream(request, target))
   }

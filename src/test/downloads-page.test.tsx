@@ -73,6 +73,28 @@ const data: DownloadsData = {
       ],
     },
     {
+      id: 'clashbox-harmonyos',
+      label: 'ClashBox',
+      platform: 'harmonyos',
+      arch: null,
+      version: '1.2.3',
+      publishedAt: null,
+      filename: 'clashbox.hap',
+      sizeBytes: 42_000_000,
+      downloads: [
+        {
+          id: 'h-fast',
+          label: 'HarmonyOS 下载',
+          url: 'https://fast.example.com/h',
+        },
+        {
+          id: 'h-backup',
+          label: 'HarmonyOS 备用',
+          url: 'https://backup.example.com/h',
+        },
+      ],
+    },
+    {
       id: 'linux-x64',
       label: 'Debian / Ubuntu',
       platform: 'linux',
@@ -187,6 +209,11 @@ describe('Downloads page', () => {
     expect(router.state.location.pathname).toBe('/downloads')
     expect(screen.getByRole('heading', { name: 'macOS' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Android' })).toBeInTheDocument()
+    const harmony = screen.getByRole('region', { name: 'HarmonyOS' })
+    expect(within(harmony).getByText('ClashBox')).toBeInTheDocument()
+    expect(
+      within(harmony).getByRole('link', { name: 'HarmonyOS 下载' }),
+    ).toHaveAttribute('href', 'https://fast.example.com/h')
 
     const linux = screen.getByRole('region', { name: 'Linux GUI' })
     expect(within(linux).getAllByRole('heading', { level: 3 })).toHaveLength(2)

@@ -179,6 +179,48 @@ describe('Cloudflare Pages same-origin API boundary', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
+  it('allows only exact authenticated Help GET paths', async () => {
+    for (const path of [
+      'help/categories',
+      'help/articles',
+      'help/articles/12',
+    ]) {
+      expect((await onRequest({ request: request(path), env })).status).toBe(
+        401,
+      )
+      expect(
+        (
+          await onRequest({
+            request: request(path, {
+              headers: { authorization: 'Bearer legacy' },
+            }),
+            env,
+          })
+        ).status,
+      ).toBe(401)
+    }
+    for (const path of [
+      'help/other',
+      'help/articles/not-numeric',
+      'help/articles/0',
+      'help/articles/2147483648',
+      'help/articles/12/extra',
+    ]) {
+      expect((await onRequest({ request: request(path), env })).status).toBe(
+        404,
+      )
+      expect(
+        (
+          await onRequest({
+            request: request(path, { method: 'POST', headers: { origin } }),
+            env,
+          })
+        ).status,
+      ).toBe(404)
+    }
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it('permits optional announcements without a session', async () => {
     expect(
       (await onRequest({ request: request('announcements'), env })).status,

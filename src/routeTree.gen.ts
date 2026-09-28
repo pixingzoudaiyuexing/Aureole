@@ -15,6 +15,7 @@ import { Route as PublicRouteImport } from './routes/_public'
 import { Route as DownloadsRouteImport } from './routes/downloads'
 import { Route as AppAppleIdRouteImport } from './routes/_app.apple-id'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppHelpRouteImport } from './routes/_app.help'
 import { Route as AppNoticesRouteImport } from './routes/_app.notices'
 import { Route as AppOrdersRouteImport } from './routes/_app.orders'
 import { Route as AppPlansRouteImport } from './routes/_app.plans'
@@ -28,6 +29,8 @@ import { Route as PublicForgotPasswordRouteImport } from './routes/_public.forgo
 import { Route as PublicLoginRouteImport } from './routes/_public.login'
 import { Route as PublicRegisterRouteImport } from './routes/_public.register'
 import { Route as AppCustomCustomPageIdRouteImport } from './routes/_app.custom.$customPageId'
+import { Route as AppHelpIndexRouteImport } from './routes/_app.help.index'
+import { Route as AppHelpArticleIdRouteImport } from './routes/_app.help.$articleId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -55,6 +58,11 @@ const AppAppleIdRoute = AppAppleIdRouteImport.update({
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHelpRoute = AppHelpRouteImport.update({
+  id: '/help',
+  path: '/help',
   getParentRoute: () => AppRoute,
 } as any)
 const AppNoticesRoute = AppNoticesRouteImport.update({
@@ -122,12 +130,23 @@ const AppCustomCustomPageIdRoute = AppCustomCustomPageIdRouteImport.update({
   path: '/custom/$customPageId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppHelpIndexRoute = AppHelpIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppHelpRoute,
+} as any)
+const AppHelpArticleIdRoute = AppHelpArticleIdRouteImport.update({
+  id: '/$articleId',
+  path: '/$articleId',
+  getParentRoute: () => AppHelpRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/downloads': typeof DownloadsRoute
   '/apple-id': typeof AppAppleIdRoute
   '/dashboard': typeof AppDashboardRoute
+  '/help': typeof AppHelpRouteWithChildren
   '/notices': typeof AppNoticesRoute
   '/orders': typeof AppOrdersRoute
   '/plans': typeof AppPlansRoute
@@ -141,6 +160,8 @@ export interface FileRoutesByFullPath {
   '/login': typeof PublicLoginRoute
   '/register': typeof PublicRegisterRoute
   '/custom/$customPageId': typeof AppCustomCustomPageIdRoute
+  '/help/$articleId': typeof AppHelpArticleIdRoute
+  '/help/': typeof AppHelpIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -160,6 +181,8 @@ export interface FileRoutesByTo {
   '/login': typeof PublicLoginRoute
   '/register': typeof PublicRegisterRoute
   '/custom/$customPageId': typeof AppCustomCustomPageIdRoute
+  '/help/$articleId': typeof AppHelpArticleIdRoute
+  '/help': typeof AppHelpIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -169,6 +192,7 @@ export interface FileRoutesById {
   '/downloads': typeof DownloadsRoute
   '/_app/apple-id': typeof AppAppleIdRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/help': typeof AppHelpRouteWithChildren
   '/_app/notices': typeof AppNoticesRoute
   '/_app/orders': typeof AppOrdersRoute
   '/_app/plans': typeof AppPlansRoute
@@ -182,6 +206,8 @@ export interface FileRoutesById {
   '/_public/login': typeof PublicLoginRoute
   '/_public/register': typeof PublicRegisterRoute
   '/_app/custom/$customPageId': typeof AppCustomCustomPageIdRoute
+  '/_app/help/$articleId': typeof AppHelpArticleIdRoute
+  '/_app/help/': typeof AppHelpIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -190,6 +216,7 @@ export interface FileRouteTypes {
     | '/downloads'
     | '/apple-id'
     | '/dashboard'
+    | '/help'
     | '/notices'
     | '/orders'
     | '/plans'
@@ -203,6 +230,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/custom/$customPageId'
+    | '/help/$articleId'
+    | '/help/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -222,6 +251,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/custom/$customPageId'
+    | '/help/$articleId'
+    | '/help'
   id:
     | '__root__'
     | '/'
@@ -230,6 +261,7 @@ export interface FileRouteTypes {
     | '/downloads'
     | '/_app/apple-id'
     | '/_app/dashboard'
+    | '/_app/help'
     | '/_app/notices'
     | '/_app/orders'
     | '/_app/plans'
@@ -243,6 +275,8 @@ export interface FileRouteTypes {
     | '/_public/login'
     | '/_public/register'
     | '/_app/custom/$customPageId'
+    | '/_app/help/$articleId'
+    | '/_app/help/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -294,6 +328,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/help': {
+      id: '/_app/help'
+      path: '/help'
+      fullPath: '/help'
+      preLoaderRoute: typeof AppHelpRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/notices': {
@@ -387,12 +428,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCustomCustomPageIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/help/': {
+      id: '/_app/help/'
+      path: '/'
+      fullPath: '/help/'
+      preLoaderRoute: typeof AppHelpIndexRouteImport
+      parentRoute: typeof AppHelpRoute
+    }
+    '/_app/help/$articleId': {
+      id: '/_app/help/$articleId'
+      path: '/$articleId'
+      fullPath: '/help/$articleId'
+      preLoaderRoute: typeof AppHelpArticleIdRouteImport
+      parentRoute: typeof AppHelpRoute
+    }
   }
 }
+
+interface AppHelpRouteChildren {
+  AppHelpArticleIdRoute: typeof AppHelpArticleIdRoute
+  AppHelpIndexRoute: typeof AppHelpIndexRoute
+}
+
+const AppHelpRouteChildren: AppHelpRouteChildren = {
+  AppHelpArticleIdRoute: AppHelpArticleIdRoute,
+  AppHelpIndexRoute: AppHelpIndexRoute,
+}
+
+const AppHelpRouteWithChildren =
+  AppHelpRoute._addFileChildren(AppHelpRouteChildren)
 
 interface AppRouteChildren {
   AppAppleIdRoute: typeof AppAppleIdRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppHelpRoute: typeof AppHelpRouteWithChildren
   AppNoticesRoute: typeof AppNoticesRoute
   AppOrdersRoute: typeof AppOrdersRoute
   AppPlansRoute: typeof AppPlansRoute
@@ -408,6 +477,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAppleIdRoute: AppAppleIdRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppHelpRoute: AppHelpRouteWithChildren,
   AppNoticesRoute: AppNoticesRoute,
   AppOrdersRoute: AppOrdersRoute,
   AppPlansRoute: AppPlansRoute,

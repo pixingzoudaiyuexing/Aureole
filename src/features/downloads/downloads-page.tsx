@@ -12,6 +12,7 @@ const platformSections = [
   { platform: 'windows', title: 'Windows' },
   { platform: 'macos', title: 'macOS' },
   { platform: 'android', title: 'Android' },
+  { platform: 'harmonyos', title: 'HarmonyOS' },
   { platform: 'linux', title: 'Linux GUI' },
 ] as const
 

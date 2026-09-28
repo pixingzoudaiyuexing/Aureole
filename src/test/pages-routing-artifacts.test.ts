@@ -23,6 +23,8 @@ describe('Cloudflare Pages Routing Artifacts', () => {
       '/dashboard',
       '/apple-id',
       '/notices',
+      '/help',
+      '/help/*',
       '/orders',
       '/plans',
       '/referrals',
@@ -64,6 +66,7 @@ describe('Cloudflare Pages Routing Artifacts', () => {
       false,
     )
     expect(rules.filter(({ source }) => source.includes('*'))).toEqual([
+      { source: '/help/*', destination: '/', status: '200' },
       { source: '/custom/*', destination: '/', status: '200' },
     ])
 

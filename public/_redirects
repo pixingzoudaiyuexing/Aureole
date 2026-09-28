@@ -1,6 +1,8 @@
 /dashboard / 200
 /apple-id / 200
 /notices / 200
+/help / 200
+/help/* / 200
 /orders / 200
 /plans / 200
 /referrals / 200

@@ -73,6 +73,29 @@ describe('Downloads API', () => {
     await expect(downloadsApi.getDownloads()).resolves.toEqual({ items: [] })
   })
 
+  it('accepts HarmonyOS using only Solution-provided download URLs', async () => {
+    vi.spyOn(apiClient, 'request').mockResolvedValue({
+      items: [
+        {
+          ...item,
+          id: 'clashbox-harmonyos',
+          label: 'ClashBox',
+          platform: 'harmonyos',
+        },
+      ],
+    })
+    await expect(downloadsApi.getDownloads()).resolves.toEqual({
+      items: [
+        {
+          ...item,
+          id: 'clashbox-harmonyos',
+          label: 'ClashBox',
+          platform: 'harmonyos',
+        },
+      ],
+    })
+  })
+
   it.each([
     [{ ...item, downloads: [item.downloads[0]] }],
     [{ ...item, downloads: [...item.downloads, item.downloads[0]] }],

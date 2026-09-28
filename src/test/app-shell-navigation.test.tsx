@@ -11,6 +11,7 @@ import {
   customPagesApi,
   type CustomPage,
 } from '@/features/custom-pages/custom-pages-api'
+import { helpApi } from '@/features/help/help-api'
 import { noticesApi } from '@/features/notices/notices-api'
 import { ordersApi } from '@/features/orders/orders-api'
 import { subscriptionApi } from '@/features/subscription/subscription-api'
@@ -30,6 +31,13 @@ const iframePage: CustomPage = {
 }
 
 function installNavigationMocks() {
+  vi.spyOn(helpApi, 'getCategories').mockResolvedValue({ categories: [] })
+  vi.spyOn(helpApi, 'getArticles').mockResolvedValue({
+    items: [],
+    page: 1,
+    pageSize: 20,
+    total: 0,
+  })
   vi.mocked(customPagesApi.getList).mockResolvedValue({ items: [iframePage] })
   vi.spyOn(subscriptionApi, 'getOverview').mockResolvedValue({
     product: null,
@@ -102,6 +110,7 @@ async function expectMobileNavigationClosed() {
 describe('App shell navigation', () => {
   it.each([
     ['Orders', '/orders'],
+    ['帮助中心', '/help'],
     ['使用指南', '/custom/guide'],
   ])(
     'closes the mobile sheet after navigating to %s',

@@ -1,5 +1,6 @@
 import {
   Bell,
+  BookOpen,
   Boxes,
   CircleUserRound,
   CreditCard,
@@ -25,6 +26,7 @@ export type AppPath =
   | '/orders'
   | '/wallet'
   | '/notices'
+  | '/help'
   | '/support'
   | '/referrals'
   | '/settings'
@@ -73,6 +75,7 @@ const coreNavigationItems: InternalNavigationItem[] = [
   { kind: 'internal', label: 'Orders', to: '/orders', icon: ReceiptText },
   { kind: 'internal', label: 'Wallet', to: '/wallet', icon: WalletCards },
   { kind: 'internal', label: 'Notices', to: '/notices', icon: Bell },
+  { kind: 'internal', label: '帮助中心', to: '/help', icon: BookOpen },
   { kind: 'internal', label: 'Support', to: '/support', icon: Headphones },
   { kind: 'internal', label: 'Referrals', to: '/referrals', icon: Share2 },
 ]
@@ -116,6 +119,7 @@ export function getNavigationPageTitle(
   pathname: string,
   pages: readonly CustomPage[],
 ) {
+  if (pathname.startsWith('/help/')) return '帮助中心'
   const item = buildNavigationItems(pages).find((candidate) => {
     if (candidate.kind === 'internal') return candidate.to === pathname
     if (candidate.kind === 'custom-iframe') return candidate.path === pathname

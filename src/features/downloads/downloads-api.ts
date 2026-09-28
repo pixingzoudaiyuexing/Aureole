@@ -40,7 +40,7 @@ const downloadItemSchema = z
   .object({
     id: z.string().min(1),
     label: z.string().min(1),
-    platform: z.enum(['windows', 'macos', 'android', 'linux']),
+    platform: z.enum(['windows', 'macos', 'android', 'harmonyos', 'linux']),
     arch: z.string().min(1).nullable(),
     version: z.string().min(1),
     publishedAt: z.string().min(1).nullable(),
