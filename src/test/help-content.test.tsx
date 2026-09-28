@@ -23,13 +23,13 @@ describe('Help typed content', () => {
     ]
     const { container } = render(<HelpArticleContent blocks={blocks} />)
     expect(
-      screen.getByRole('heading', { name: '一级', level: 2 }),
+      screen.getByRole('heading', { name: '一级', level: 1 }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { name: '二级', level: 3 }),
+      screen.getByRole('heading', { name: '二级', level: 2 }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { name: '三级', level: 4 }),
+      screen.getByRole('heading', { name: '三级', level: 3 }),
     ).toBeInTheDocument()
     expect(screen.getByText('<script>bad()</script>')).toBeInTheDocument()
     expect(container.querySelector('script')).toBeNull()

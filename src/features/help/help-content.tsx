@@ -107,10 +107,10 @@ function HelpBlockView({ block }: { block: HelpBlock }) {
   if (block.type === 'heading') {
     const content = <HelpInlines items={block.children} />
     if (block.level === 1)
-      return <h2 className="break-words text-xl font-semibold">{content}</h2>
+      return <h1 className="break-words text-xl font-semibold">{content}</h1>
     if (block.level === 2)
-      return <h3 className="break-words text-lg font-semibold">{content}</h3>
-    return <h4 className="break-words text-base font-semibold">{content}</h4>
+      return <h2 className="break-words text-lg font-semibold">{content}</h2>
+    return <h3 className="break-words text-base font-semibold">{content}</h3>
   }
   const items = block.items.map((item, index) => (
     <li className="break-words pl-1" key={index}>
