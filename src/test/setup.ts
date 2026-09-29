@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
 import { customPagesApi } from '@/features/custom-pages/custom-pages-api'
+import { navigationApi } from '@/features/navigation/navigation-api'
 import { runtimeSettingsApi } from '@/features/runtime-settings/runtime-settings-api'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
 import { resetSessionSafetyRuntimeForTests } from '@/lib/auth/session-safety-storage'
@@ -18,6 +19,9 @@ beforeEach(() => {
     .querySelector<HTMLMetaElement>('meta[name="description"]')
     ?.setAttribute('content', 'Aureole account and subscription management')
   vi.spyOn(customPagesApi, 'getList').mockResolvedValue({ items: [] })
+  vi.spyOn(navigationApi, 'getList').mockImplementation(
+    () => new Promise(() => {}),
+  )
   vi.spyOn(runtimeSettingsApi, 'getRuntimeSettings').mockResolvedValue({
     siteName: null,
     brandName: null,

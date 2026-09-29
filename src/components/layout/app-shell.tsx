@@ -7,19 +7,25 @@ import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { getNavigationPageTitle } from '@/config/navigation'
+import {
+  getNavigationPageTitle,
+  resolveNavigationItems,
+} from '@/config/navigation'
 import { AccountSummary } from '@/features/auth/account-summary'
 import { AnnouncementsSurface } from '@/features/announcements/announcements-surface'
 import { useExitOnInvalidSessionError } from '@/features/auth/use-exit-on-invalid-session-error'
 import { useCustomPages } from '@/features/custom-pages/custom-pages-queries'
 import { isCustomPageRoutePath } from '@/features/custom-pages/custom-pages-routing'
+import { useNavigation } from '@/features/navigation/navigation-queries'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
 import { cn } from '@/lib/utils'
 
 export function AppShell() {
   const accessToken = useAuthSessionStore((state) => state.accessToken)
   const customPagesQuery = useCustomPages(accessToken)
+  const navigationQuery = useNavigation(accessToken)
   useExitOnInvalidSessionError(customPagesQuery.error)
+  useExitOnInvalidSessionError(navigationQuery.error)
 
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
@@ -27,7 +33,15 @@ export function AppShell() {
   const customPages = customPagesQuery.isError
     ? []
     : (customPagesQuery.data?.items ?? [])
-  const pageTitle = getNavigationPageTitle(pathname, customPages)
+  const navigationItems = resolveNavigationItems(
+    navigationQuery.isSuccess ? navigationQuery.data : null,
+    customPages,
+  )
+  const pageTitle = getNavigationPageTitle(
+    pathname,
+    customPages,
+    navigationItems,
+  )
   const customPageLayout = isCustomPageRoutePath(pathname)
   const [mobileNavigationPath, setMobileNavigationPath] = useState<
     string | null
@@ -45,7 +59,7 @@ export function AppShell() {
           <Brand />
         </div>
         <Separator />
-        <SidebarNavigation customPages={customPages} />
+        <SidebarNavigation items={navigationItems} />
         <AccountSummary />
       </aside>
 
@@ -77,7 +91,7 @@ export function AppShell() {
                   <Brand />
                 </div>
                 <Separator />
-                <SidebarNavigation customPages={customPages} closeOnNavigate />
+                <SidebarNavigation items={navigationItems} closeOnNavigate />
                 <AccountSummary />
               </SheetContent>
             </Sheet>

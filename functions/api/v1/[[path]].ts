@@ -40,6 +40,7 @@ const SESSION_POST = new Set(['/api/v1/auth/login', '/api/v1/auth/register'])
 const OPTIONAL_GET = new Set(['/api/v1/announcements'])
 const PROTECTED: Record<string, RegExp[]> = {
   GET: [
+    /^\/api\/v1\/navigation$/,
     /^\/api\/v1\/(?:me|me\/preferences|me\/stats|wallet|products|products\/[A-Za-z0-9_-]+|orders|orders\/[A-Za-z0-9_-]+|orders\/[A-Za-z0-9_-]+\/status|billing\/methods|subscription|subscription\/(?:overview|entries|delivery-options)|resources|apple-ids|tickets|tickets\/[A-Za-z0-9_-]+|notices|notices\/[A-Za-z0-9_-]+|custom-pages|traffic\/logs|referrals|referrals\/commissions|referrals\/withdrawal-options|config\/account)$/,
     /^\/api\/v1\/help\/(?:categories|articles|articles\/[1-9]\d*)$/,
   ],

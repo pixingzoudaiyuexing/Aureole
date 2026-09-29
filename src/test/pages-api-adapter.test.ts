@@ -179,6 +179,43 @@ describe('Cloudflare Pages same-origin API boundary', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
+  it('treats only the exact Navigation GET as protected', async () => {
+    expect(
+      (await onRequest({ request: request('navigation'), env })).status,
+    ).toBe(401)
+    expect(
+      (
+        await onRequest({
+          request: request('navigation', {
+            headers: { authorization: 'Bearer legacy' },
+          }),
+          env,
+        })
+      ).status,
+    ).toBe(401)
+    for (const path of [
+      'navigation/items',
+      'navigation/settings',
+      'navigation-extra',
+    ]) {
+      expect((await onRequest({ request: request(path), env })).status).toBe(
+        404,
+      )
+    }
+    expect(
+      (
+        await onRequest({
+          request: request('navigation', {
+            method: 'POST',
+            headers: { origin },
+          }),
+          env,
+        })
+      ).status,
+    ).toBe(404)
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it('allows only exact authenticated Help GET paths', async () => {
     for (const path of [
       'help/categories',

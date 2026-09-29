@@ -1,7 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { SheetClose } from '@/components/ui/sheet'
-import { buildNavigationItems, type NavigationItem } from '@/config/navigation'
-import type { CustomPage } from '@/features/custom-pages/custom-pages-api'
+import type { NavigationItem } from '@/config/navigation'
 
 const linkClassName =
   'group relative flex min-h-11 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring'
@@ -53,17 +52,15 @@ function NavigationLink({ item }: { item: NavigationItem }) {
 }
 
 export function SidebarNavigation({
-  customPages,
+  items,
   closeOnNavigate = false,
 }: {
-  customPages: readonly CustomPage[]
+  items: readonly NavigationItem[]
   closeOnNavigate?: boolean
 }) {
-  const navigationItems = buildNavigationItems(customPages)
-
   return (
     <nav className="flex flex-1 flex-col gap-1 px-3 py-4" aria-label="Primary">
-      {navigationItems.map((item) => {
+      {items.map((item) => {
         const key =
           item.kind === 'internal' ? item.to : `${item.kind}:${item.id}`
         const link = <NavigationLink item={item} />
