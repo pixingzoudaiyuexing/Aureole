@@ -12,7 +12,7 @@ import { formatMinorMoney } from '@/features/catalog/money-format'
 import { formatBytes } from '@/features/subscription/subscription-format'
 import { useSubscriptionOverview } from '@/features/subscription/subscription-queries'
 import { useWallet } from '@/features/wallet/wallet-queries'
-import { useRuntimeSettingsQuery } from '@/features/runtime-settings/runtime-settings-queries'
+import { useRuntimeSettings } from '@/features/runtime-settings/runtime-settings-context'
 import { useAuthSessionStore } from '@/lib/auth/session-store'
 import {
   CRISP_SCRIPT_ID,
@@ -199,8 +199,7 @@ function ConfiguredCrispIntegration({ websiteId }: { websiteId: string }) {
 }
 
 export function CrispIntegration() {
-  const settings = useRuntimeSettingsQuery()
-  const websiteId = settings.isSuccess ? settings.data.crispWebsiteId : null
+  const websiteId = useRuntimeSettings().crispWebsiteId
   const previousWebsiteId = useRef<string | null>(null)
 
   useLayoutEffect(() => {

@@ -71,7 +71,7 @@ function RuntimeHarness() {
 function renderRuntime(queryClient: QueryClient = createNoRetryQueryClient()) {
   const result = render(
     <QueryClientProvider client={queryClient}>
-      <RuntimeSettingsProvider>
+      <RuntimeSettingsProvider queryClient={queryClient}>
         <RuntimeHarness />
       </RuntimeSettingsProvider>
     </QueryClientProvider>,

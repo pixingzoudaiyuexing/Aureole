@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createQueryClient } from '@/app/providers/query-client'
+import { AppProviders } from '@/app/providers/app-providers'
+import { createAppRouter } from '@/app/router/router'
 import { accountApi } from '@/features/account/account-api'
 import type { CurrentUser } from '@/features/auth/auth-api'
 import { AuthContext, type AuthStatus } from '@/features/auth/auth-context'
@@ -16,7 +18,11 @@ import {
   describeClient,
   type CrispCommand,
 } from '@/features/crisp/crisp-runtime'
-import { runtimeSettingsApi } from '@/features/runtime-settings/runtime-settings-api'
+import {
+  runtimeSettingsApi,
+  type RuntimeSettings,
+} from '@/features/runtime-settings/runtime-settings-api'
+import { RuntimeSettingsProvider } from '@/features/runtime-settings/runtime-settings-provider'
 import {
   subscriptionApi,
   type SubscriptionOverview,
@@ -102,20 +108,22 @@ function setup({
   }
   const tree = (status: AuthStatus, currentUser: CurrentUser | null) => (
     <QueryClientProvider client={queryClient}>
-      <AuthContext.Provider
-        value={{
-          status,
-          currentUser,
-          bootstrapError: null,
-          establishSession: vi.fn(),
-          signIn: vi.fn(),
-          retryBootstrap: vi.fn(),
-          logout: vi.fn(),
-          sessionInvalidated: vi.fn(),
-        }}
-      >
-        <CrispIntegration />
-      </AuthContext.Provider>
+      <RuntimeSettingsProvider queryClient={queryClient}>
+        <AuthContext.Provider
+          value={{
+            status,
+            currentUser,
+            bootstrapError: null,
+            establishSession: vi.fn(),
+            signIn: vi.fn(),
+            retryBootstrap: vi.fn(),
+            logout: vi.fn(),
+            sessionInvalidated: vi.fn(),
+          }}
+        >
+          <CrispIntegration />
+        </AuthContext.Provider>
+      </RuntimeSettingsProvider>
     </QueryClientProvider>
   )
   const wrap = (status: AuthStatus, currentUser: CurrentUser | null) =>
@@ -148,6 +156,40 @@ afterEach(() => {
 })
 
 describe('Crisp integration', () => {
+  it('boots on the public login route after AuthProvider clears the initial query cache', async () => {
+    let resolveSettings!: (value: RuntimeSettings) => void
+    vi.mocked(runtimeSettingsApi.getRuntimeSettings).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSettings = resolve
+        }),
+    )
+    const authApi = {
+      login: vi.fn(),
+      getCurrentUser: vi.fn().mockRejectedValue(
+        new ApiError({
+          status: 401,
+          code: 'AUTH_REQUIRED',
+          message: 'No session',
+        }),
+      ),
+    }
+    render(
+      <AppProviders
+        router={createAppRouter({ initialEntries: ['/login'] })}
+        authApi={authApi}
+        queryClient={createQueryClient()}
+      />,
+    )
+    await screen.findByRole('heading', { name: '登录 Aureole' })
+    await act(async () =>
+      resolveSettings({ ...settings, siteName: 'Configured TEST' }),
+    )
+    await waitFor(() =>
+      expect(document.getElementById(CRISP_SCRIPT_ID)).not.toBeNull(),
+    )
+    expect(window.CRISP_WEBSITE_ID).toBe(websiteId)
+  })
   it('does not bootstrap or query private data when runtime ID is null', async () => {
     const { subscription, wallet, config } = setup({ configured: false })
     await waitFor(() =>
@@ -440,10 +482,12 @@ describe('Crisp integration', () => {
     }
     render(
       <QueryClientProvider client={createQueryClient()}>
-        <AuthProvider api={authApi}>
-          <CrispIntegration />
-          <AuthHarness />
-        </AuthProvider>
+        <RuntimeSettingsProvider>
+          <AuthProvider api={authApi}>
+            <CrispIntegration />
+            <AuthHarness />
+          </AuthProvider>
+        </RuntimeSettingsProvider>
       </QueryClientProvider>,
     )
     await waitFor(() =>
