@@ -39,6 +39,7 @@ export function verifyCspPolicy(headersContent) {
     "'self'",
     'https://client.crisp.chat',
     'wss://client.relay.crisp.chat',
+    'wss://client.relay.rescue.crisp.chat',
   ])
   requireExactDirective(csp, 'style-src', [
     "'self'",
