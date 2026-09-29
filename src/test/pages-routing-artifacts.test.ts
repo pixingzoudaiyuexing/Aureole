@@ -179,11 +179,14 @@ describe('Cloudflare Pages Routing Artifacts', () => {
     expect(csp).toContain("object-src 'none'")
     expect(csp).toContain("frame-ancestors 'none'")
     expect(csp).toContain("form-action 'self'")
-    expect(csp).toContain("connect-src 'self'")
+    expect(csp).toContain(
+      "connect-src 'self' https://client.crisp.chat wss://client.relay.crisp.chat",
+    )
     expect(csp).toContain("script-src 'self' 'sha256-")
+    expect(csp).toContain('https://client.crisp.chat')
     expect(csp).toContain("style-src 'self' 'unsafe-inline'")
     expect(csp).toContain("img-src 'self' data: https:")
-    expect(csp).toContain("font-src 'self' data:")
+    expect(csp).toContain("font-src 'self' data: https://client.crisp.chat")
     expect(csp).toContain('frame-src https:')
 
     // Should NOT contain unsafe things

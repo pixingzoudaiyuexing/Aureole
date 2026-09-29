@@ -27,6 +27,7 @@ const allNullSettings: RuntimeSettings = {
   logoUrl: null,
   faviconUrl: null,
   footerText: null,
+  crispWebsiteId: null,
 }
 
 const configuredSettings: RuntimeSettings = {
@@ -37,6 +38,7 @@ const configuredSettings: RuntimeSettings = {
   logoUrl: 'https://assets.example.com/logo.png',
   faviconUrl: 'https://assets.example.com/favicon.ico',
   footerText: 'Aureole Services',
+  crispWebsiteId: null,
 }
 
 const currentUser: CurrentUser = {

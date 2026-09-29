@@ -15,7 +15,7 @@ describe('CSP Hash Drift Verification', () => {
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 /*
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; connect-src 'self'; script-src 'self' ${hashes.join(' ')}; frame-src https:
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; connect-src 'self' https://client.crisp.chat wss://client.relay.crisp.chat; script-src 'self' ${hashes.join(' ')} https://client.crisp.chat; style-src 'self' 'unsafe-inline' https://client.crisp.chat; font-src 'self' data: https://client.crisp.chat; frame-src https:
 `
 
   it('CASE A: current one inline theme script + correct hash → PASS', () => {
@@ -263,5 +263,25 @@ describe('CSP Hash Drift Verification', () => {
       'connect-src *',
     )
     expect(() => verifyCspPolicy(headers)).toThrowError('connect-src')
+  })
+
+  it('rejects extra Crisp-unrelated script and connection origins', () => {
+    const headers = buildHeaders([getHash('theme')])
+    expect(() =>
+      verifyCspPolicy(
+        headers.replace(
+          'wss://client.relay.crisp.chat; script-src',
+          'wss://other.example; script-src',
+        ),
+      ),
+    ).toThrowError('connect-src')
+    expect(() =>
+      verifyCspPolicy(
+        headers.replace(
+          'https://client.crisp.chat; style-src',
+          'https://other.example; style-src',
+        ),
+      ),
+    ).toThrowError('script-src')
   })
 })

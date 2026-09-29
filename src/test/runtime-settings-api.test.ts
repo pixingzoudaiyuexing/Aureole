@@ -15,6 +15,7 @@ const allNullSettings = {
   logoUrl: null,
   faviconUrl: null,
   footerText: null,
+  crispWebsiteId: null,
 }
 
 const validSettings = {
@@ -25,6 +26,7 @@ const validSettings = {
   logoUrl: 'https://assets.example.com/logo.png',
   faviconUrl: 'https://assets.example.com/favicon.ico',
   footerText: 'Aureole Services',
+  crispWebsiteId: null,
 }
 
 describe('Runtime Settings API contract', () => {
@@ -51,6 +53,16 @@ describe('Runtime Settings API contract', () => {
     expect(parseRuntimeSettings(allNullSettings)).toEqual(allNullSettings)
   })
 
+  it('accepts a runtime Crisp Website ID without changing branding fields', () => {
+    const websiteId = '11111111-1111-4111-8111-111111111111'
+    expect(
+      parseRuntimeSettings({ ...validSettings, crispWebsiteId: websiteId }),
+    ).toEqual({
+      ...validSettings,
+      crispWebsiteId: websiteId,
+    })
+  })
+
   it('strips additive fields without exposing Registry metadata', () => {
     expect(
       parseRuntimeSettings({
@@ -68,6 +80,14 @@ describe('Runtime Settings API contract', () => {
     ['boolean title', { ...allNullSettings, title: true }],
     ['object description', { ...allNullSettings, description: {} }],
     ['array footerText', { ...allNullSettings, footerText: [] }],
+    [
+      'missing Crisp Website ID',
+      { ...allNullSettings, crispWebsiteId: undefined },
+    ],
+    [
+      'malformed Crisp Website ID',
+      { ...allNullSettings, crispWebsiteId: 'not-a-uuid' },
+    ],
   ])('fails closed for a %s', (_case, payload) => {
     expect(() => parseRuntimeSettings(payload)).toThrowError(
       expect.objectContaining({
