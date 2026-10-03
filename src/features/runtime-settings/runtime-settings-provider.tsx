@@ -77,7 +77,7 @@ export function RuntimeSettingsProvider({
   children: ReactNode
   queryClient?: QueryClient
 }) {
-  // Public configuration must survive AuthProvider clearing private query state.
+  // Public configuration survives AuthProvider clearing its private query cache.
   const [publicQueryClient] = useState(createQueryClient)
   const runtimeSettingsQuery = useRuntimeSettingsQuery(
     providedQueryClient ?? publicQueryClient,

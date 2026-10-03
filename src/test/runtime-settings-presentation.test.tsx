@@ -313,6 +313,20 @@ describe('Runtime Settings presentation', () => {
     expect(screen.getByText('Return to sign in')).toBeInTheDocument()
   })
 
+  it('retains public branding when Auth clears private query data', async () => {
+    vi.mocked(runtimeSettingsApi.getRuntimeSettings).mockResolvedValue(
+      configuredSettings,
+    )
+    const { queryClient } = renderRoute('/login')
+    expect(await screen.findAllByText('Aureole Plus')).not.toHaveLength(0)
+
+    act(() => queryClient.clear())
+
+    expect(screen.getAllByText('Aureole Plus')).not.toHaveLength(0)
+    expect(document.title).toBe('Aureole Plus Portal')
+    expect(runtimeSettingsApi.getRuntimeSettings).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps the authenticated AppShell and Auth state when Runtime Settings fails', async () => {
     window.sessionStorage.setItem(
       AUTH_SESSION_STORAGE_KEY,

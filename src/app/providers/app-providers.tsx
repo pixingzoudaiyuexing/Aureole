@@ -4,8 +4,9 @@ import { useState } from 'react'
 import type { AppRouter } from '@/app/router/router'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthProvider } from '@/features/auth/auth-provider'
-import { CrispIntegration } from '@/features/crisp/crisp-integration'
 import type { AuthApi } from '@/features/auth/auth-api'
+import { CrispLoader } from '@/features/crisp/crisp-loader'
+import { CrispMetadata } from '@/features/crisp/crisp-metadata'
 import { RuntimeSettingsProvider } from '@/features/runtime-settings/runtime-settings-provider'
 import { createQueryClient } from './query-client'
 import { ThemeProvider } from './theme-provider'
@@ -26,8 +27,9 @@ export function AppProviders({
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <RuntimeSettingsProvider>
+          <CrispLoader />
           <AuthProvider api={authApi}>
-            <CrispIntegration />
+            <CrispMetadata />
             <TooltipProvider delayDuration={250}>
               <RouterProvider router={router} />
             </TooltipProvider>

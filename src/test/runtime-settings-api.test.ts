@@ -49,18 +49,17 @@ describe('Runtime Settings API contract', () => {
     expect(JSON.stringify(request.mock.calls[0])).not.toContain('Authorization')
   })
 
-  it('accepts all seven nullable public fields', () => {
+  it('accepts the nullable Crisp ID and rejects invalid values', () => {
     expect(parseRuntimeSettings(allNullSettings)).toEqual(allNullSettings)
-  })
-
-  it('accepts a runtime Crisp Website ID without changing branding fields', () => {
-    const websiteId = '11111111-1111-4111-8111-111111111111'
+    const websiteId = 'f2f29d4a-625e-4613-bd18-6ae788aac471'
     expect(
       parseRuntimeSettings({ ...validSettings, crispWebsiteId: websiteId }),
-    ).toEqual({
-      ...validSettings,
-      crispWebsiteId: websiteId,
-    })
+    ).toMatchObject({ crispWebsiteId: websiteId })
+    for (const crispWebsiteId of [undefined, 'not-a-uuid', 123]) {
+      expect(() =>
+        parseRuntimeSettings({ ...validSettings, crispWebsiteId }),
+      ).toThrowError(expect.objectContaining({ code: 'MALFORMED_RESPONSE' }))
+    }
   })
 
   it('strips additive fields without exposing Registry metadata', () => {
@@ -80,14 +79,6 @@ describe('Runtime Settings API contract', () => {
     ['boolean title', { ...allNullSettings, title: true }],
     ['object description', { ...allNullSettings, description: {} }],
     ['array footerText', { ...allNullSettings, footerText: [] }],
-    [
-      'missing Crisp Website ID',
-      { ...allNullSettings, crispWebsiteId: undefined },
-    ],
-    [
-      'malformed Crisp Website ID',
-      { ...allNullSettings, crispWebsiteId: 'not-a-uuid' },
-    ],
   ])('fails closed for a %s', (_case, payload) => {
     expect(() => parseRuntimeSettings(payload)).toThrowError(
       expect.objectContaining({

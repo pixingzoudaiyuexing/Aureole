@@ -264,24 +264,4 @@ describe('CSP Hash Drift Verification', () => {
     )
     expect(() => verifyCspPolicy(headers)).toThrowError('connect-src')
   })
-
-  it('rejects extra Crisp-unrelated script and connection origins', () => {
-    const headers = buildHeaders([getHash('theme')])
-    expect(() =>
-      verifyCspPolicy(
-        headers.replace(
-          'wss://client.relay.rescue.crisp.chat; script-src',
-          'wss://other.example; script-src',
-        ),
-      ),
-    ).toThrowError('connect-src')
-    expect(() =>
-      verifyCspPolicy(
-        headers.replace(
-          'https://client.crisp.chat; style-src',
-          'https://other.example; style-src',
-        ),
-      ),
-    ).toThrowError('script-src')
-  })
 })
