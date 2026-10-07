@@ -15,7 +15,6 @@ const allNullSettings = {
   logoUrl: null,
   faviconUrl: null,
   footerText: null,
-  crispWebsiteId: null,
 }
 
 const validSettings = {
@@ -26,7 +25,6 @@ const validSettings = {
   logoUrl: 'https://assets.example.com/logo.png',
   faviconUrl: 'https://assets.example.com/favicon.ico',
   footerText: 'Aureole Services',
-  crispWebsiteId: null,
 }
 
 describe('Runtime Settings API contract', () => {
@@ -49,17 +47,8 @@ describe('Runtime Settings API contract', () => {
     expect(JSON.stringify(request.mock.calls[0])).not.toContain('Authorization')
   })
 
-  it('accepts the nullable Crisp ID and rejects invalid values', () => {
+  it('accepts all seven nullable public fields', () => {
     expect(parseRuntimeSettings(allNullSettings)).toEqual(allNullSettings)
-    const websiteId = 'f2f29d4a-625e-4613-bd18-6ae788aac471'
-    expect(
-      parseRuntimeSettings({ ...validSettings, crispWebsiteId: websiteId }),
-    ).toMatchObject({ crispWebsiteId: websiteId })
-    for (const crispWebsiteId of [undefined, 'not-a-uuid', 123]) {
-      expect(() =>
-        parseRuntimeSettings({ ...validSettings, crispWebsiteId }),
-      ).toThrowError(expect.objectContaining({ code: 'MALFORMED_RESPONSE' }))
-    }
   })
 
   it('strips additive fields without exposing Registry metadata', () => {

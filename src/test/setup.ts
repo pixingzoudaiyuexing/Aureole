@@ -30,7 +30,6 @@ beforeEach(() => {
     logoUrl: null,
     faviconUrl: null,
     footerText: null,
-    crispWebsiteId: null,
   })
 })
 

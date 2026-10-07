@@ -38,7 +38,6 @@ const runtimeSettingsSchema = z
     logoUrl: runtimeSettingsUrlSchema.nullable(),
     faviconUrl: runtimeSettingsUrlSchema.nullable(),
     footerText: nullableTextSchema,
-    crispWebsiteId: z.string().uuid().nullable(),
   })
   .strip()
 

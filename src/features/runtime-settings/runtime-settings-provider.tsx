@@ -1,6 +1,4 @@
-import type { QueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { createQueryClient } from '@/app/providers/query-client'
+import { useEffect, useMemo, type ReactNode } from 'react'
 import { RuntimeSettingsContextProvider } from './runtime-settings-context'
 import {
   compiledRuntimeSettings,
@@ -70,18 +68,8 @@ function RuntimeSettingsDocumentEffects({
   return null
 }
 
-export function RuntimeSettingsProvider({
-  children,
-  queryClient: providedQueryClient,
-}: {
-  children: ReactNode
-  queryClient?: QueryClient
-}) {
-  // Public configuration survives AuthProvider clearing its private query cache.
-  const [publicQueryClient] = useState(createQueryClient)
-  const runtimeSettingsQuery = useRuntimeSettingsQuery(
-    providedQueryClient ?? publicQueryClient,
-  )
+export function RuntimeSettingsProvider({ children }: { children: ReactNode }) {
+  const runtimeSettingsQuery = useRuntimeSettingsQuery()
   const settings = runtimeSettingsQuery.isSuccess
     ? runtimeSettingsQuery.data
     : null
@@ -91,12 +79,7 @@ export function RuntimeSettingsProvider({
   )
 
   return (
-    <RuntimeSettingsContextProvider
-      value={{
-        ...effectiveSettings,
-        crispWebsiteId: settings?.crispWebsiteId ?? null,
-      }}
-    >
+    <RuntimeSettingsContextProvider value={effectiveSettings}>
       <RuntimeSettingsDocumentEffects
         settings={effectiveSettings}
         runtimeSettings={settings}

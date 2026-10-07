@@ -15,7 +15,7 @@ describe('CSP Hash Drift Verification', () => {
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 /*
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; connect-src 'self' https://client.crisp.chat wss://client.relay.crisp.chat wss://client.relay.rescue.crisp.chat; script-src 'self' ${hashes.join(' ')} https://client.crisp.chat; style-src 'self' 'unsafe-inline' https://client.crisp.chat; font-src 'self' data: https://client.crisp.chat; frame-src https:
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; connect-src 'self'; script-src 'self' ${hashes.join(' ')}; frame-src https:
 `
 
   it('CASE A: current one inline theme script + correct hash → PASS', () => {

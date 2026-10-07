@@ -27,7 +27,6 @@ const allNullSettings: RuntimeSettings = {
   logoUrl: null,
   faviconUrl: null,
   footerText: null,
-  crispWebsiteId: null,
 }
 
 const configuredSettings: RuntimeSettings = {
@@ -38,7 +37,6 @@ const configuredSettings: RuntimeSettings = {
   logoUrl: 'https://assets.example.com/logo.png',
   faviconUrl: 'https://assets.example.com/favicon.ico',
   footerText: 'Aureole Services',
-  crispWebsiteId: null,
 }
 
 const currentUser: CurrentUser = {
@@ -71,7 +69,7 @@ function RuntimeHarness() {
 function renderRuntime(queryClient: QueryClient = createNoRetryQueryClient()) {
   const result = render(
     <QueryClientProvider client={queryClient}>
-      <RuntimeSettingsProvider queryClient={queryClient}>
+      <RuntimeSettingsProvider>
         <RuntimeHarness />
       </RuntimeSettingsProvider>
     </QueryClientProvider>,
@@ -311,20 +309,6 @@ describe('Runtime Settings presentation', () => {
     expect(await screen.findAllByText('Aureole Plus')).not.toHaveLength(0)
     expect(screen.getAllByText('Aureole Services')).toHaveLength(1)
     expect(screen.getByText('Return to sign in')).toBeInTheDocument()
-  })
-
-  it('retains public branding when Auth clears private query data', async () => {
-    vi.mocked(runtimeSettingsApi.getRuntimeSettings).mockResolvedValue(
-      configuredSettings,
-    )
-    const { queryClient } = renderRoute('/login')
-    expect(await screen.findAllByText('Aureole Plus')).not.toHaveLength(0)
-
-    act(() => queryClient.clear())
-
-    expect(screen.getAllByText('Aureole Plus')).not.toHaveLength(0)
-    expect(document.title).toBe('Aureole Plus Portal')
-    expect(runtimeSettingsApi.getRuntimeSettings).toHaveBeenCalledTimes(1)
   })
 
   it('keeps the authenticated AppShell and Auth state when Runtime Settings fails', async () => {
