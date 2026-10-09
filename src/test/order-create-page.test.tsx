@@ -130,6 +130,76 @@ async function selectMonthAndConfirm(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('Order Create flow', () => {
+  it('shares ordered feature text between list/detail while preserving price, promotion and create payload', async () => {
+    const mocks = installMocks()
+    const features = [
+      { feature: 'Streaming', support: true },
+      { feature: '<img src=x onerror=alert(1)>', support: false },
+      { feature: 'Streaming', support: true },
+    ]
+    mocks.getProducts.mockResolvedValue([{ ...product, features }])
+    mocks.getProduct.mockResolvedValue({ ...product, features })
+    renderPlans()
+    await screen.findByText('Pro Plan')
+    const list = screen.getByRole('list', { name: '套餐功能' })
+    const expected = [
+      '支持Streaming',
+      '不支持<img src=x onerror=alert(1)>',
+      '支持Streaming',
+    ]
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(expected)
+    expect(screen.getByText('¥9.90 CNY')).toBeInTheDocument()
+    expect(screen.getByText('容量状态：暂不可用')).toBeInTheDocument()
+    const { dialog, user } = await openCreateDialog()
+    const detailList = within(dialog).getByRole('list', { name: '套餐功能' })
+    expect(
+      within(detailList)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(expected)
+    expect(detailList.querySelector('img')).toBeNull()
+    expect(within(dialog).getByText('套餐标价：¥9.90 CNY')).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('radio', { name: /月付/ }))
+    await user.type(within(dialog).getByLabelText('优惠码（可选）'), 'PROMO')
+    await user.click(within(dialog).getByRole('button', { name: '验证优惠码' }))
+    await within(dialog).findByText('优惠预览：固定金额优惠 ¥5.00 CNY')
+    expect(mocks.validate).toHaveBeenCalledWith(expect.any(String), {
+      code: 'PROMO',
+      productId: 7,
+    })
+    expect(mocks.create).not.toHaveBeenCalled()
+    await user.click(
+      within(dialog).getByRole('button', { name: '确认创建订单' }),
+    )
+    await within(dialog).findByText('订单已创建')
+    expect(mocks.create).toHaveBeenCalledExactlyOnceWith(expect.any(String), {
+      productId: '7',
+      billingPeriod: 'month',
+      promotionCode: 'PROMO',
+    })
+  })
+
+  it.each([undefined, []])(
+    'keeps list/detail usable without feature rows',
+    async (features) => {
+      const mocks = installMocks()
+      mocks.getProducts.mockResolvedValue([{ ...product, features }])
+      mocks.getProduct.mockResolvedValue({ ...product, features })
+      renderPlans()
+      await screen.findByText('Pro Plan')
+      expect(screen.queryByRole('list', { name: '套餐功能' })).toBeNull()
+      const { dialog } = await openCreateDialog()
+      expect(
+        within(dialog).queryByRole('list', { name: '套餐功能' }),
+      ).toBeNull()
+      expect(within(dialog).getByRole('radio', { name: /月付/ })).toBeEnabled()
+    },
+  )
+
   it('loads Product Detail lazily, keeps unavailable as metadata, and restores focus', async () => {
     const mocks = installMocks()
     renderPlans()

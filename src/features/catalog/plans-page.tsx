@@ -11,6 +11,7 @@ import type { Product } from './catalog-api'
 import { billingPeriodLabels } from './billing-periods'
 import { useProducts } from './catalog-queries'
 import { formatMinorMoney } from './money-format'
+import { ProductFeatures } from './product-features'
 
 export function PlansPage() {
   const accessToken = useAuthSessionStore((state) => state.accessToken)
@@ -169,6 +170,7 @@ function ProductRow({
             </dd>
           </div>
         </dl>
+        <ProductFeatures features={product.features} />
       </div>
 
       <div className="min-w-0">

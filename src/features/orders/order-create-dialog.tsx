@@ -14,6 +14,7 @@ import {
 } from '@/features/catalog/catalog-api'
 import { useProductDetail } from '@/features/catalog/catalog-queries'
 import { formatMinorMoney } from '@/features/catalog/money-format'
+import { ProductFeatures } from '@/features/catalog/product-features'
 import { ReadError } from '@/components/shared/read-error'
 import { Button } from '@/components/ui/button'
 import {
@@ -313,6 +314,8 @@ export function OrderCreateDialog({
                   </dd>
                 </div>
               </dl>
+
+              <ProductFeatures features={product.data.features} />
 
               {config.isError ? (
                 <ReadError

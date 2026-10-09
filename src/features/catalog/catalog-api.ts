@@ -35,6 +35,9 @@ export const productSchema = z
     speedLimitMbps: safeIntegerSchema.nullable(),
     available: z.boolean(),
     prices: z.array(productPriceSchema),
+    features: z
+      .array(z.object({ feature: z.string(), support: z.boolean() }).strip())
+      .optional(),
   })
   .strip()
 const productsResponseSchema = z
